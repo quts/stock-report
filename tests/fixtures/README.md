@@ -5,6 +5,8 @@
 - TWSE／TPEx 的**欄位名稱與民國交易日格式已依實際探查樣本校正**
   （`reports/phase-0/provider-probes.json`：`Date=1151113`、`Code`／`Name`／`ClosingPrice`、
   `SecuritiesCompanyCode`／`CompanyName`／`Close`）。SEC 欄位契約仍未經實際回應核對。
+- `twse_income_general.json`／`tpex_income_general.json` 的 33 個欄位名稱與民國年度／季別／出表日期形狀
+  依 2026-11-15 實測回應形狀撰寫（見 `docs/phase-0/taiwan-financial-source-notes.md`）；公司列與所有數值皆為示意值。
 - 檔案中的**數值一律為示意值**，不是任何來源的實際數字：授權登錄檔尚未確認內部留存權限，
   因此不得把真實回應數值寫進版本控制。
 - 數值皆為示意值，刻意不等於任何真實市場或財報數字，不得用於任何研究結論。

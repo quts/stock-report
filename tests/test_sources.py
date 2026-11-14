@@ -289,7 +289,7 @@ def test_sec_non_adjacent_prior_year_is_left_missing():
     data[key]['units']['USD/shares'][1].update(start='2021-02-01', end='2022-01-30')
     result = sec(data=data)
     assert all(o.role != 'eps_prior' for o in result.observations)
-    assert any('不是相鄰年度' in note for note in result.notes)
+    assert any('期間起訖不相鄰' in note for note in result.notes)
 
 
 def test_sec_filing_before_period_end_is_rejected():
@@ -340,3 +340,22 @@ def test_unknown_source_or_profile_key_is_refused():
         merge_profile('nasdaq-free-feed')
     with pytest.raises(ValueError, match='Unknown profile key'):
         merge_profile('twse-openapi-stock-day-all', {'secret_backdoor': 1})
+
+
+def test_sec_adjacent_end_years_with_a_gap_are_not_a_comparable_prior_period():
+    """End years 2025 and 2024 look adjacent, but the prior window stops before the current one starts."""
+    data = payloads('sec_nvda_concepts.json')
+    key = 'revenue:RevenueFromContractWithCustomerExcludingAssessedTax'
+    facts = data[key]['units']['USD']
+    data[key]['units']['USD'] = [f for f in facts if f['end'] != '2024-01-28'] + [
+        {'start': '2023-01-02', 'end': '2024-01-01', 'val': 900000000, 'accn': '0001045810-24-000029',
+         'fy': 2024, 'fp': 'FY', 'form': '10-K', 'filed': '2024-02-21'}]
+    result = sec(data=data)
+    roles = {o.role: o for o in result.observations if o.role}
+    assert 'revenue_prior' not in roles
+    assert any('revenue 的前期與本期期間起訖不相鄰' in note for note in result.notes)
+    # Kept figures carry their original window, not just a fiscal-year label.
+    current = roles['revenue_current']
+    assert (current.period_start, current.period_end) == (date(2024, 1, 29), date(2025, 1, 26))
+    assert current.period_basis == 'fiscal_year' and current.period == 'FY2025'
+    assert roles['eps_prior'].period_end + timedelta(days=1) == roles['eps_current'].period_start

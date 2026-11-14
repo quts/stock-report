@@ -178,7 +178,10 @@ def inspection_record(collection):
             'entity_shape': {'exchange': collection.entity.exchange, 'currency': collection.entity.currency,
                              'share_class': collection.entity.share_class, 'name_present': True},
             'observations': [{'kind': o.kind, 'role': o.role, 'unit': o.unit, 'currency': o.currency,
-                              'publication_basis': o.publication_basis, 'value_present': o.value is not None}
+                              'publication_basis': o.publication_basis, 'period_basis': o.period_basis,
+                              'period_window_present': o.period_start is not None,
+                              'source_unit_declared': o.source_unit_raw is not None,
+                              'value_present': o.value is not None}
                              for o in collection.observations],
             'transport': [{k: v for k, v in row.items() if k in ('key', 'status', 'attempts', 'cached')}
                           for row in collection.transport],
@@ -239,7 +242,8 @@ def to_evidence(observation, request, license_snapshot, capture_mode, verified_c
     return Evidence(
         evidence_id=observation.evidence_id, entity_id=observation.entity_id, claim=observation.claim,
         kind=observation.kind, value=observation.value, unit=observation.unit, currency=observation.currency,
-        period=observation.period, source_url=observation.source_url, publisher=license_snapshot['publisher'],
+        period=observation.period, period_start=observation.period_start, period_end=observation.period_end,
+        period_basis=observation.period_basis, source_url=observation.source_url, publisher=license_snapshot['publisher'],
         source_type='official' if capture_mode == 'network' else 'synthetic',
         source_record_id=observation.provider_record_id, metric_key=observation.role,
         source_hash=response_hash if license_snapshot['store_response_hash'] else None,

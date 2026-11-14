@@ -38,7 +38,7 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke 
 
 `smoke`（`./scripts/runtime.sh smoke --allow-network`）是明示的真實來源探查，輸出
 `reports/phase-0/source-smoke.json`；`./scripts/runtime.sh test -m network` 另有同樣需明示的契約測試
-（預設以 `-m 'not network'` 排除）。未知內部保存權限時，兩者只保存欄位名稱、狀態與數量等檢視中繼資料，不保存來源數值，也不建立授權結論。
+（預設以 `-m 'not network'` 排除）。`./scripts/runtime.sh contract --allow-network --endpoint KEY [--code 2330]` 只在終端輸出白名單端點的欄位名稱、列數與字元類別形狀，不寫檔；`--cumulative-check twse|tpex` 只輸出損益表營收與月營收累計數的比值。未知內部保存權限時，兩者只保存欄位名稱、狀態與數量等檢視中繼資料，不保存來源數值，也不建立授權結論。
 
 `analyze --run DIRECTORY` 只輸出受控交換檔；Codex 在互動環境依證據產生提案。此命令不使用付費 API、不假裝已呼叫模型。`--synthetic` 僅允許 Mock，產生清楚標示為合成的測試提案。此版本沒有任意自然語言 shell 執行功能。
 

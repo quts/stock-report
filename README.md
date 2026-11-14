@@ -66,6 +66,9 @@ SEC 探查需要自行在 User-Agent 設定符合來源要求的聯絡資訊；�
 # 1) 採集（以下完整流程需先確認登錄的內部使用權；unknown 只輸出 inspection-record.json）
 ./scripts/runtime.sh cli collect --source twse-openapi-stock-day-all \
   --ticker 2330.TW --allow-network --output reports/collections
+# 台灣損益表摘要（一般業，最新一期年初至今累計）：twse-openapi-income-general／tpex-openapi-income-general
+./scripts/runtime.sh cli collect --source twse-openapi-income-general \
+  --ticker 2330.TW --allow-network --output reports/collections
 # SEC 需要操作人自行設定聯絡資訊，絕不取自登入資料，也不寫入任何輸出檔
 STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
   ./scripts/runtime.sh cli collect --source sec-xbrl-companyconcept \
@@ -85,7 +88,7 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
 ```
 
 授權狀態來自版本化登錄檔 `config/source-licenses.json`：`unknown` 不可分享也不可本機留存，
-`confirmed` 必須附人工逐字條款引用與具名 attestation。**目前三個來源都是 `unknown`**，
+`confirmed` 必須附人工逐字條款引用與具名 attestation。**目前五個來源都是 `unknown`**，
 因此 collect 目前只保存檢視用中繼資料，不能把該檔傳入 request-template／bundle 當成研究輸入。
 內部權限確認後需重新採集，才會產生 collection.json；核心證據不足時可輸出不足摘要。公開時間依來源分為
 來源宣告日期與「擷取當下可得性上界」；後者只適用最新時點研究，既有歷史時點不會被改寫。

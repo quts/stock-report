@@ -1,4 +1,5 @@
 """All numeric derivations are replayable Python calculations."""
+from datetime import timedelta
 import re
 from .models import Evidence, Metric
 
@@ -11,6 +12,41 @@ def usable(e: Evidence, cutoff) -> bool:
 def comparable_years(current, prior):
     a, b = re.fullmatch(r'FY(\d{4})', current or ''), re.fullmatch(r'FY(\d{4})', prior or '')
     return bool(a and b and int(a[1]) == int(b[1]) + 1)
+
+def has_window(e):
+    return e.period_start is not None and e.period_end is not None and e.period_basis is not None
+
+def window_problem(a, b, name):
+    """Why two figures may not be combined, judged on recorded windows rather than labels.
+
+    Evidence without recorded windows (synthetic fixtures) keeps the label-only rule. Official
+    evidence must carry its window, and once either side carries one both must agree: an equal
+    label or end year is never enough to equate two reporting windows.
+    """
+    official = a.source_type == 'official' or b.source_type == 'official'
+    if not has_window(a) and not has_window(b):
+        return '官方財務證據缺少期間起訖，不以期別標籤推定可比' if official else None
+    if not has_window(a) or not has_window(b):
+        return '僅一方記錄期間起訖，不以期別標籤推定可比'
+    if a.period_basis != b.period_basis:
+        return f'期間基礎不同（{a.period_basis} 與 {b.period_basis}），不可比較'
+    if name in ('revenue_growth', 'eps_growth'):
+        if a.period_basis != 'fiscal_year':
+            return f'期間基礎為 {a.period_basis}，來源未提供可比的前期同窗資料，不計算成長率'
+        if b.period_end + timedelta(days=1) != a.period_start:
+            return '前期與本期的期間起訖不相鄰，不因年度標籤相鄰而視為可比'
+    elif (a.period_start, a.period_end) != (b.period_start, b.period_end):
+        return '期間起訖不同，不因期別標籤或結束年度相同而視為同一期間'
+    return None
+
+def pe_problem(close, eps):
+    if eps.period != 'TTM' or (has_window(eps) and eps.period_basis != 'trailing_twelve_months') \
+            or (eps.source_type == 'official' and not has_window(eps)):
+        return (f'Not Applicable：需要正的 TTM EPS；現有 EPS 期間為 {eps.period or "未標示"}'
+                f'（{eps.period_basis or "未記錄期間基礎"}），不將年度、單季或累計 EPS 年化或冒充 TTM')
+    if eps.value <= 0 or close.value <= 0 or close.unit != 'per_share' or eps.unit != 'per_share':
+        return 'Not Applicable：需要正的 TTM EPS'
+    return None
 
 def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
     output = []
@@ -30,15 +66,21 @@ def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
             reason = None
             value = None
             if not a or not b:
-                reason = '缺少可核實且截止日前公開的數值'
+                missing = '、'.join(key for key, record in ((a_key, a), (b_key, b)) if not record)
+                reason = f'缺少可核實且截止日前公開的數值（{missing}）'
+                present = a or b
+                if present and present.period_basis == 'cumulative_ytd':
+                    reason += f'；現有 {present.period} 為年初至今累計數，不年化、不以其他期間替代'
             elif not a.currency or a.currency != b.currency:
                 reason = '幣別不一致，不可比較'
             elif name in ('revenue_growth', 'eps_growth') and (not comparable_years(a.period, b.period) or a.unit != b.unit):
                 reason = '期別或單位不可比較'
             elif name in ('net_margin', 'free_cash_flow') and (a.period != b.period or a.unit != b.unit):
                 reason = '期別或單位不可比較'
-            elif name == 'pe' and (b.period != 'TTM' or b.value <= 0 or a.value <= 0 or a.unit != 'per_share' or b.unit != 'per_share'):
-                reason = 'Not Applicable：需要正的 TTM EPS'
+            elif name == 'pe' and pe_problem(a, b):
+                reason = pe_problem(a, b)
+            elif name != 'pe' and window_problem(a, b, name):
+                reason = window_problem(a, b, name)
             elif name != 'free_cash_flow' and b.value <= 0:
                 reason = 'Not Applicable：分母非正'
             elif name == 'free_cash_flow' and b.value < 0:

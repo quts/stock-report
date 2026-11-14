@@ -16,8 +16,9 @@ Rules that hold for every adapter here:
 from datetime import date, datetime, timedelta, timezone
 import re
 from typing import Literal
-from pydantic import AwareDatetime, Field
-from .models import Entity, MetricRole, Model, PublicationBasis
+import calendar
+from pydantic import AwareDatetime, Field, model_validator
+from .models import Entity, MetricRole, Model, PeriodBasis, PublicationBasis, check_period_window
 from .storage import read_json
 
 TAIPEI = timezone(timedelta(hours=8))
@@ -49,6 +50,10 @@ class Observation(Model):
     unit: str | None = None
     currency: str | None = None
     period: str | None = None
+    # The reporting window as dates, plus what it covers. `period` alone is only a label.
+    period_start: date | None = None
+    period_end: date | None = None
+    period_basis: PeriodBasis | None = None
     provider_record_id: str = Field(min_length=1, max_length=120)
     request_key: str = Field(max_length=120)
     source_url: str
@@ -60,6 +65,11 @@ class Observation(Model):
     availability_observed_at: AwareDatetime | None = None
     event_time: AwareDatetime
     retrieved_at: AwareDatetime
+
+    @model_validator(mode='after')
+    def period_window_is_complete(self):
+        check_period_window(self.period_start, self.period_end, self.period_basis)
+        return self
 
 
 class ParseResult(Model):
@@ -129,6 +139,14 @@ def bind_field(record, names):
     return None
 
 
+# Normalized roles served by the Taiwan income-statement summaries. `money` figures keep the
+# undeclared source scale and are only meaningful as ratios inside one filing record.
+TW_INCOME_ROLES = {
+    'revenue_current': {'field': 'revenue', 'kind': 'money', 'label': '營業收入'},
+    'net_income': {'field': 'net_income_parent', 'kind': 'money', 'label': '歸屬於母公司業主之淨利（淨損）'},
+    'eps_current': {'field': 'eps_basic', 'kind': 'per_share', 'label': '基本每股盈餘'},
+}
+
 # Field contracts are provisional until a recorded network smoke run confirms them;
 # `--source-profile` overrides any key without a code change.
 PROFILES = {
@@ -166,6 +184,51 @@ PROFILES = {
                    'date': ['Date', '日期']},
         'required_fields': ['code', 'name', 'close', 'date'],
         'date_formats': ['roc', 'iso'],
+    },
+    # Taiwan consolidated income statement summaries (general-industry format). Contract observed
+    # on 2026-11-15, see docs/phase-0/taiwan-financial-source-notes.md:
+    #  * one row per issuer for the latest filed period only, identified by ROC year + quarter;
+    #  * figures are fiscal-year-to-date cumulative (cross-checked against the monthly revenue
+    #    filing), so they are never a single quarter and never a trailing twelve months;
+    #  * the dataset declares no monetary scale, only "（元）" on the EPS column;
+    #  * the only date is the table output date, which is not an issuer filing date.
+    'twse-openapi-income-general': {
+        'adapter': 'tw_income_statement',
+        'endpoint': 'https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci',
+        'exchange': 'TWSE', 'currency': 'TWD', 'ticker_suffix': '.TW',
+        'code_shape_pattern': r'[1-9]\d{3}',
+        'instruments_config': 'config/tw-instruments.json',
+        'supported_instrument_types': ['common_share'],
+        'coverage_mode': 'latest_only',
+        'statement_format': 'general', 'supported_fiscal_year_end_months': [12],
+        'period_basis': 'cumulative_ytd', 'year_calendar': 'roc', 'date_formats': ['roc'],
+        'money_unit': 'source_scale_undeclared',
+        'fields': {'code': ['公司代號'], 'name': ['公司名稱'], 'year': ['年度'], 'quarter': ['季別'],
+                   'table_date': ['出表日期'], 'revenue': ['營業收入'],
+                   'net_income_parent': ['淨利（淨損）歸屬於母公司業主'],
+                   'eps_basic': ['基本每股盈餘（元）']},
+        'required_fields': ['code', 'name', 'year', 'quarter', 'table_date', 'revenue', 'net_income_parent',
+                            'eps_basic'],
+        'roles': TW_INCOME_ROLES,
+    },
+    'tpex-openapi-income-general': {
+        'adapter': 'tw_income_statement',
+        'endpoint': 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci',
+        'exchange': 'TPEx', 'currency': 'TWD', 'ticker_suffix': '.TWO',
+        'code_shape_pattern': r'[1-9]\d{3}',
+        'instruments_config': 'config/tw-instruments.json',
+        'supported_instrument_types': ['common_share'],
+        'coverage_mode': 'latest_only',
+        'statement_format': 'general', 'supported_fiscal_year_end_months': [12],
+        'period_basis': 'cumulative_ytd', 'year_calendar': 'roc', 'date_formats': ['roc'],
+        'money_unit': 'source_scale_undeclared',
+        'fields': {'code': ['SecuritiesCompanyCode'], 'name': ['CompanyName'], 'year': ['Year'],
+                   'quarter': ['Season'], 'table_date': ['Date'], 'revenue': ['營業收入'],
+                   'net_income_parent': ['淨利（淨損）歸屬於母公司業主'],
+                   'eps_basic': ['基本每股盈餘（元）']},
+        'required_fields': ['code', 'name', 'year', 'quarter', 'table_date', 'revenue', 'net_income_parent',
+                            'eps_basic'],
+        'roles': TW_INCOME_ROLES,
     },
     'sec-xbrl-companyconcept': {
         'adapter': 'sec_concept',
@@ -210,8 +273,8 @@ def merge_profile(source_id, overrides=None):
     return profile
 
 
-class ExchangeQuoteAdapter:
-    """Taiwan exchange daily-close OpenAPI endpoints (latest session only)."""
+class TaiwanInstrumentAdapter:
+    """Shared issuer, market and instrument-type gate for Taiwan exchange sources."""
 
     def __init__(self, source_id, profile, instruments_config=None):
         self.source_id, self.profile = source_id, profile
@@ -241,12 +304,9 @@ class ExchangeQuoteAdapter:
                              f'support: {self.profile["supported_instrument_types"]}')
         return code, row
 
-    def requests(self, ticker):
-        self.instrument(ticker)
-        return [RequestSpec(key='daily', url=self.profile['endpoint'])]
-
-    def parse(self, ticker, payloads, collected_at):
-        payload = payloads.get('daily')
+    def table(self, payloads, key):
+        """The one JSON array this source serves, or a contract error. Never a substitute."""
+        payload = payloads.get(key)
         if not isinstance(payload, list):
             raise SourceContractError(f'{self.source_id}: expected a JSON array, got {type(payload).__name__}')
         if not payload:
@@ -258,11 +318,15 @@ class ExchangeQuoteAdapter:
             raise SourceContractError(f'{self.source_id}: response contains no JSON objects')
         binding = {}
         for field, names in self.profile['fields'].items():
-            key = bind_field(sample, names)
-            if key is None and field in self.profile['required_fields']:
+            bound = bind_field(sample, names)
+            if bound is None and field in self.profile['required_fields']:
                 raise SourceContractError(
                     f'{self.source_id}: no field for {field!r} among {names}; observed fields: {sorted(sample)[:24]}')
-            binding[field] = key
+            binding[field] = bound
+        return payload, binding
+
+    def issuer_record(self, ticker, payload, binding):
+        """Exactly one row for the configured code, whose name passes the configured identity check."""
         code, instrument = self.instrument(ticker)
         matches = [r for r in payload if isinstance(r, dict) and str(r.get(binding['code'], '')).strip() == code]
         if len(matches) != 1:
@@ -275,6 +339,19 @@ class ExchangeQuoteAdapter:
         if expected_name and expected_name not in name:
             raise SourceContractError(f'{self.source_id}: record name {name[:40]!r} does not contain the configured '
                                       f'identity check {expected_name!r} for {ticker}')
+        return code, instrument, record, name
+
+
+class ExchangeQuoteAdapter(TaiwanInstrumentAdapter):
+    """Taiwan exchange daily-close OpenAPI endpoints (latest session only)."""
+
+    def requests(self, ticker):
+        self.instrument(ticker)
+        return [RequestSpec(key='daily', url=self.profile['endpoint'])]
+
+    def parse(self, ticker, payloads, collected_at):
+        payload, binding = self.table(payloads, 'daily')
+        code, instrument, record, name = self.issuer_record(ticker, payload, binding)
         entity = Entity(entity_id=ticker, name=name, exchange=self.profile['exchange'],
                         currency=self.profile['currency'], share_class=instrument['share_class'])
         notes = [f'股份類別來自 {self.profile["instruments_config"]} 版本 {self.instruments_version}'
@@ -321,6 +398,125 @@ class ExchangeQuoteAdapter:
                       f'（交易日欄位：{raw_date or "未提供"}）；來源未宣告公開時間。',
                 value=close, unit='per_share', currency=self.profile['currency'], period='close',
                 provider_record_id=record_id, **shared))
+        return ParseResult(entity=entity, observations=observations, field_binding=binding, notes=notes)
+
+
+class TaiwanIncomeStatementAdapter(TaiwanInstrumentAdapter):
+    """Taiwan consolidated income-statement summary: the latest filed period of one issuer.
+
+    What the response declares, and what it does not:
+
+    * The period is a year and a quarter number. The figures are fiscal-year-to-date
+      cumulative, so the window runs from the fiscal year start to that quarter's end. The
+      fiscal year end is not in the response; it comes from explicit instrument configuration,
+      and an issuer without it is refused instead of being assumed to follow the calendar year.
+    * Only the latest period is served. There is no prior-year window, so growth is not
+      derivable here, and a cumulative EPS is never annualized into a trailing figure.
+    * Monetary columns carry no declared scale. They are kept verbatim under an explicit
+      `source_scale_undeclared` unit, which only supports ratios within the same record.
+    * The single date is the table output date. It is not an issuer filing date, so
+      publication is modeled as observed availability and the stamp is kept only as raw text.
+    """
+
+    def statement_instrument(self, ticker):
+        code, row = self.instrument(ticker)
+        if row.get('financial_statement_format') != self.profile['statement_format']:
+            raise ValueError(f'{ticker} is not configured with financial_statement_format='
+                             f'{self.profile["statement_format"]!r}; financial, insurance and other formats '
+                             f'are published in different datasets and are not read by this adapter')
+        if row.get('fiscal_year_end_month') not in self.profile['supported_fiscal_year_end_months']:
+            raise ValueError(f'{ticker} has no supported fiscal_year_end_month in '
+                             f'{self.profile["instruments_config"]} (supported: '
+                             f'{self.profile["supported_fiscal_year_end_months"]}); the response does not declare '
+                             f'the fiscal year, so the reporting window is not derived without it')
+        return code, row
+
+    def requests(self, ticker):
+        self.statement_instrument(ticker)
+        return [RequestSpec(key='income', url=self.profile['endpoint'])]
+
+    def window(self, year_raw, quarter_raw):
+        """(start, end) of the cumulative window named by the source's year and quarter."""
+        if self.profile['year_calendar'] != 'roc':
+            raise SourceContractError(f'{self.source_id}: undeclared year calendar {self.profile["year_calendar"]!r}')
+        if not re.fullmatch(r'\d{2,3}', year_raw):
+            raise SourceContractError(f'{self.source_id}: year {year_raw[:12]!r} is not a ROC year; '
+                                      f'no other calendar is assumed')
+        if quarter_raw not in ('1', '2', '3', '4'):
+            raise SourceContractError(f'{self.source_id}: quarter {quarter_raw[:12]!r} is not one of 1-4')
+        year, end_month = int(year_raw) + 1911, int(quarter_raw) * 3
+        return date(year, 1, 1), date(year, end_month, calendar.monthrange(year, end_month)[1])
+
+    def parse(self, ticker, payloads, collected_at):
+        self.statement_instrument(ticker)
+        payload, binding = self.table(payloads, 'income')
+        code, instrument, record, name = self.issuer_record(ticker, payload, binding)
+        observed = collected_at
+        year_raw, quarter_raw, table_raw = (str(record.get(binding[key]) or '').strip()
+                                            for key in ('year', 'quarter', 'table_date'))
+        start, end = self.window(year_raw, quarter_raw)
+        basis = self.profile['period_basis']
+        if basis != 'cumulative_ytd':
+            raise SourceContractError(f'{self.source_id}: period basis {basis!r} has no verified contract here')
+        if end_of_day(end, TAIPEI) >= observed:
+            raise SourceContractError(f'{self.source_id}: the reported period {year_raw}Q{quarter_raw} had not ended '
+                                      f'at the observation instant; the response is not internally consistent')
+        if not table_raw:
+            raise SourceContractError(f'{self.source_id}: record for {code} has an empty table output date')
+        table_date, variant = parse_source_date(table_raw, self.profile['date_formats'])
+        if table_date <= end:
+            raise SourceContractError(f'{self.source_id}: table output date {table_raw} is not after the period '
+                                      f'end it reports; the period fields are not trusted')
+        if start_of_day(table_date, TAIPEI) > observed:
+            raise SourceContractError(f'{self.source_id}: table output date {table_raw} starts after the '
+                                      f'observation instant; the response is not internally consistent')
+        binding.update(table_date_format=variant, year_calendar=self.profile['year_calendar'], period_basis=basis)
+        period = f'{start.year}YTD-Q{quarter_raw}'
+        period_raw = f'{binding["year"]}={year_raw} {binding["quarter"]}={quarter_raw}'
+        record_id = f'{code}@{year_raw}Q{quarter_raw}@{table_raw}'
+        entity = Entity(entity_id=ticker, name=name, exchange=self.profile['exchange'],
+                        currency=self.profile['currency'], share_class=instrument['share_class'])
+        # The output date says when the table was generated, not when the issuer filed, so the
+        # only publication claim made is that the record existed when it was observed.
+        shared = {'entity_id': ticker, 'publication_basis': 'observed_availability', 'published_at': observed,
+                  'availability_observed_at': observed, 'event_time': end_of_day(end, TAIPEI),
+                  'retrieved_at': observed, 'source_url': self.profile['endpoint'],
+                  'source_published_raw': f'{binding["table_date"]}={table_raw}', 'source_period_raw': period_raw,
+                  'request_key': 'income', 'provider_record_id': record_id}
+        window_text = f'{start.isoformat()}~{end.isoformat()} 年初至今累計'
+        observations = [Observation(
+            evidence_id=f'{self.source_id}-{ticker}-identity'[:80], kind='identity',
+            claim=f'{name}（{code}）列於 {self.profile["exchange"]} 綜合損益表（一般業）彙總資料；'
+                  f'來源僅提供出表日期，未宣告公司申報時間，僅能以擷取當下可得性為上界。', **shared)]
+        notes = [f'股份類別、財報格式與會計年度結束月份來自 {self.profile["instruments_config"]} 版本 '
+                 f'{self.instruments_version}（{instrument["verified_by"]}），非來源欄位',
+                 # Notes reach the inspection record, so they describe the rule and never the period.
+                 '期間起訖由來源的年度／季別欄位與設定的會計年度推得（年初至今累計）；來源未提供起訖日欄位',
+                 '出表日期不是公司申報日，公開時間採觀測可得性上界，不支援早於擷取時點的歷史截止',
+                 '來源未宣告金額級距：金額保留來源原值，僅可用於同一申報紀錄內的比率，不作跨來源金額比較',
+                 '省略 revenue_growth／eps_growth：端點只提供最新一期累計數，沒有可比的前期同窗資料',
+                 '省略 pe：累計基本每股盈餘不年化、不冒充 TTM',
+                 '省略 free_cash_flow：此資料集不含現金流量表']
+        for role, spec in self.profile['roles'].items():
+            field = binding[spec['field']]
+            value = to_number(record.get(field))
+            if value is None:
+                notes.append(f'{role}：來源欄位為空，保留缺值，不以零或其他科目替代')
+                continue
+            if spec['kind'] == 'per_share':
+                declared = re.search(r'[（(]([^（()）]+)[）)]\s*$', field)
+                if declared is None or declared[1] != '元':
+                    raise SourceContractError(f'{self.source_id}: per-share field {field!r} does not declare the '
+                                              f'expected unit; it is not assumed')
+                unit, unit_raw, unit_text = 'per_share', declared[1], f'{declared[1]}／股'
+            else:
+                unit, unit_raw, unit_text = self.profile['money_unit'], None, '來源未宣告金額級距'
+            observations.append(Observation(
+                evidence_id=f'{self.source_id}-{ticker}-{role}'[:80], kind='financial', role=role,
+                claim=f'{name}（{code}）{spec["label"]}（來源欄位「{field}」）{value}（{unit_text}），'
+                      f'期間 {window_text}（來源年度 {year_raw}、季別 {quarter_raw}）；非單季、非 TTM。',
+                value=value, unit=unit, currency=self.profile['currency'], period=period, period_start=start,
+                period_end=end, period_basis=basis, source_unit_raw=unit_raw, **shared))
         return ParseResult(entity=entity, observations=observations, field_binding=binding, notes=notes)
 
 
@@ -380,6 +576,7 @@ class SecConceptAdapter:
             if filed_date < end_date:
                 raise SourceContractError(f'{self.source_id}: filing date precedes the period end it reports')
             row = {'value': value, 'start': start, 'end': end, 'filed': filed, 'accn': accn,
+                   'start_date': start_date,
                    'fy': fact.get('fy'), 'fp': fact.get('fp'), 'form': fact.get('form'), 'frame': fact.get('frame'),
                    'end_date': end_date, 'filed_date': filed_date, 'unit_key': unit_key, 'source_url': source_url}
             current = selected.get(end)
@@ -432,14 +629,18 @@ class SecConceptAdapter:
                     notes.append(f'{role} 僅有 {len(facts)} 個年度期間，{metric_key} 保留缺值')
                     break
                 fact = facts[index]
-                if index == 1 and facts[0]['end_date'].year - fact['end_date'].year != 1:
-                    notes.append(f'{role} 的前期不是相鄰年度，{metric_key} 保留缺值')
+                # Adjacent means the prior window ends the day before the current one starts. Two
+                # windows whose end years merely differ by one (a changed fiscal year end, a
+                # skipped year) are not a comparable prior period.
+                if index == 1 and fact['end_date'] + timedelta(days=1) != facts[0]['start_date']:
+                    notes.append(f'{role} 的前期與本期期間起訖不相鄰，{metric_key} 保留缺值')
                     break
                 published_at = end_of_day(fact['filed_date'], US_DATE_UPPER_BOUND)
                 observations.append(Observation(
                     evidence_id=f'sec-{ticker}-{metric_key}'[:80], entity_id=ticker, kind='financial',
                     role=metric_key, value=fact['value'], unit=spec['unit'], currency=config['currency'],
-                    period=f'FY{fact["end_date"].year}',
+                    period=f'FY{fact["end_date"].year}', period_start=fact['start_date'],
+                    period_end=fact['end_date'], period_basis='fiscal_year',
                     claim=f'{spec["label"]}（us-gaap:{used_concept}）{fact["value"]} {fact["unit_key"]}，'
                           f'期間 {fact["start"]}~{fact["end"]}，來自 {fact["form"]} {fact["accn"]}，申報日 {fact["filed"]}。',
                     provider_record_id=f'{fact["accn"]}:{used_concept}:{fact["end"]}',
@@ -473,7 +674,8 @@ class SecConceptAdapter:
                            field_binding={'cik': 'cik', 'entity_name': 'entityName'}, notes=notes)
 
 
-ADAPTERS = {'exchange_quote': ExchangeQuoteAdapter, 'sec_concept': SecConceptAdapter}
+ADAPTERS = {'exchange_quote': ExchangeQuoteAdapter, 'tw_income_statement': TaiwanIncomeStatementAdapter,
+            'sec_concept': SecConceptAdapter}
 
 
 def build_adapter(source_id, overrides=None, **kwargs):

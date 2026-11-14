@@ -12,7 +12,10 @@
       "expected_name_contains": "台積電",
       "verified_by": "test-fixture",
       "checked_at": "2026-11-15T00:00:00+00:00",
-      "evidence": "fixture"
+      "evidence": "fixture",
+      "financial_statement_format": "general",
+      "fiscal_year_end_month": 12,
+      "financial_basis_evidence": "fixture"
     },
     {
       "ticker": "2603.TW",

@@ -11,12 +11,15 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import time
+from contract_probe import cumulative_basis
 from stock_report.collect import SEC_CONTACT_ENV, collect, persist, persistence_blockers
 from stock_report.licensing import load_registry
 from stock_report.storage import write_json
 
 TARGETS = [('twse-openapi-stock-day-all', '2330.TW'), ('tpex-openapi-mainboard-daily-close', '6488.TWO'),
+           ('twse-openapi-income-general', '2330.TW'), ('tpex-openapi-income-general', '6488.TWO'),
            ('sec-xbrl-companyconcept', 'NVDA'), ('sec-xbrl-companyconcept', 'AMD')]
+CUMULATIVE_CHECKS = {'twse-openapi-income-general': 'twse', 'tpex-openapi-income-general': 'tpex'}
 
 parser = argparse.ArgumentParser(prog='source_smoke')
 parser.add_argument('--allow-network', action='store_true', required=True)
@@ -45,13 +48,23 @@ for source_id, ticker in TARGETS:
                    entity_shape={'exchange': collection.entity.exchange, 'currency': collection.entity.currency,
                                  'share_class': collection.entity.share_class},
                    observations=[{'kind': o.kind, 'role': o.role, 'unit': o.unit,
-                                  'publication_basis': o.publication_basis,
+                                  'publication_basis': o.publication_basis, 'period_basis': o.period_basis,
+                                  'period_window_present': o.period_start is not None,
+                                  'source_unit_declared': o.source_unit_raw is not None,
                                   'value_present': o.value is not None} for o in collection.observations],
                    transport=[{k: v for k, v in t.items() if k in ('key', 'status', 'attempts', 'cached')}
                               for t in collection.transport],
                    license_status=collection.license['status'], retention=collection.retention,
                    persistence_blockers=blockers,
                    license_registry_version=collection.license['registry_version'], notes=collection.notes)
+        if source_id in CUMULATIVE_CHECKS:
+            # The statement dataset does not declare that its figures are year-to-date. The
+            # assumption is re-checked against the monthly revenue filing on every smoke run;
+            # only the ratio is kept.
+            try:
+                row['cumulative_basis_check'] = cumulative_basis(CUMULATIVE_CHECKS[source_id], ticker.split('.')[0])
+            except Exception as exc:
+                row['cumulative_basis_check'] = {'conclusion': 'check_failed', 'error_type': type(exc).__name__}
     except Exception as exc:
         row.update(status='failed', error_type=type(exc).__name__, error=str(exc)[:300])
     row['elapsed_seconds'] = round(time.monotonic() - started, 3)

@@ -1,4 +1,5 @@
 """Strict, timezone-aware contracts for untrusted inputs."""
+from datetime import date
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, AwareDatetime, model_validator
 
@@ -10,6 +11,19 @@ MetricRole = Literal['revenue_current', 'revenue_prior', 'eps_current', 'eps_pri
 # publication time: `published_at` then only carries the instant the record was observed to exist,
 # which is an upper bound and never a claim that publication happened at that moment.
 PublicationBasis = Literal['source_declared_timestamp', 'source_declared_date', 'observed_availability', 'synthetic']
+# What a financial figure's reporting window covers. A label such as `FY2026` never establishes
+# comparability on its own: two windows are only compared when their recorded start/end dates and
+# basis say they may be. `cumulative_ytd` is a fiscal-year-to-date interim figure and is never
+# annualized or treated as a trailing-twelve-month value.
+PeriodBasis = Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'trailing_twelve_months']
+
+
+def check_period_window(start, end, basis):
+    if (start is None) != (end is None):
+        raise ValueError('A period window needs both its start and its end date')
+    if start is not None and (start > end or basis is None):
+        raise ValueError('A period window must be ordered and must declare its basis')
+
 
 class Model(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
@@ -60,6 +74,9 @@ class Evidence(Model):
     unit: str | None = None
     currency: str | None = None
     period: str | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    period_basis: PeriodBasis | None = None
     source_url: str
     publisher: str
     source_type: Literal['official', 'secondary', 'synthetic']
@@ -92,6 +109,7 @@ class Evidence(Model):
 
     @model_validator(mode='after')
     def publication_time_is_modeled_truthfully(self):
+        check_period_window(self.period_start, self.period_end, self.period_basis)
         if self.publication_basis == 'observed_availability':
             if self.availability_observed_at is None or self.availability_observed_at != self.published_at:
                 raise ValueError('Observed availability must be recorded explicitly and carried as the publication upper bound')

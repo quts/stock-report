@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
-  "config_version": "0.1.0",
-  "notes": "Explicit POC issuer/instrument configuration for Taiwan exchange adapters. A four-digit code shape does NOT prove a common share: depositary receipts, ETFs, REITs, preferred and beneficiary certificates can also carry four-digit codes. The adapters therefore refuse any ticker without an entry here. `verified_by` records who established the instrument type and how; `assistant-poc-declaration` is an explicitly scoped project configuration for the Phase 0 targets, NOT an official instrument-type feed and NOT a human attestation. Before adding issuers, record an official instrument-type source (for example the TWSE/TPEx ISIN registration service) in `evidence`, or mark the entry as unsupported.",
+  "config_version": "0.2.0",
+  "notes": "Explicit POC issuer/instrument configuration for Taiwan exchange adapters. A four-digit code shape does NOT prove a common share: depositary receipts, ETFs, REITs, preferred and beneficiary certificates can also carry four-digit codes. The adapters therefore refuse any ticker without an entry here. `verified_by` records who established the instrument type and how; `assistant-poc-declaration` is an explicitly scoped project configuration for the Phase 0 targets, NOT an official instrument-type feed and NOT a human attestation. Before adding issuers, record an official instrument-type source (for example the TWSE/TPEx ISIN registration service) in `evidence`, or mark the entry as unsupported. `financial_statement_format` and `fiscal_year_end_month` gate the financial-statement adapters: the statement endpoints declare only a year and a quarter number, so the reporting window is derived from this explicit declaration and refused when it is absent.",
   "instruments": [
     {
       "ticker": "2330.TW",
@@ -12,7 +12,10 @@
       "expected_name_contains": "台積電",
       "verified_by": "assistant-poc-declaration",
       "checked_at": "2026-11-15T00:00:00+00:00",
-      "evidence": "Phase 0 POC 指定標的；代號與公司名稱由專案設定，尚未以官方 ISIN／有價證券種類端點核對，不得視為人工簽認。"
+      "evidence": "Phase 0 POC 指定標的；代號與公司名稱由專案設定，尚未以官方 ISIN／有價證券種類端點核對，不得視為人工簽認。",
+      "financial_statement_format": "general",
+      "fiscal_year_end_month": 12,
+      "financial_basis_evidence": "Phase 0 POC 宣告：採一般業財報格式、會計年度為曆年制（12 月結束）。2026-11-15 實測該標的在一般業綜合損益表彙總端點恰有一列，且累計營收與每月營收申報的累計數一致；會計年度結束月份不是來源欄位，尚未以公司章程或年報人工核對，不得視為人工簽認。"
     },
     {
       "ticker": "6488.TWO",
@@ -23,7 +26,10 @@
       "expected_name_contains": "環球晶",
       "verified_by": "assistant-poc-declaration",
       "checked_at": "2026-11-15T00:00:00+00:00",
-      "evidence": "Phase 0 POC 指定標的；代號與公司名稱由專案設定，尚未以官方 ISIN／有價證券種類端點核對，不得視為人工簽認。"
+      "evidence": "Phase 0 POC 指定標的；代號與公司名稱由專案設定，尚未以官方 ISIN／有價證券種類端點核對，不得視為人工簽認。",
+      "financial_statement_format": "general",
+      "fiscal_year_end_month": 12,
+      "financial_basis_evidence": "Phase 0 POC 宣告：採一般業財報格式、會計年度為曆年制（12 月結束）。2026-11-15 實測該標的在一般業綜合損益表彙總端點恰有一列，且累計營收與每月營收申報的累計數一致；會計年度結束月份不是來源欄位，尚未以公司章程或年報人工核對，不得視為人工簽認。"
     }
   ]
 }

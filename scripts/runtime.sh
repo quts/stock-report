@@ -26,5 +26,6 @@ case "$command" in
   bundle) run_container python scripts/review_bundle.py "$@" ;;
   demo) run_container python scripts/demo.py "$@" ;;
   smoke) run_container python scripts/source_smoke.py "$@" ;;
-  *) echo 'Usage: scripts/runtime.sh build|test|cli|demo|qa|bundle|smoke [arguments]' >&2; exit 2 ;;
+  contract) run_container python scripts/contract_probe.py "$@" ;;
+  *) echo 'Usage: scripts/runtime.sh build|test|cli|demo|qa|bundle|smoke|contract [arguments]' >&2; exit 2 ;;
 esac
