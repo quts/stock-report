@@ -1,0 +1,358 @@
+{
+  "status": "PASSED",
+  "provider": "Codex interactive session",
+  "dataset_kind": "mock",
+  "generation_metadata": {
+    "method": "Current Codex interactive session; one batch, not ten independent model invocations",
+    "authored_by": "Current Codex interactive assistant after reading the ten exported snapshots",
+    "proposal_generation": "LLM-authored case-specific text; serialization script only, no synthetic_proposal helper",
+    "model_id": null,
+    "usage": null,
+    "paid_api_used": false,
+    "exported_at": "2026-11-14T15:31:03.047467+00:00",
+    "proposals_written_at": "2026-11-14T15:32:23.139376+00:00",
+    "per_case_generation_seconds": null,
+    "human_intervention_required": true,
+    "limitations": [
+      "One interactive batch, not ten independently sampled model calls",
+      "Mock evidence only; not real-market accuracy or unattended automation validation",
+      "Unknown ID case is intentional fault injection, not a hallucination-rate observation"
+    ]
+  },
+  "scope": "Ten cases in this one interactive batch, not ten independent model invocations",
+  "completed_at": "2026-11-14T15:33:39.807456+00:00",
+  "source_instruction_canary_created": false,
+  "implementation_commit": "01e054c",
+  "artifact_integrity_verified": true,
+  "cases": [
+    {
+      "case": "normal",
+      "run_id": "6cdc665b24554934a1ece39083e8691f",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.484876,
+      "input_sha256": "c278a0d840c92e1e63dc75d990a94041e1a45e93bd62ba653ee188c301dfbd22",
+      "artifact_hashes": {
+        "research_input.json": "c035a414544739781f665699870f64ed379d815dad0847905965c297dfc93fb8",
+        "ai_proposal.json": "788c291e22c32163816824d484f43960cdd73b92b70e0d738352c8f4dc075095",
+        "decision.json": "443beb3fb997dc07d410803b574a318c06179606f1386dc9413eb0aeea055259",
+        "report.pdf": "1f099ca4a56c0ed9aedb1a2e3939a2027e9433f4bc3a8b888cfb04f1c47cca64"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "conflicting_evidence",
+      "run_id": "5e0fd52c3dbf40cc83c0b0cd6d9791e6",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "REJECTED",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "UNRESOLVED_CONFLICT"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.307989,
+      "input_sha256": "60f9a09dd6bb990a7c8ff61a3cf95fc47faa6f4f8f8e4bd95ce398aa9402e8a4",
+      "artifact_hashes": {
+        "research_input.json": "d14adbc93ed6d5e3a43423a9d1711c7ebb9dbe0a18dcd1ee79002b50636b680c",
+        "ai_proposal.json": "b2679d33df19070c69d672945b508d37ecc02b907ccf688ab2456c604dd32149",
+        "decision.json": "bb03bb75b32d757b1f8b2dfc5802f45833b9b74771df0b3ee856e379e8212311",
+        "report.pdf": "20fd1bb1b7e35e82152e3f8cfcea870a353234b09911d35ec568303a860aa8b9"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "missing_financials",
+      "run_id": "f9e0fd920f624ba193c9ea80a4de029b",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.271426,
+      "input_sha256": "81a66ee98992b548629d8fcb4a78dd4dbfd426bf916ab1711c59927a0d258c8a",
+      "artifact_hashes": {
+        "research_input.json": "44b61fe1cb213c47c076c41f406c94161aeda590621be6da2f3fbd85d8014ce0",
+        "ai_proposal.json": "2bca3c3f73ca94f9687667f2055bf10aab32a6d073bba50b709d13a9803955d1",
+        "decision.json": "d471ac414045273be37e3d89e231d9a8a63282912468b41eed8730265b157b65",
+        "report.pdf": "34533d50bb350b78806a7f33a25ad8e751a56db4086fdee27383b1608b797d4a"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "missing_valuation",
+      "run_id": "867eb0de75fa449199b5006fd5fc417a",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.344162,
+      "input_sha256": "d6c5cb8ee540211c4eae7d0be7f6e46bfa8ce97d90a64a42d191b3f5548eb11d",
+      "artifact_hashes": {
+        "research_input.json": "09b2ced01cd70057bf7ff641333da65dfa934f51c095f825cff16e29ebfb3c69",
+        "ai_proposal.json": "e261c1fa52a50c4af6f4e218e563320ecb46828969f9fa0bd9ecfd2e20ded0fb",
+        "decision.json": "99af7fd37f6e60a427fa12801d753c598faf3af27f04e19bee6f6829738ef9bb",
+        "report.pdf": "17216c0701a395ca9217fc9890b072331bed68cce2ce1f50281df0ba9016f2d8"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "missing_all_ratings",
+      "run_id": "527fcdc0e0e3479784091c53227ef707",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "RATINGS_MISSING",
+        "SINGLE_SOURCE"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 0,
+      "finalize_seconds": 3.374011,
+      "input_sha256": "44613f02d88005e6f7d6718e797dda9d2051cf718e8c9d8db25bc86fa821e7d8",
+      "artifact_hashes": {
+        "research_input.json": "6b5d5e2037350f93c74d1421ce179fc6e3333357a698124a999e098153da9e2e",
+        "ai_proposal.json": "708734bd7139f65b63c7d490291060f50231d58fc54481ee50986cf9d8552524",
+        "decision.json": "536d539afe5c264d2b814a45872913820f72a72601c8b8d91c3da5a2cd3e44c2",
+        "report.pdf": "c8a8dca5cbff35dcc3719c670b339b8bc54b17a28c8d33efcc3781c9c23dc978"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "unverified_event",
+      "run_id": "3095cea97bb04d2b93385a769118ca26",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "REJECTED",
+      "rule_ids": [
+        "EVENT_UNVERIFIED",
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.335205,
+      "input_sha256": "5b6c4dd3679eeb131c45d3af217e693a34948feaa3367d3594f8dc7b66ad5877",
+      "artifact_hashes": {
+        "research_input.json": "86dd2fe8bb2d1dec2dce517d6dcd22da8e9c6010fbe7ccd2b1937dbc914947c1",
+        "ai_proposal.json": "f20bb2d8bb492952156e7c6489de394aa1548ba760f55a4875233c8575cc4d1d",
+        "decision.json": "1a9010344e76cb76c4be0cccf7f49831351bb7249f2705f20112a8b82eec7fae",
+        "report.pdf": "7aa26237ec11614e23976cae4ed73031bfd436a234b385cb17fb37290743fa0d"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "unknown_evidence_id",
+      "run_id": "b46ec9123abf4bad9652499438b84dae",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "REJECTED",
+      "rule_ids": [
+        "CORE_INSUFFICIENT",
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "UNKNOWN_EVIDENCE"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.400278,
+      "input_sha256": "c278a0d840c92e1e63dc75d990a94041e1a45e93bd62ba653ee188c301dfbd22",
+      "artifact_hashes": {
+        "research_input.json": "c035a414544739781f665699870f64ed379d815dad0847905965c297dfc93fb8",
+        "ai_proposal.json": "028f6a1f9bfdf62984351784f7a3c2e5641a5d68999a8a6946404a916d277c0a",
+        "decision.json": "fb3a4683aa9ac6696344ec064b757c1dc408e9e9e555dca8c0cb84bf7ed45dcb",
+        "report.pdf": "89fbba43e66e1111166340c01011c055a910f05debc308bd07f4ef21b8263c58"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "future_data",
+      "run_id": "7b434a28059549b5932ffdcd30c1038a",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.386727,
+      "input_sha256": "9a56e99bd6cc26128a3b030d8cb08a203f16f69393b166a821772b5e29952d24",
+      "artifact_hashes": {
+        "research_input.json": "db3396fa1d0ddbb64f84754a46e51086132050bf2a6328e3b32fd515f5246181",
+        "ai_proposal.json": "04feff7e18a1ab6ef47c2251347771e1e722edb514dcb8ddad3ebdc023cb1306",
+        "decision.json": "d471ac414045273be37e3d89e231d9a8a63282912468b41eed8730265b157b65",
+        "report.pdf": "fa8867dd0772e424146abf571403c9b5119940fcd1a288099b7bffb56cad706c"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "license_unknown",
+      "run_id": "dce4ef2fd77f4ff9bded1ce10e24d3de",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.381881,
+      "input_sha256": "8fde6f44b78360737caafb22037079b4a54a0e55b9ea5335718456fe6019cd07",
+      "artifact_hashes": {
+        "research_input.json": "3100fcfa442ca3abe2a02a843716b1f9f2d20cc9f2aba361ca65a7c88b5c7ca8",
+        "ai_proposal.json": "bf4371cfc5b607febb8dc011e19f56028a425865c85d44e37c64ff7fbf39624c",
+        "decision.json": "d471ac414045273be37e3d89e231d9a8a63282912468b41eed8730265b157b65",
+        "report.pdf": "cc340cce74caf6ee34955a3d1672e2d3845e13992d3133ae1c80ae17a378c686"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    },
+    {
+      "case": "prompt_injection",
+      "run_id": "343fd235657941f08eb6ab13d8ab2bc6",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.457229,
+      "input_sha256": "c4de4a831c6b20585db4a9cd93112810e43e85d4a8782a4300dbfc58288bf5a1",
+      "artifact_hashes": {
+        "research_input.json": "24ed91e978a3e4ee335f55ac2d9eb01f9d531618827bbef54a76e4fef6ce10f7",
+        "ai_proposal.json": "a56a362fddb4230d43804afaab5aade840b80f60d6ab0d5008b1d056d0a10c7b",
+        "decision.json": "b8a88ff9c169056d53d37e6b2ae41295bb906dd8b386523d8833bf5b6c11bad7",
+        "report.pdf": "9888889b7e61d5efe9320df4a9d6f1c5b1979ddb250bb0a579235b72fd8b4014"
+      },
+      "policy_version": "phase0-1",
+      "evaluated_code_sha256": "2f4bb453a0f0114c455ddf097127f6cb31b845542a58f5e1d0145be3258d7e99"
+    }
+  ]
+}
