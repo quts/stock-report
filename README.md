@@ -14,6 +14,9 @@ container system start
 ./scripts/runtime.sh test -q
 ./scripts/runtime.sh demo
 ./scripts/runtime.sh qa
+# 選用、需明示的真實來源探查（會發出網路請求）
+./scripts/runtime.sh smoke --allow-network
+./scripts/runtime.sh test -m network
 ```
 
 Docker 使用相同 `Dockerfile` 與腳本：
@@ -42,7 +45,7 @@ CONTAINER_ENGINE=docker ./scripts/runtime.sh demo
 ./scripts/runtime.sh cli replay --run reports/RUN_ID
 ```
 
-僅測試合成管線時可用 `analyze --synthetic` 產生確定性的測試提案；這不代表 Codex／LLM 的十例實測已通過。`finalize` 回傳機器可讀的 `run_id`、`status`、`gate_status`、PDF／JSON 路徑、研究截止時間、覆蓋狀態與警告。失敗回傳非零 exit code 和 `status=failed`。
+僅測試合成管線時可用 `analyze --synthetic` 產生確定性的測試提案；這不代表 Codex／LLM 實測；本次另有 [實際互動十例紀錄](docs/phase-0/codex-interactive-evaluation.md)，明列基線與單批次限制。`finalize` 回傳機器可讀的 `run_id`、`status`、`gate_status`、PDF／JSON 路徑、研究截止時間、覆蓋狀態與警告。失敗回傳非零 exit code 和 `status=failed`。
 
 ## 真實資料與可行性
 
@@ -55,6 +58,39 @@ CONTAINER_ENGINE=docker ./scripts/runtime.sh demo
 
 SEC 探查需要自行在 User-Agent 設定符合來源要求的聯絡資訊；沒有聯絡資訊便記錄阻礙，不會取用 Claude／Codex 的登入資料。條款未核對前所有真實探查資料均標為不可在分享 PDF 使用。無付費 API、無自動重新登入。
 
-已人工查證身份、發布時間與權限的標準化真實證據可經 `prepare --provider import --evidence-bundle FILE --request REQUEST` 載入。Bundle 使用 `ResearchInput` Schema，必須 `dataset_kind=real`；不得含 Synthetic 證據，且須確認內部保存權限。這是受信任的人工整理介面，**不是自動證實來源真實性或授權的機制**。`schema --output reports/schemas` 可輸出契約。
+### 官方來源採集（collect → bundle → prepare）
+
+真實證據不需要手寫 JSON。採集先行，研究截止時點**之後**才套用：
+
+```sh
+# 1) 採集（以下完整流程需先確認登錄的內部使用權；unknown 只輸出 inspection-record.json）
+./scripts/runtime.sh cli collect --source twse-openapi-stock-day-all \
+  --ticker 2330.TW --allow-network --output reports/collections
+# SEC 需要操作人自行設定聯絡資訊，絕不取自登入資料，也不寫入任何輸出檔
+STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
+  ./scripts/runtime.sh cli collect --source sec-xbrl-companyconcept \
+  --ticker NVDA --allow-network --output reports/collections
+
+# 2) 產生研究截止時點不早於採集時間的 Request
+./scripts/runtime.sh cli request-template --ticker NVDA --exchange NASDAQ \
+  --collection reports/collections/COLLECTION_ID --output reports/collections/request.json
+
+# 3) 套用時點與授權，輸出證據包；不合格只輸出 bundle-report.json 與 blockers
+./scripts/runtime.sh cli bundle --request reports/collections/request.json \
+  --collection reports/collections/COLLECTION_ID --output reports/collections/bundle.json
+
+# 4) 進入既有管線（不繞過 Gate）
+./scripts/runtime.sh cli prepare --request reports/collections/request.json \
+  --provider import --evidence-bundle reports/collections/bundle.json
+```
+
+授權狀態來自版本化登錄檔 `config/source-licenses.json`：`unknown` 不可分享也不可本機留存，
+`confirmed` 必須附人工逐字條款引用與具名 attestation。**目前三個來源都是 `unknown`**，
+因此 collect 目前只保存檢視用中繼資料，不能把該檔傳入 request-template／bundle 當成研究輸入。
+內部權限確認後需重新採集，才會產生 collection.json；核心證據不足時可輸出不足摘要。公開時間依來源分為
+來源宣告日期與「擷取當下可得性上界」；後者只適用最新時點研究，既有歷史時點不會被改寫。
+欄位契約與限制見 [來源可行性](docs/phase-0/provider-feasibility.md)。
+
+已人工查證身份、發布時間與權限的標準化真實證據也可直接經 `prepare --provider import --evidence-bundle FILE --request REQUEST` 載入。Bundle 使用 `ResearchInput` Schema，必須 `dataset_kind=real`；不得含 Synthetic 證據，且須確認內部保存權限。這是受信任的人工整理介面，**不是自動證實來源真實性或授權的機制**。`schema --output reports/schemas` 可輸出契約。
 
 操作細節、已實作範圍與限制見 [實作說明](docs/phase-0/implementation.md)、[來源可行性](docs/phase-0/provider-feasibility.md) 及 [Phase 0 Review](docs/phase-0/phase-0-review.md)。

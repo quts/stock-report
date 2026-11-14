@@ -23,9 +23,12 @@ def projection(data, decision, mapping):
         metrics = [m for m in computed if m.entity_id == entity.entity_id and m.value is not None
                    and all(eid in allowed for eid in m.evidence_ids)]
         company_evidence = [e for e in allowed.values() if e.entity_id == entity.entity_id]
+        quotes = [e for e in company_evidence if e.kind == 'price' and e.metric_key == 'close'
+                  and e.value is not None and e.value > 0 and e.currency == entity.currency]
+        latest_quote = max(quotes, key=lambda e: (e.event_time, e.published_at, e.evidence_id), default=None)
         relation = next((r for r in data.relationships if r.entity_id == entity.entity_id), None)
         valid_relation = relation and relation.evidence_ids and all(eid in allowed and allowed[eid].kind == 'relationship' and allowed[eid].entity_id == entity.entity_id for eid in relation.evidence_ids)
-        companies.append({'entity': entity, 'metrics': metrics,
+        companies.append({'entity': entity, 'metrics': metrics, 'latest_quote': latest_quote,
             'events': [e for e in company_evidence if e.kind == 'event'],
             'outlooks': [p for p in decision.outlooks if p.entity_id == entity.entity_id],
             'consensus': consensus(company_evidence, entity.entity_id, data.request.research_as_of, mapping),

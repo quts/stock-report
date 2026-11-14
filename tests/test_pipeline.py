@@ -158,3 +158,19 @@ def test_cli_invalid_arguments_are_json(capsys):
     error=json.loads(capsys.readouterr().out)
     assert error['status']=='failed'
     assert error['error_type']=='ValueError'
+
+
+def test_licensed_close_is_visible_and_restricted_close_is_hidden(tmp_path,request_model,data,proposal,mapping):
+    from stock_report.policy import evaluate
+    from stock_report.render import render,projection
+    run,result=run_report(tmp_path,request_model)
+    text=''.join(p.extract_text() for p in PdfReader(result['report_path']).pages)
+    assert '最近可得收盤' in unicodedata.normalize('NFKC',text)
+    assert '100.00 USD' in text
+    close=next(e for e in data.evidence if e.metric_key=='close')
+    close.shareable_in_pdf=False
+    view=projection(data,evaluate(data,proposal),mapping)
+    assert view['companies'][0]['latest_quote'] is None
+    render(data,evaluate(data,proposal),mapping,tmp_path/'restricted-close.pdf')
+    text=''.join(p.extract_text() for p in PdfReader(tmp_path/'restricted-close.pdf').pages)
+    assert '100.00 USD' not in text

@@ -1,0 +1,63 @@
+{
+  "results": [
+    {
+      "source": "twse",
+      "ticker": "2330",
+      "dataset_url": "https://data.gov.tw/dataset/11549",
+      "csv_url": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data",
+      "json_url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "checked_at": "2026-11-14T16:29:32.967268+00:00",
+      "retained_source_values": false,
+      "resource_final_url": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data",
+      "csv_columns": [
+        "日期",
+        "證券代號",
+        "證券名稱",
+        "成交股數",
+        "成交金額",
+        "開盤價",
+        "最高價",
+        "最低價",
+        "收盤價",
+        "漲跌價差",
+        "成交筆數"
+      ],
+      "close_matches": true,
+      "name_matches": true,
+      "status": "matched_target_fields"
+    },
+    {
+      "source": "tpex",
+      "ticker": "6488",
+      "dataset_url": "https://data.gov.tw/dataset/11371",
+      "csv_url": "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&o=data&se=EW",
+      "json_url": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
+      "checked_at": "2026-11-14T16:29:33.532595+00:00",
+      "retained_source_values": false,
+      "resource_final_url": "https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&o=data&se=EW",
+      "csv_columns": [
+        "資料日期",
+        "代號",
+        "名稱",
+        "收盤",
+        "漲跌",
+        "開盤",
+        "最高",
+        "最低",
+        "成交股數",
+        "成交金額",
+        "成交筆數",
+        "最後買價",
+        "最後賣價",
+        "發行股數",
+        "次日漲停價",
+        "次日跌停價"
+      ],
+      "close_matches": true,
+      "name_matches": true,
+      "status": "matched_target_fields"
+    }
+  ],
+  "scope": "Target code/name/close comparison only; no automatic legal or human attestation",
+  "source_values_saved": false
+}

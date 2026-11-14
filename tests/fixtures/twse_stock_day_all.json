@@ -1,0 +1,43 @@
+{
+  "daily": [
+    {
+      "Date": "1151113",
+      "Code": "1101",
+      "Name": "台泥",
+      "TradeVolume": "1000000",
+      "TradeValue": "30000000",
+      "OpeningPrice": "30.00",
+      "HighestPrice": "30.50",
+      "LowestPrice": "29.50",
+      "ClosingPrice": "30.00",
+      "Change": "0.0000",
+      "Transaction": "1500"
+    },
+    {
+      "Date": "1151113",
+      "Code": "2330",
+      "Name": "台積電",
+      "TradeVolume": "20000000",
+      "TradeValue": "2000000000",
+      "OpeningPrice": "99.00",
+      "HighestPrice": "101.00",
+      "LowestPrice": "98.00",
+      "ClosingPrice": "100.00",
+      "Change": "1.0000",
+      "Transaction": "40000"
+    },
+    {
+      "Date": "1151113",
+      "Code": "2603",
+      "Name": "長榮",
+      "TradeVolume": "500000",
+      "TradeValue": "10000000",
+      "OpeningPrice": "20.00",
+      "HighestPrice": "20.10",
+      "LowestPrice": "19.90",
+      "ClosingPrice": "--",
+      "Change": "0.0000",
+      "Transaction": "900"
+    }
+  ]
+}

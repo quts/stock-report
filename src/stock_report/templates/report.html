@@ -19,6 +19,8 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 {% set c = companies[0] %}
 <h2>{{ c.entity.entity_id }} · {{ c.entity.name }}</h2>
 <p>{{ c.entity.exchange }} / {{ c.entity.currency }} / {{ c.entity.share_class }}</p>
+{% if c.latest_quote %}<p><b>最近可得收盤：</b>{{ '%.2f'|format(c.latest_quote.value) }} {{ c.latest_quote.currency }}／股</p>
+<p class="note">資料日期 {{ c.latest_quote.source_period_raw or c.latest_quote.event_time.date() }} · [{{ c.latest_quote.evidence_id }}]</p>{% else %}<p class="note">最近收盤價無可發布的已核實資料。</p>{% endif %}
 <h2>基本面與估值</h2>
 <table><tr><th>指標</th><th>數值 / 期別</th><th>證據</th></tr>
 {% for m in c.metrics %}<tr><td>{{ metric_labels[m.name] }}</td><td>{{ '%.2f'|format(m.value) }} {{ m.currency or '' }} {{ {'percent':'%', 'multiple':'倍', 'million':'百萬', 'thousand':'千'}.get(m.unit, m.unit) }} / {{ m.period }}</td><td><small>{{ m.evidence_ids|join(', ') }}</small></td></tr>{% endfor %}
@@ -30,7 +32,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 <p>尚未取得可比較且具分享權限的歷史價格序列，不計算 3 / 6 / 12 個月報酬或同業估值。</p>
 {% else %}
 <h2>事件狀態與時間軸</h2>
-{% for e in event_records %}<p><b>{{ e.event_time.date() }}</b> · {{ e.claim|brief(220) }}</p><p class="note">公開 {{ e.published_at.isoformat() }} [{{ e.evidence_id }}]</p>{% else %}<p>事件尚無可發布的核實證據；相關展望降級為資料不足。</p>{% endfor %}
+{% for e in event_records %}<p><b>{{ e.event_time.date() }}</b> · {{ e.claim|brief(220) }}</p><p class="note">{% if e.publication_basis == 'observed_availability' %}來源未宣告公開時間；擷取當下已可取得（上界 {{ e.published_at.isoformat() }}）{% elif e.publication_basis == 'source_declared_date' %}來源宣告公開日 {{ e.source_published_raw }}（以當日上界 {{ e.published_at.isoformat() }} 比對截止時點）{% else %}公開 {{ e.published_at.isoformat() }}{% endif %} [{{ e.evidence_id }}]</p>{% else %}<p>事件尚無可發布的核實證據；相關展望降級為資料不足。</p>{% endfor %}
 <h2>公司關聯與影響路徑</h2>
 <table><tr><th>公司 / 市場</th><th>關聯類別</th><th>追溯依據</th></tr>
 {% for c in companies %}<tr><td>{{ c.entity.entity_id }} / {{ c.entity.exchange }}</td><td>{{ {'direct':'直接', 'indirect':'間接', 'hypothetical':'Hypothetical／假設'}.get(c.relationship, '未確認') }}</td><td>{{ c.relationship_evidence_ids|join(', ') or '未確認' }}</td></tr>{% endfor %}</table>
@@ -39,6 +41,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 {% endif %}
 <h2>主要來源與使用範圍</h2>
 {% for e in sources[:2] %}<p class="sources">{{ e.publisher }} · {{ e.source_url }}<br>{{ e.attribution }}</p>{% endfor %}
+{% if sources|selectattr('publication_basis', 'equalto', 'observed_availability')|list %}<p class="note">部分來源未宣告公開時間，僅以擷取當下的可得性上界表示，只適用於最新時點研究，不得視為歷史時點證據。</p>{% endif %}
 <p class="note">完整來源、證據與逐機構明細保留於本機 evidence.json / research.json，不隨分享 PDF 自動散布。</p>
 <div class="page"></div>
 <h2>{{ '個股' if data.request.mode == 'stock' else '公司' }}獨立展望 · 3–6 / 6–12 個月</h2>

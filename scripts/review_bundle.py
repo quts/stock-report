@@ -2,6 +2,7 @@
 from pathlib import Path
 from datetime import datetime, timezone
 from shutil import copyfile
+from stock_report.evaluation import load_evaluation
 from stock_report.analysis import synthetic_proposal
 from stock_report.mock import fixture
 from stock_report.models import Request
@@ -47,23 +48,34 @@ for name,label in [('stock-nvda','stock'),('event','event')]:
     copyfile(row['report_path'],output/f'sample-{label}.pdf')
 write_json(output/'research-manifest.json',{'generated_at':datetime.now(timezone.utc).isoformat(),
     'samples':'DEMO / SYNTHETIC DATA only', 'runs':[read_json(Path(r['report_path']).parent/'manifest.json') for r in index],
-    'replay_verified':any('replay_of' in r for r in index), 'test_results':'junit.xml',
-    'real_data_probe':'provider-probes.json', 'real_research_e2e':'NOT_PASSED'})
+    'replay_verified':any('replay_of' in r for r in index), 'test_results':'provider-increment-junit.xml', 'network_test_results':'network-junit.xml',
+    'real_data_probe':'provider-probes.json' if (output/'provider-probes.json').exists() else 'legacy probe archived privately',
+    'source_binding':'taiwan-source-binding.json', 'interactive_evaluation':'llm-evaluation.json',
+    'real_source_smoke':'source-smoke.json' if (output/'source-smoke.json').exists() else 'NOT_RUN',
+    'license_registry':read_json('config/source-licenses.json')['registry_version'],
+    'real_research_e2e':'NOT_PASSED'})
 coverage={}
 for row in index:
     if 'example' in row:coverage.update(row['coverage'])
 probe=read_json(output/'provider-probes.json') if (output/'provider-probes.json').exists() else {'results':[]}
+smoke=read_json(output/'source-smoke.json') if (output/'source-smoke.json').exists() else {'results':[]}
+registry=read_json('config/source-licenses.json')
 write_json(output/'data-coverage.json',{'mock_coverage':coverage,
     'real_coverage':{r['provider']:{'access':r['status'],'license_status':r['license_status'],
       'shareable_in_pdf':r['shareable_in_pdf'],'field_coverage':'NOT_VERIFIED; probe is not research E2E'} for r in probe['results']},
+    'collected_sources':[{'source_id':r['source_id'],'ticker':r['ticker'],'status':r['status'],
+      'roles':sorted({o['role'] for o in r.get('observations',[]) if o['role']}),
+      'publication_basis':sorted({o['publication_basis'] for o in r.get('observations',[])}),
+      'license_status':r.get('license_status','unknown')} for r in smoke['results']],
+    'license_registry':{'version':registry['registry_version'],
+      'statuses':{s['source_id']:s['declared_status'] for s in registry['sources']},
+      'shareable_sources':[s['source_id'] for s in registry['sources'] if s['scope'].get('pdf_share_allowed')]},
     'denominator':'No fabricated aggregate coverage percentage; each named field/provider is reported separately'})
-llm_cases=['normal','conflicting_evidence','missing_financials','missing_valuation','missing_all_ratings',
-    'unverified_event','unknown_evidence_id','future_data','license_unknown','prompt_injection']
-write_json(output/'llm-evaluation.json',{'provider':'Codex interactive subscription', 'status':'NOT_RUN',
-    'cases':[{'id':s,'status':'NOT_RUN','reason':'Deterministic fixtures do not establish LLM performance'} for s in llm_cases],
-    'claude_implementation_assistant':'Stopped at account 5-hour usage limit; not the research LLM evaluation',
-    'paid_api_used':False,'usage':None,'elapsed_seconds':None,'human_intervention_required':True})
-for name in ('provider-feasibility.md','phase-0-review.md'):
+write_json(output/'llm-evaluation.json',load_evaluation(
+    Path('reports/codex-evaluation/llm-evaluation.json'),
+    Path('docs/phase-0/codex-interactive-evaluation.json'),Path('reports')))
+for name in ('provider-feasibility.md','phase-0-review.md','codex-interactive-evaluation.md',
+             'codex-interactive-evaluation.json','taiwan-license-review-evidence.md','taiwan-source-binding.json'):
     source=Path('docs/phase-0')/name
     if source.exists():copyfile(source,output/name)
 print(output.resolve())

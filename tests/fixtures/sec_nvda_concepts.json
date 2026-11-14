@@ -1,0 +1,72 @@
+{
+  "revenue:RevenueFromContractWithCustomerExcludingAssessedTax": {
+    "cik": 1045810,
+    "taxonomy": "us-gaap",
+    "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+    "label": "Revenue from Contract with Customer, Excluding Assessed Tax",
+    "description": "FIXTURE TEXT. Illustrative values only.",
+    "entityName": "NVIDIA CORP",
+    "units": {
+      "USD": [
+        {"start": "2024-01-29", "end": "2024-04-28", "val": 300000000, "accn": "0001045810-24-000100", "fy": 2025, "fp": "Q1", "form": "10-Q", "filed": "2024-05-29", "frame": "CY2024Q1"},
+        {"start": "2023-01-30", "end": "2024-01-28", "val": 1000000000, "accn": "0001045810-24-000029", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-02-21"},
+        {"start": "2023-01-30", "end": "2024-01-28", "val": 1000000001, "accn": "0001045810-25-000023", "fy": 2025, "fp": "FY", "form": "10-K", "filed": "2025-02-26"},
+        {"start": "2024-01-29", "end": "2025-01-26", "val": 1234500000, "accn": "0001045810-25-000023", "fy": 2025, "fp": "FY", "form": "10-K", "filed": "2025-02-26"}
+      ]
+    }
+  },
+  "net_income:NetIncomeLoss": {
+    "cik": 1045810,
+    "taxonomy": "us-gaap",
+    "tag": "NetIncomeLoss",
+    "label": "Net Income (Loss)",
+    "description": "FIXTURE TEXT. Illustrative values only.",
+    "entityName": "NVIDIA CORP",
+    "units": {
+      "USD": [
+        {"start": "2024-01-29", "end": "2025-01-26", "val": 240000000, "accn": "0001045810-25-000023", "fy": 2025, "fp": "FY", "form": "10-K", "filed": "2025-02-26"},
+        {"start": "2023-01-30", "end": "2024-01-28", "val": 180000000, "accn": "0001045810-24-000029", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-02-21"}
+      ]
+    }
+  },
+  "eps:EarningsPerShareDiluted": {
+    "cik": 1045810,
+    "taxonomy": "us-gaap",
+    "tag": "EarningsPerShareDiluted",
+    "label": "Earnings Per Share, Diluted",
+    "description": "FIXTURE TEXT. Illustrative values only.",
+    "entityName": "NVIDIA CORP",
+    "units": {
+      "USD/shares": [
+        {"start": "2024-01-29", "end": "2025-01-26", "val": 4.0, "accn": "0001045810-25-000023", "fy": 2025, "fp": "FY", "form": "10-K", "filed": "2025-02-26"},
+        {"start": "2023-01-30", "end": "2024-01-28", "val": 3.0, "accn": "0001045810-24-000029", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-02-21"}
+      ]
+    }
+  },
+  "operating_cash_flow:NetCashProvidedByUsedInOperatingActivities": {
+    "cik": 1045810,
+    "taxonomy": "us-gaap",
+    "tag": "NetCashProvidedByUsedInOperatingActivities",
+    "label": "Net Cash Provided by (Used in) Operating Activities",
+    "description": "FIXTURE TEXT. Illustrative values only.",
+    "entityName": "NVIDIA CORP",
+    "units": {
+      "USD": [
+        {"start": "2024-01-29", "end": "2025-01-26", "val": 300000000, "accn": "0001045810-25-000023", "fy": 2025, "fp": "FY", "form": "10-K", "filed": "2025-02-26"}
+      ]
+    }
+  },
+  "capital_expenditure:PaymentsToAcquirePropertyPlantAndEquipment": {
+    "cik": 1045810,
+    "taxonomy": "us-gaap",
+    "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+    "label": "Payments to Acquire Property, Plant, and Equipment",
+    "description": "FIXTURE TEXT. Illustrative values only.",
+    "entityName": "NVIDIA CORP",
+    "units": {
+      "USD": [
+        {"start": "2024-01-29", "end": "2025-01-26", "val": 80000000, "accn": "0001045810-25-000023", "fy": 2025, "fp": "FY", "form": "10-K", "filed": "2025-02-26"}
+      ]
+    }
+  }
+}

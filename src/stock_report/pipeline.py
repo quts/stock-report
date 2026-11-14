@@ -18,8 +18,10 @@ def byte_hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def runtime_versions(mapping):
-    return {**VERSIONS, 'package': __version__, 'ratings': digest(mapping),
+def runtime_versions(mapping, data=None):
+    # The dataset label follows the snapshot, so a real run is never stamped as synthetic.
+    dataset = data.versions.get('dataset', VERSIONS['dataset']) if data is not None else VERSIONS['dataset']
+    return {**VERSIONS, 'dataset': dataset, 'package': __version__, 'ratings': digest(mapping),
             'template_sha256': byte_hash(files('stock_report').joinpath('templates/report.html')),
             'code_sha256': digest({p.name: byte_hash(p) for p in Path(str(files('stock_report'))).glob('*.py')})}
 
@@ -45,7 +47,9 @@ def prepare(request, root, source=None):
         raise ValueError('Do not persist source contents without confirmed internal-use permission')
     # Recompute imported quantities; never trust provider-supplied calculations.
     data.metrics = calculate(data.evidence, request.research_as_of)
-    data.versions = VERSIONS.copy()
+    # Pin the executing code versions, but never relabel a real import as synthetic data.
+    dataset = data.versions.get('dataset', 'real-import-1') if data.dataset_kind == 'real' else VERSIONS['dataset']
+    data.versions = {**VERSIONS, 'dataset': dataset}
     run_id = uuid.uuid4().hex
     directory = Path(root).resolve() / run_id
     directory.mkdir(parents=True, exist_ok=False)
@@ -103,7 +107,7 @@ def finalize(directory, proposal_path, mapping_path):
     artifacts = ['research_input.json', 'ai_proposal.json', 'rating_mapping.json', 'evidence.json', 'evidence.sqlite', 'decision.json', 'research.json', 'report.pdf']
     manifest = {'run_id': prepared['run_id'], 'created_at': datetime.now(timezone.utc).isoformat(),
                 'research_as_of': data.request.research_as_of.isoformat(), 'dataset_kind': data.dataset_kind,
-                'versions': runtime_versions(mapping), 'proposal_model': proposal.model, 'usage': proposal.usage,
+                'versions': runtime_versions(mapping, data), 'proposal_model': proposal.model, 'usage': proposal.usage,
                 'input_sha256': digest(data), 'decision_sha256': digest(decision), 'pdf_pages': pages,
                 'shareable_files': ['report.pdf'], 'audit_files_private': True,
                 'hashes': {name: byte_hash(directory / name) for name in artifacts}}
@@ -120,7 +124,7 @@ def replay(directory, root):
     directory, data, _ = load_prepared(directory)
     manifest = read_json(directory / 'manifest.json')
     mapping = read_json(directory / 'rating_mapping.json')
-    if manifest['versions'] != runtime_versions(mapping):
+    if manifest['versions'] != runtime_versions(mapping, data):
         raise ValueError('Replay requires the same code/policy/template/rating versions')
     for name, expected in manifest['hashes'].items():
         if Path(name).name != name or byte_hash(directory / name) != expected:

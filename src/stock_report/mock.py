@@ -22,7 +22,8 @@ def fixture(request):
         e = Evidence(evidence_id=f'{entity}-{suffix}', entity_id=entity, claim=claim, kind=kind,
             source_url=f'https://example.invalid/synthetic/{entity}/{suffix}', publisher='Synthetic fixture',
             source_type='synthetic', source_record_id=suffix, event_time=cutoff-timedelta(days=3),
-            published_at=cutoff-timedelta(days=2), retrieved_at=cutoff, research_as_of=cutoff,
+            published_at=cutoff-timedelta(days=2), publication_basis='synthetic',
+            retrieved_at=cutoff, research_as_of=cutoff,
             verification_status='verified', license_status='confirmed', attribution='專案自行生成合成測資',
             shareable_in_pdf=True, internal_use_allowed=True, terms_url='https://example.invalid/synthetic-terms',
             license_checked_at=cutoff, **kwargs)

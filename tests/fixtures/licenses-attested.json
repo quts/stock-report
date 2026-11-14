@@ -1,0 +1,68 @@
+{
+  "schema_version": "1",
+  "registry_version": "9.9.9",
+  "updated_at": "2026-11-14T00:00:00+00:00",
+  "policy": "TEST FIXTURE ONLY. The attestations below are fabricated for offline tests of the confirmed-license code path and prove nothing about any real source's terms.",
+  "sources": [
+    {
+      "source_id": "twse-openapi-stock-day-all",
+      "publisher": "FIXTURE Exchange (test)",
+      "attribution": "FIXTURE attribution (test only)",
+      "endpoint_scope": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "terms_url": "https://example.invalid/fixture-terms",
+      "declared_status": "confirmed",
+      "scope": {"internal_use_allowed": true, "pdf_share_allowed": true, "store_response_hash": true, "store_raw_response": false},
+      "terms_evidence": [
+        {
+          "terms_url": "https://example.invalid/fixture-terms",
+          "checked_at": "2026-11-14T00:00:00+00:00",
+          "checked_by": "human",
+          "checker": "test-fixture (not a real attestation)",
+          "excerpt": "FIXTURE TEXT - not a quotation of any real terms page.",
+          "excerpt_covers": "internal use and report redistribution, fixture only"
+        }
+      ],
+      "attested_by": "test-fixture (not a real attestation)",
+      "attested_at": "2026-11-14T00:00:00+00:00",
+      "open_questions": [],
+      "notes": "Fixture entry used only to exercise the confirmed path."
+    },
+    {
+      "source_id": "sec-xbrl-companyconcept",
+      "publisher": "FIXTURE Regulator (test)",
+      "attribution": "FIXTURE attribution (test only)",
+      "endpoint_scope": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "terms_url": "https://example.invalid/fixture-terms",
+      "declared_status": "confirmed",
+      "scope": {"internal_use_allowed": true, "pdf_share_allowed": true, "store_response_hash": false, "store_raw_response": false},
+      "terms_evidence": [
+        {
+          "terms_url": "https://example.invalid/fixture-terms",
+          "checked_at": "2026-11-14T00:00:00+00:00",
+          "checked_by": "human",
+          "checker": "test-fixture (not a real attestation)",
+          "excerpt": "FIXTURE TEXT - not a quotation of any real terms page.",
+          "excerpt_covers": "internal use and report redistribution, fixture only"
+        }
+      ],
+      "attested_by": "test-fixture (not a real attestation)",
+      "attested_at": "2026-11-14T00:00:00+00:00",
+      "open_questions": [],
+      "notes": "Fixture entry used only to exercise the confirmed path."
+    },
+    {
+      "source_id": "tpex-openapi-mainboard-daily-close",
+      "publisher": "FIXTURE OTC (test)",
+      "attribution": "FIXTURE attribution (test only)",
+      "endpoint_scope": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
+      "terms_url": "https://example.invalid/fixture-terms",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": ["left unknown on purpose so tests cover the blocked path"],
+      "notes": "Fixture entry kept unknown to exercise the non-shareable path."
+    }
+  ]
+}

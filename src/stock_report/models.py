@@ -4,6 +4,12 @@ from pydantic import BaseModel, ConfigDict, Field, AwareDatetime, model_validato
 
 Horizon = Literal['3-6m', '6-12m']
 Outlook = Literal['bullish', 'neutral', 'bearish', 'insufficient']
+MetricRole = Literal['revenue_current', 'revenue_prior', 'eps_current', 'eps_prior', 'net_income',
+                     'operating_cash_flow', 'capital_expenditure', 'close']
+# How `published_at` was established. `observed_availability` means the source never declared a
+# publication time: `published_at` then only carries the instant the record was observed to exist,
+# which is an upper bound and never a claim that publication happened at that moment.
+PublicationBasis = Literal['source_declared_timestamp', 'source_declared_date', 'observed_availability', 'synthetic']
 
 class Model(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
@@ -58,10 +64,15 @@ class Evidence(Model):
     publisher: str
     source_type: Literal['official', 'secondary', 'synthetic']
     source_record_id: str
-    metric_key: Literal['revenue_current', 'revenue_prior', 'eps_current', 'eps_prior', 'net_income', 'operating_cash_flow', 'capital_expenditure', 'close'] | None = None
+    metric_key: MetricRole | None = None
     source_hash: str | None = None
     event_time: AwareDatetime
     published_at: AwareDatetime
+    publication_basis: PublicationBasis = 'source_declared_timestamp'
+    availability_observed_at: AwareDatetime | None = None
+    source_published_raw: str | None = Field(default=None, max_length=120)
+    source_period_raw: str | None = Field(default=None, max_length=120)
+    source_unit_raw: str | None = Field(default=None, max_length=60)
     retrieved_at: AwareDatetime
     research_as_of: AwareDatetime
     verification_status: Literal['verified', 'unverified', 'conflicting', 'unavailable']
@@ -71,11 +82,24 @@ class Evidence(Model):
     internal_use_allowed: bool = False
     terms_url: str
     license_checked_at: AwareDatetime
+    license_source_id: str | None = Field(default=None, max_length=64)
+    license_registry_version: str | None = Field(default=None, max_length=32)
     institution: str | None = None
     analyst: str | None = None
     raw_rating: str | None = None
     valid_until: AwareDatetime | None = None
     target_price: float | None = None
+
+    @model_validator(mode='after')
+    def publication_time_is_modeled_truthfully(self):
+        if self.publication_basis == 'observed_availability':
+            if self.availability_observed_at is None or self.availability_observed_at != self.published_at:
+                raise ValueError('Observed availability must be recorded explicitly and carried as the publication upper bound')
+        elif self.availability_observed_at is not None and self.availability_observed_at < self.published_at:
+            raise ValueError('Observed availability cannot precede the declared publication time')
+        if self.source_type == 'official' and self.publication_basis == 'synthetic':
+            raise ValueError('Official evidence cannot declare a synthetic publication basis')
+        return self
 
 class Relationship(Model):
     entity_id: str

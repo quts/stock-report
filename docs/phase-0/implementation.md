@@ -10,6 +10,9 @@
 ./scripts/runtime.sh demo
 ./scripts/runtime.sh qa
 ./scripts/runtime.sh bundle
+# 明示的真實來源探查（選用，會發出網路請求）
+STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke --allow-network
+./scripts/runtime.sh test -m network
 ```
 
 建置需要網路取得基礎映像及依賴；一般測試與 Mock 管線不呼叫市場資料或模型 API。依賴直接版本固定在 requirements.txt，間接依賴尚未完整鎖定；Manifest 記錄程式與模板雜湊，但不主張跨任意映像可逐位元重製。
@@ -17,6 +20,25 @@
 ## 固定執行契約
 
 `prepare --request JSON --provider mock|import [--evidence-bundle JSON] --output reports` 驗證 Request，產生 UUID 研究目錄、Evidence SQLite、JSON、提案 Schema、Prompt、輸入雜湊。匯入數值會重新計算，不能信任外部提供的 Quant 結果；不得把合成資料標為真實資料。
+
+`collect --source SOURCE_ID --ticker TICKER [--allow-network | --fixture JSON] [--license-registry JSON]
+[--source-profile JSON] [--sec-contact TEXT] --output reports/collections` 在任何研究截止時點之前採集官方來源紀錄。
+真實採集必須明示 `--allow-network`，失敗時直接報錯，沒有 Mock 或合成替代。`--fixture` 只用於離線契約測試，
+會標記 `capture_mode=fixture`，預設不被 `bundle` 接受；即使使用測試旗標，輸出仍為 mock／synthetic，不能當成 real 匯入。SEC 聯絡資訊僅能由 `--sec-contact` 或
+`STOCK_REPORT_SEC_CONTACT` 提供，不取自登入資料，也不寫入採集檔或錯誤訊息。
+
+`bundle --request JSON --collection DIR [--collection DIR ...] --output bundle.json` 才套用研究截止時點，
+產生可供 `prepare --provider import` 使用的真實證據包。授權未確認、公開時間不支援該時點、未通過核實或
+身份不符的證據會被逐筆排除並記錄原因。身份缺失等不可還原問題只輸出
+`bundle-report.json` 與 blockers（結束碼 1）；核心來源紀錄少於兩筆則保留 coverage warning，
+允許不足摘要，由 Gate 阻擋方向性結論。供應的 `research_as_of` 永遠不會被改寫。
+
+`request-template --ticker TICKER [--exchange X] --collection DIR --output request.json` 以採集時間作為預設
+研究截止時點；對 `latest_only` 來源拒絕早於採集時間的時點，且拒絕覆寫既有 Request 檔。
+
+`smoke`（`./scripts/runtime.sh smoke --allow-network`）是明示的真實來源探查，輸出
+`reports/phase-0/source-smoke.json`；`./scripts/runtime.sh test -m network` 另有同樣需明示的契約測試
+（預設以 `-m 'not network'` 排除）。未知內部保存權限時，兩者只保存欄位名稱、狀態與數量等檢視中繼資料，不保存來源數值，也不建立授權結論。
 
 `analyze --run DIRECTORY` 只輸出受控交換檔；Codex 在互動環境依證據產生提案。此命令不使用付費 API、不假裝已呼叫模型。`--synthetic` 僅允許 Mock，產生清楚標示為合成的測試提案。此版本沒有任意自然語言 shell 執行功能。
 
@@ -29,6 +51,19 @@
 ## 研究模型與計算
 
 身份包括 ticker、exchange、currency、share_class；時間使用時區感知 datetime。區分事件、公開、擷取、研究截止及授權查證時間。每筆 Evidence 保留來源 URL、來源 ID、發布者、原始主張、期別、原始評等及權限。
+
+公開時間另以 `publication_basis` 明示依據：`source_declared_timestamp`、`source_declared_date`
+（只宣告日期，`published_at` 取該日時區日終作為上界）、`observed_availability`
+（來源未宣告公開時間，`published_at` 僅為擷取當下可得性上界，另存 `availability_observed_at`）、
+`synthetic`。`source_published_raw`、`source_period_raw`、`source_unit_raw` 保留來源原文，
+與正規化後的 `period`／`unit`／`metric_key` 分開。擷取時間不會被當成公開時間使用，
+`observed_availability` 證據不得用於早於觀測時間的歷史時點研究。
+
+普通股身份另依 `config/tw-instruments.json` 明示的 POC 標的設定，不以代號形狀推定。
+
+來源授權由版本化登錄檔 `config/source-licenses.json` 決定：`unknown` 不可分享也不可本機留存，
+`confirmed` 需要人工逐字條款引用與具名 attestation 才能通過驗證。Evidence 另存
+`license_source_id` 與 `license_registry_version` 以供追溯。
 
 `metric_key` 為正規化的計算角色，與來源本身的 `source_record_id` 分開。現階段支援相鄰 FY 營收／EPS 成長、同期期別淨利率、營業現金流減正規化資本支出的自由現金流、正 TTM EPS 本益比。不同幣別／單位、不可比期別、非正分母或缺值不計算；缺值不是零。TTM 成長、P/S、EV/EBITDA、負債指標、調整後歷史價格及同業比較未實作，不以替代數字冒充。
 
@@ -55,3 +90,13 @@ HTTPClient 提供有限 Retry、速率限制與可選 TTL Cache；原始回應 C
 ## 尚未驗收的必要項目
 
 真實台美財報／行情正規化與分享條款、逐機構評等來源、跨市場真實事件探索排序、Codex 十例互動提案驗證、真實股／事件兩頁報告、校準 Gate 門檻。這些狀態必須留在 Review，不能用 Mock 測試通過取代。
+
+真實採集管線（`collect`／`bundle`／`request-template`、授權登錄檔、公開時間模型）已實作並附離線契約測試，
+但**尚未以實際網路回應驗證**，且**本次新增的測試尚未在容器內執行**：本工作階段未取得執行容器、
+Python 或網路工具的授權。欄位契約、來源條款與測試結果都必須在下一次實際執行後才可視為成立。
+
+## 本次互動驗證紀錄
+
+Review Bundle 載入並驗證 `reports/codex-evaluation/llm-evaluation.json` 的歷史十例成品雜湊，保留基線 commit 與單批次限制；不冒充對目前程式版本重新呼叫模型。只有版本化摘要時會標示原始成品不在本機，無紀錄時才用 NOT_RUN。完整說明見 [Codex 互動驗證](codex-interactive-evaluation.md)。
+
+台股來源的 Date 僅作原始交易期別 `source_period_raw`；未宣告的公開日期 `source_published_raw` 保持 null，不把交易日放進公開日欄位。使用者本次選擇維持來源 unknown，未啟用來源數值保存或分享。

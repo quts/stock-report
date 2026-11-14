@@ -18,3 +18,9 @@
 - finalize 成功後檢查實際 report.pdf、research.json 與 manifest.json；最終回報研究範圍、警告及主機可存取路徑。容器 /work 對應本 repository 根目錄。
 - PDF 可分享資格不涵蓋本機 JSON／SQLite 原始稽核資料；未核對來源條款時禁止呈現其數據。
 - 驗證使用 `scripts/runtime.sh test -q`。範例使用 `demo`，版面檢視使用 `qa`，Review Bundle 使用 `bundle`。真實探查需要明示 `cli probe --allow-network`。
+
+# 官方來源增量操作
+
+- 真實採集使用 `cli collect --allow-network`，權限確認後再 `request-template` → `bundle` → `prepare --provider import`；Fixture 不能冒充 Real Data。
+- 使用者於 2026-11-15 選擇維持來源 `unknown`、暫不啟用；除非使用者另行明示，維持 `config/source-licenses.json` 的封閉權限，只保留檢視用中繼資料。
+- 網路契約測試需明示 `scripts/runtime.sh test -m network`；一般測試預設排除 network。SEC 聯絡資訊須由操作人提供，不取自登入資料。

@@ -1,0 +1,95 @@
+{
+  "schema_version": "1",
+  "registry_version": "0.1.0",
+  "updated_at": "2026-11-14T16:28:37.497541+00:00",
+  "policy": "Unknown terms are non-shareable AND not cleared for local persistence. A source becomes 'confirmed' only after a human records the quoted excerpt, the exact terms URL, the check date and a named attestation in this file. Endpoint accessibility is never evidence of a redistribution right.",
+  "sources": [
+    {
+      "source_id": "twse-openapi-stock-day-all",
+      "publisher": "臺灣證券交易所",
+      "attribution": "資料來源：臺灣證券交易所 OpenAPI（授權範圍未確認）",
+      "endpoint_scope": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "terms_url": "https://data.gov.tw/dataset/11549",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/dataset/11549",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集層級的授權標示與指定資源連結；不涵蓋本專案實際呼叫的 openapi.twse.com.tw JSON 端點對應"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "重製、散布",
+          "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
+        "資料發布時間與更新頻率是否有官方宣告未確認"
+      ],
+      "notes": "官方資料集授權標示已由 Codex 查核；2026-11-15 在記憶體內比對本次目標的 CSV／JSON 名稱與收盤欄位一致。證據見 docs/phase-0/taiwan-source-binding.json。這是有限範圍的助手查核，缺人工來源核對與簽認，故維持 unknown，不保存來源數值或分享。"
+    },
+    {
+      "source_id": "tpex-openapi-mainboard-daily-close",
+      "publisher": "財團法人中華民國證券櫃檯買賣中心",
+      "attribution": "資料來源：證券櫃檯買賣中心 OpenAPI（授權範圍未確認）",
+      "endpoint_scope": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
+      "terms_url": "https://data.gov.tw/dataset/11371",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/dataset/11371",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集層級的授權標示與指定資源連結；不涵蓋本專案實際呼叫的 openapi JSON 端點對應"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "重製、散布",
+          "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
+        "資料發布時間是否有官方宣告未確認"
+      ],
+      "notes": "官方資料集授權標示已由 Codex 查核；2026-11-15 在記憶體內比對本次目標的 CSV／JSON 名稱與收盤欄位一致。證據見 docs/phase-0/taiwan-source-binding.json。這是有限範圍的助手查核，缺人工來源核對與簽認，故維持 unknown，不保存來源數值或分享。"
+    },
+    {
+      "source_id": "sec-xbrl-companyconcept",
+      "publisher": "U.S. Securities and Exchange Commission",
+      "attribution": "Source: U.S. SEC EDGAR XBRL company concept API (terms not yet verified)",
+      "endpoint_scope": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "terms_url": "https://www.sec.gov/about/developer-resources",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "SEC 開發者資源頁與網站使用條款尚未逐字核對並留存引用",
+        "重製／再散布範圍與是否需標示來源未確認",
+        "宣告式 User-Agent 與存取頻率的正式要求條文未逐字核對",
+        "原始回應留存與雜湊留存是否允許未確認"
+      ],
+      "notes": "SEC 要求呼叫方自行宣告聯絡資訊；聯絡資訊必須由操作人以 --sec-contact 或 STOCK_REPORT_SEC_CONTACT 明示提供，不得取自登入資料，且不寫入任何產出檔案。"
+    }
+  ]
+}
