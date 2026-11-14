@@ -30,7 +30,7 @@
 
 ## 實際測試與交付紀錄
 
-- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸的實際數量與結果（2026-11-15 財報增量後為 213 passed、6 deselected）。
+- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸的實際數量與結果（2026-11-15 財報增量後為 218 passed、6 deselected）。
 - `reports/phase-0/network-junit.xml`：真實台股網路契約（報價 2 項、損益表 2 項通過）；SEC 缺設定時保留 skipped（2 項）。
 - `reports/phase-0/source-smoke.json`：2026-11-15 台北時間實際擷取紀錄，四個台股端點／標的組合成功解析，並含損益表累計基礎的比值核對；只落盤中繼資料，不構成真實研究 E2E。
 - `reports/codex-evaluation/llm-evaluation.json` 與 [互動驗證紀錄](codex-interactive-evaluation.md)：實際單批十例、原始提案／決策／PDF 雜湊與限制。確切模型 ID 與用量無法取得時保留 null。

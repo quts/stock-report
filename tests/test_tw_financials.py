@@ -545,3 +545,13 @@ def test_cli_network_capture_under_unknown_licence_is_inspection_only(tmp_path, 
     assert result['status'] == 'inspection_only' and result['persisted'] == 'inspection_record'
     assert '台積電' not in output and '1000000' not in output
     assert not list(tmp_path.rglob('collection.json'))
+
+
+def test_undeclared_scale_is_not_shared_across_two_retrievals_of_the_same_source(attested):
+    """Revenue from one capture and net income from a later one are not assumed to share a scale."""
+    first = collection(TWSE_INCOME, '2330.TW', attested)
+    data, _ = build_bundle(tsmc_request(), [first], registry=attested)
+    assert metric(data, 'net_margin').value == pytest.approx(25.0)
+    next(e for e in data.evidence if e.metric_key == 'net_income').retrieved_at -= timedelta(minutes=5)
+    result = metric(data, 'net_margin')
+    assert result.value is None and '不假設級距相同' in result.missing_reason

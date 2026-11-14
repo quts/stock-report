@@ -48,6 +48,20 @@ def pe_problem(close, eps):
         return 'Not Applicable：需要正的 TTM EPS'
     return None
 
+UNDECLARED_SCALE = 'source_scale_undeclared'
+
+def scale_problem(a, b):
+    """An undeclared monetary scale only cancels inside one statement snapshot.
+
+    Two figures tagged with the same placeholder unit are not known to share a scale unless
+    they are the same provider record, from the same publisher and URL, in the same retrieval.
+    """
+    if UNDECLARED_SCALE not in (a.unit, b.unit):
+        return None
+    same = all(getattr(a, name) == getattr(b, name)
+               for name in ('publisher', 'source_url', 'source_record_id', 'retrieved_at'))
+    return None if same else '來源未宣告金額級距，且兩值不屬於同一來源申報紀錄與同一次擷取，不假設級距相同'
+
 def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
     output = []
     for entity in sorted({e.entity_id for e in evidence if e.kind == 'identity'}):
@@ -77,6 +91,8 @@ def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
                 reason = '期別或單位不可比較'
             elif name in ('net_margin', 'free_cash_flow') and (a.period != b.period or a.unit != b.unit):
                 reason = '期別或單位不可比較'
+            elif scale_problem(a, b):
+                reason = scale_problem(a, b)
             elif name == 'pe' and pe_problem(a, b):
                 reason = pe_problem(a, b)
             elif name != 'pe' and window_problem(a, b, name):
