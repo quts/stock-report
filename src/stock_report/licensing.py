@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 from typing import Literal
 from pydantic import AwareDatetime, Field, model_validator
-from .models import Model
+from .models import Model, SourceClass
 from .storage import read_json
 
 DEFAULT_REGISTRY_PATH = Path('config/source-licenses.json')
@@ -53,6 +53,8 @@ class Scope(Model):
 class SourceLicense(Model):
     source_id: str = Field(pattern=r'^[a-z0-9][a-z0-9.\-]{2,63}$')
     publisher: str = Field(min_length=1, max_length=80)
+    # Official filing/exchange record, or a secondary market-data provider.
+    source_class: SourceClass = 'official'
     attribution: str = Field(min_length=1, max_length=200)
     endpoint_scope: str = Field(min_length=1, max_length=300)
     terms_url: str = Field(min_length=8, max_length=300)
@@ -115,7 +117,8 @@ class LicenseRegistry(Model):
         source = self.get(source_id)
         checked_at = source.checked_at() or self.updated_at
         return {'source_id': source.source_id, 'registry_version': self.registry_version,
-                'publisher': source.publisher, 'attribution': source.attribution,
+                'publisher': source.publisher, 'source_class': source.source_class,
+                'attribution': source.attribution,
                 'terms_url': source.terms_url, 'status': source.declared_status,
                 'endpoint_scope': source.endpoint_scope,
                 'terms_evidence': [{'terms_url': t.terms_url, 'checked_at': t.checked_at.isoformat(),

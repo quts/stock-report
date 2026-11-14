@@ -6,7 +6,18 @@ from pydantic import BaseModel, ConfigDict, Field, AwareDatetime, model_validato
 Horizon = Literal['3-6m', '6-12m']
 Outlook = Literal['bullish', 'neutral', 'bearish', 'insufficient']
 MetricRole = Literal['revenue_current', 'revenue_prior', 'eps_current', 'eps_prior', 'net_income',
-                     'operating_cash_flow', 'capital_expenditure', 'close']
+                     'operating_cash_flow', 'capital_expenditure', 'close',
+                     'close_anchor_3m', 'close_anchor_6m', 'close_anchor_12m']
+# Who a record comes from. `official` is the issuer's regulator filing or the listing exchange's own
+# dataset; `secondary` is a market-data redistributor whose figures are not an official record.
+SourceClass = Literal['official', 'secondary']
+# What a price series has been adjusted for. `unknown` means the provider does not document it: such a
+# series may show a latest price, but is never compared across time. A dividend-adjusted series is a
+# total-return construct and is never reported as a price change.
+PriceAdjustment = Literal['unadjusted', 'split_adjusted', 'split_dividend_adjusted', 'unknown']
+# Calendar-month windows for price change, and how far before the target date the anchor session may be.
+PRICE_CHANGE_MONTHS = (3, 6, 12)
+PRICE_ANCHOR_TOLERANCE_DAYS = 7
 # How `published_at` was established. `observed_availability` means the source never declared a
 # publication time: `published_at` then only carries the instant the record was observed to exist,
 # which is an upper bound and never a claim that publication happened at that moment.
@@ -15,7 +26,7 @@ PublicationBasis = Literal['source_declared_timestamp', 'source_declared_date', 
 # comparability on its own: two windows are only compared when their recorded start/end dates and
 # basis say they may be. `cumulative_ytd` is a fiscal-year-to-date interim figure and is never
 # annualized or treated as a trailing-twelve-month value.
-PeriodBasis = Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'trailing_twelve_months']
+PeriodBasis = Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'trailing_twelve_months', 'trading_day']
 
 
 def check_period_window(start, end, basis):
@@ -77,6 +88,7 @@ class Evidence(Model):
     period_start: date | None = None
     period_end: date | None = None
     period_basis: PeriodBasis | None = None
+    price_adjustment: PriceAdjustment | None = None
     source_url: str
     publisher: str
     source_type: Literal['official', 'secondary', 'synthetic']

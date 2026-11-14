@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal
 import uuid
 from pydantic import AwareDatetime, Field
-from .models import Entity, Evidence, Model, Request, ResearchInput
+from .models import Entity, Evidence, Model, Request, ResearchInput, SourceClass
 from .mock import VERSIONS
 from .providers import HTTPClient
 from .quant import calculate
@@ -33,6 +33,9 @@ class Collection(Model):
     source_id: str
     endpoint: str
     capture_mode: Literal['network', 'fixture']
+    # Official filing/exchange record or secondary market-data provider. Recorded at capture from
+    # the source contract and the licence registry, which must agree.
+    source_class: SourceClass = 'official'
     coverage_mode: Literal['latest_only', 'historical_filings']
     requested_ticker: str
     collected_at: AwareDatetime
@@ -79,6 +82,9 @@ def collect(source_id, ticker, *, registry, allow_network=False, fixture=None, c
         raise ValueError(f'Endpoint {profile["endpoint"]} is outside the reviewed scope of {source_id} '
                          f'({snapshot["endpoint_scope"]}); a different dataset never inherits reviewed '
                          f'permissions. Register the endpoint before collecting from it.')
+    if licence.source_class != profile['source_class']:
+        raise ValueError(f'{source_id}: licence registry classifies the source as {licence.source_class!r} but its '
+                         f'recorded contract says {profile["source_class"]!r}; resolve the classification first')
     adapter = build_adapter(source_id, profile_overrides)
     specs = adapter.requests(ticker)
     notes, transport, payloads = [], [], {}
@@ -133,7 +139,8 @@ def collect(source_id, ticker, *, registry, allow_network=False, fixture=None, c
         notes.append('授權未確認：本採集僅為欄位契約可行性驗證，不得作為研究輸入，不得散布；'
                      '若條款不允許留存請刪除本地檔案')
     return Collection(collection_id=uuid.uuid4().hex, source_id=source_id, endpoint=profile['endpoint'],
-                      capture_mode=capture_mode, coverage_mode=profile['coverage_mode'], requested_ticker=ticker,
+                      capture_mode=capture_mode, source_class=profile['source_class'],
+                      coverage_mode=profile['coverage_mode'], requested_ticker=ticker,
                       collected_at=collected_at, entity=parsed.entity, observations=parsed.observations,
                       license=snapshot, field_binding=parsed.field_binding, transport=transport,
                       profile_overrides=profile_overrides or {},
@@ -172,6 +179,7 @@ def inspection_record(collection):
             'retained': 'contract field names, counts, publication basis, licence status and blockers only',
             'collection_id': collection.collection_id, 'source_id': collection.source_id,
             'endpoint': collection.endpoint, 'capture_mode': collection.capture_mode,
+            'source_class': collection.source_class,
             'coverage_mode': collection.coverage_mode, 'requested_ticker': collection.requested_ticker,
             'collected_at': collection.collected_at.isoformat(), 'retention': collection.retention,
             'field_binding': collection.field_binding, 'profile_overrides': collection.profile_overrides,
@@ -180,6 +188,7 @@ def inspection_record(collection):
             'observations': [{'kind': o.kind, 'role': o.role, 'unit': o.unit, 'currency': o.currency,
                               'publication_basis': o.publication_basis, 'period_basis': o.period_basis,
                               'period_window_present': o.period_start is not None,
+                              'price_adjustment': o.price_adjustment,
                               'source_unit_declared': o.source_unit_raw is not None,
                               'value_present': o.value is not None}
                              for o in collection.observations],
@@ -231,7 +240,8 @@ def effective_license(collection, registry):
     return merged
 
 
-def to_evidence(observation, request, license_snapshot, capture_mode, verified_capture, response_hash=None):
+def to_evidence(observation, request, license_snapshot, capture_mode, verified_capture, response_hash=None,
+                source_class='official'):
     """`verified` means: mechanical source contract checks passed, a human recorded the source
     attestation in the registry, and the capture itself is accepted as real for this run.
 
@@ -244,7 +254,10 @@ def to_evidence(observation, request, license_snapshot, capture_mode, verified_c
         kind=observation.kind, value=observation.value, unit=observation.unit, currency=observation.currency,
         period=observation.period, period_start=observation.period_start, period_end=observation.period_end,
         period_basis=observation.period_basis, source_url=observation.source_url, publisher=license_snapshot['publisher'],
-        source_type='official' if capture_mode == 'network' else 'synthetic',
+        # A fixture is authored content whatever it imitates; a real capture keeps the class of its
+        # source, so a secondary provider is never presented as an official record.
+        source_type=source_class if capture_mode == 'network' else 'synthetic',
+        price_adjustment=observation.price_adjustment,
         source_record_id=observation.provider_record_id, metric_key=observation.role,
         source_hash=response_hash if license_snapshot['store_response_hash'] else None,
         event_time=observation.event_time, published_at=observation.published_at,
@@ -300,6 +313,11 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
             blockers.append({'code': 'evidence_url_outside_license_scope', 'source_id': collection.source_id,
                              'detail': f'{stray[:3]} 不在已查核範圍 {snapshot["endpoint_scope"]} 之內'})
             continue
+        if registry.get(collection.source_id).source_class != collection.source_class:
+            blockers.append({'code': 'source_class_changed_since_capture', 'source_id': collection.source_id,
+                             'detail': f'採集時為 {collection.source_class}，登錄檔現為 '
+                                       f'{registry.get(collection.source_id).source_class}；不沿用舊分類'})
+            continue
         if 'registry_drift' in snapshot:
             notes.append(f'{collection.source_id}：授權登錄檔版本或狀態與採集時不同，採用目前登錄檔的較嚴格結果')
         if collection.capture_mode != 'network' and not allow_fixture_capture:
@@ -324,7 +342,7 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
         kept_here = 0
         for observation in collection.observations:
             record = to_evidence(observation, request, snapshot, collection.capture_mode, verified_capture,
-                                 hashes.get(observation.request_key))
+                                 hashes.get(observation.request_key), collection.source_class)
             reason = exclusion_reason(record, request)
             if reason:
                 exclusions.append({'evidence_id': record.evidence_id, 'source_id': collection.source_id,
@@ -339,7 +357,8 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
                              'detail': sorted({row['reason'] for row in exclusions
                                                if row['source_id'] == collection.source_id})})
         summary.append({'collection_id': collection.collection_id, 'source_id': collection.source_id,
-                        'capture_mode': collection.capture_mode, 'coverage_mode': collection.coverage_mode,
+                        'capture_mode': collection.capture_mode, 'source_class': collection.source_class,
+                        'coverage_mode': collection.coverage_mode,
                         'collected_at': collection.collected_at.isoformat(), 'endpoint': collection.endpoint,
                         'license_status': snapshot['status'], 'human_attested': snapshot['human_attested'],
                         'registry_version': snapshot['registry_version'], 'observations': len(collection.observations),

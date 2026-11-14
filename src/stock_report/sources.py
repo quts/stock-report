@@ -18,7 +18,9 @@ import re
 from typing import Literal
 import calendar
 from pydantic import AwareDatetime, Field, model_validator
-from .models import Entity, MetricRole, Model, PeriodBasis, PublicationBasis, check_period_window
+from .models import (Entity, MetricRole, Model, PRICE_ANCHOR_TOLERANCE_DAYS, PRICE_CHANGE_MONTHS, PeriodBasis,
+                     PriceAdjustment, PublicationBasis, check_period_window)
+from .quant import months_before
 from .storage import read_json
 
 TAIPEI = timezone(timedelta(hours=8))
@@ -54,6 +56,7 @@ class Observation(Model):
     period_start: date | None = None
     period_end: date | None = None
     period_basis: PeriodBasis | None = None
+    price_adjustment: PriceAdjustment | None = None
     provider_record_id: str = Field(min_length=1, max_length=120)
     request_key: str = Field(max_length=120)
     source_url: str
@@ -151,7 +154,7 @@ TW_INCOME_ROLES = {
 # `--source-profile` overrides any key without a code change.
 PROFILES = {
     'twse-openapi-stock-day-all': {
-        'adapter': 'exchange_quote',
+        'adapter': 'exchange_quote', 'source_class': 'official',
         'endpoint': 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL',
         'exchange': 'TWSE', 'currency': 'TWD', 'ticker_suffix': '.TW',
         # A code shape is a precondition, never proof of share class: four-digit codes are also
@@ -171,7 +174,7 @@ PROFILES = {
         'date_formats': ['roc', 'iso'],
     },
     'tpex-openapi-mainboard-daily-close': {
-        'adapter': 'exchange_quote',
+        'adapter': 'exchange_quote', 'source_class': 'official',
         'endpoint': 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes',
         'exchange': 'TPEx', 'currency': 'TWD', 'ticker_suffix': '.TWO',
         'code_shape_pattern': r'[1-9]\d{3}',
@@ -193,7 +196,7 @@ PROFILES = {
     #  * the dataset declares no monetary scale, only "（元）" on the EPS column;
     #  * the only date is the table output date, which is not an issuer filing date.
     'twse-openapi-income-general': {
-        'adapter': 'tw_income_statement',
+        'adapter': 'tw_income_statement', 'source_class': 'official',
         'endpoint': 'https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci',
         'exchange': 'TWSE', 'currency': 'TWD', 'ticker_suffix': '.TW',
         'code_shape_pattern': r'[1-9]\d{3}',
@@ -212,7 +215,7 @@ PROFILES = {
         'roles': TW_INCOME_ROLES,
     },
     'tpex-openapi-income-general': {
-        'adapter': 'tw_income_statement',
+        'adapter': 'tw_income_statement', 'source_class': 'official',
         'endpoint': 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci',
         'exchange': 'TPEx', 'currency': 'TWD', 'ticker_suffix': '.TWO',
         'code_shape_pattern': r'[1-9]\d{3}',
@@ -230,8 +233,25 @@ PROFILES = {
                             'eps_basic'],
         'roles': TW_INCOME_ROLES,
     },
+    # Secondary market-data provider, not an exchange or filing record. Contract observed on
+    # 2026-11-15, see docs/phase-0/us-price-source-notes.md:
+    #  * an undocumented, key-less JSON endpoint; the response itself returns symbol, currency,
+    #    exchange code, instrument type and granularity, which are checked against configuration;
+    #  * one row per session, stamped with the session open instant; no publication time;
+    #  * `close` has no documented adjustment basis for this endpoint and `adjclose` is a
+    #    dividend-adjusted (total-return style) series, so the basis stays `unknown` and no
+    #    cross-date comparison is derived from real captures.
+    'yahoo-chart-daily-close': {
+        'adapter': 'daily_price_series', 'source_class': 'secondary',
+        'endpoint': 'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2y&interval=1d&events=split',
+        'instruments_config': 'config/us-price-instruments.json',
+        'coverage_mode': 'latest_only',
+        'price_field': 'close', 'adjustment_basis': 'unknown',
+        'granularity': '1d', 'max_rows': 800, 'max_history_days': 800, 'max_staleness_days': 10,
+        'anchor_months': list(PRICE_CHANGE_MONTHS), 'anchor_tolerance_days': PRICE_ANCHOR_TOLERANCE_DAYS,
+    },
     'sec-xbrl-companyconcept': {
-        'adapter': 'sec_concept',
+        'adapter': 'sec_concept', 'source_class': 'official',
         'endpoint': 'https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json',
         'entities_config': 'config/sec-entities.json',
         'coverage_mode': 'historical_filings',
@@ -258,9 +278,19 @@ PROFILES = {
 }
 
 
+# What a source *is* and what its figures have been adjusted for are claims that need evidence in
+# the code and the source notes. A per-run profile override may rebind field names; it may not
+# assert provenance.
+PROTECTED_PROFILE_KEYS = ('adapter', 'source_class', 'adjustment_basis', 'price_field')
+
+
 def merge_profile(source_id, overrides=None):
     if source_id not in PROFILES:
         raise ValueError(f'Unknown source_id {source_id}; known sources: {sorted(PROFILES)}')
+    protected = sorted(set(overrides or {}) & set(PROTECTED_PROFILE_KEYS))
+    if protected:
+        raise ValueError(f'Profile keys {protected} assert source provenance and cannot be overridden per run; '
+                         f'change the recorded contract together with its evidence instead')
     profile = {k: (dict(v) if isinstance(v, dict) else list(v) if isinstance(v, list) else v)
                for k, v in PROFILES[source_id].items()}
     for key, value in (overrides or {}).items():
@@ -520,6 +550,201 @@ class TaiwanIncomeStatementAdapter(TaiwanInstrumentAdapter):
         return ParseResult(entity=entity, observations=observations, field_binding=binding, notes=notes)
 
 
+class DailyPriceSeriesAdapter:
+    """Daily close series from a secondary market-data provider's chart endpoint.
+
+    * Identity: the provider symbol, market and instrument mapping is operator configuration.
+      The response's own symbol, currency, exchange code, instrument type and granularity are
+      checked against it, and the binding records which facts the response returned.
+    * Sessions: each row is stamped with its session open instant. The trade date is kept as
+      a date, separate from any publication or observation time, and only sessions whose
+      calendar day has fully ended in the exchange's latest UTC offset are used. The current
+      or just-finished session is excluded instead of calling a last price a close.
+    * Publication: nothing is declared, so every point is `observed_availability` and cannot
+      support a research cutoff earlier than the capture.
+    * Adjustment: the configured basis is carried on every point. `unknown` means no change
+      over time is ever derived from the series.
+    """
+
+    def __init__(self, source_id, profile, instruments_config=None):
+        self.source_id, self.profile = source_id, profile
+        self.coverage_mode = profile['coverage_mode']
+        config = instruments_config if instruments_config is not None else read_json(profile['instruments_config'])
+        self.instruments = {row['ticker']: row for row in config['instruments']}
+        self.instruments_version = config.get('config_version', 'unknown')
+
+    def instrument(self, ticker):
+        row = self.instruments.get(ticker)
+        if row is None:
+            raise ValueError(f'{ticker} has no provider-symbol mapping in {self.profile["instruments_config"]}; '
+                             f'configured: {sorted(self.instruments)}')
+        mapping = (row.get('provider_symbols') or {}).get(self.source_id)
+        if not mapping:
+            raise ValueError(f'{ticker} has no mapping for provider {self.source_id}; a symbol is never guessed '
+                             f'from the ticker or borrowed from another provider')
+        if not re.fullmatch(r'[A-Z][A-Z.\-]{0,9}', mapping.get('symbol') or ''):
+            raise ValueError(f'{ticker}: configured provider symbol is not a plain equity symbol')
+        if row.get('instrument_type') != 'common_share':
+            raise ValueError(f'{ticker} is configured as {row.get("instrument_type")}; only common shares are supported')
+        return row, mapping
+
+    def requests(self, ticker):
+        _, mapping = self.instrument(ticker)
+        return [RequestSpec(key='chart', url=self.profile['endpoint'].format(symbol=mapping['symbol']))]
+
+    def fail(self, message):
+        raise SourceContractError(f'{self.source_id}: {message}')
+
+    def result(self, payload):
+        if not isinstance(payload, dict) or not isinstance(payload.get('chart'), dict):
+            self.fail(f'expected a JSON object with a chart member, got {type(payload).__name__}')
+        chart = payload['chart']
+        if chart.get('error') is not None:
+            self.fail('the provider returned an error object; no fallback data is used')
+        results = chart.get('result')
+        if not isinstance(results, list) or len(results) != 1 or not isinstance(results[0], dict):
+            self.fail('expected exactly one chart result')
+        return results[0]
+
+    def trade_day(self, stamp):
+        """Session date of an open-instant stamp, without a time zone database.
+
+        US equity sessions open mid-day in UTC, so the date is the same under both UTC offsets the
+        exchange uses. A stamp for which they disagree is not a regular session open."""
+        if isinstance(stamp, bool) or not isinstance(stamp, int):
+            self.fail('a session timestamp is not an integer epoch second')
+        try:
+            days = {datetime.fromtimestamp(stamp, timezone(timedelta(hours=offset))).date() for offset in (-4, -5)}
+        except (OverflowError, OSError, ValueError):
+            self.fail('a session timestamp is outside the representable range')
+        if len(days) != 1:
+            self.fail('a session timestamp does not identify one exchange calendar day')
+        return days.pop()
+
+    def parse(self, ticker, payloads, collected_at):
+        row, mapping = self.instrument(ticker)
+        result = self.result(payloads.get('chart'))
+        meta = result.get('meta')
+        if not isinstance(meta, dict):
+            self.fail('chart result carries no meta object')
+        observed = collected_at
+        # Facts the response itself returned, each checked against operator configuration.
+        returned = {'symbol': (meta.get('symbol'), [mapping['symbol']]),
+                    'currency': (meta.get('currency'), [row['currency']]),
+                    'exchange_code': (meta.get('exchangeName'), mapping['expected_exchange_codes']),
+                    'instrument_type': (meta.get('instrumentType'), [mapping['expected_instrument_type']]),
+                    'granularity': (meta.get('dataGranularity'), [self.profile['granularity']])}
+        for field, (value, accepted) in returned.items():
+            if value not in accepted:
+                self.fail(f'response {field} {str(value)[:24]!r} is not the configured {accepted} for {ticker}; '
+                          f'the series is not attributed to this instrument')
+        name = str(meta.get('longName') or '').strip()
+        expected = mapping.get('expected_name_contains')
+        if not name or (expected and expected.casefold() not in name.casefold()):
+            self.fail(f'response longName does not contain the configured identity check {expected!r}')
+        stamps = result.get('timestamp')
+        quotes = (result.get('indicators') or {}).get('quote')
+        if not isinstance(stamps, list) or not stamps:
+            self.fail('chart result carries no session timestamps; no fallback data is used')
+        if not isinstance(quotes, list) or len(quotes) != 1 or not isinstance(quotes[0], dict):
+            self.fail('expected exactly one quote indicator block')
+        closes = quotes[0].get(self.profile['price_field'])
+        if not isinstance(closes, list) or len(closes) != len(stamps):
+            self.fail(f'{self.profile["price_field"]!r} series is missing or not aligned with the timestamps')
+        if len(stamps) > self.profile['max_rows']:
+            self.fail(f'row count {len(stamps)} exceeds the configured limit {self.profile["max_rows"]}')
+        sessions, skipped_null, excluded_open = [], 0, 0
+        previous_stamp, previous_day = None, None
+        for stamp, close in zip(stamps, closes):
+            day = self.trade_day(stamp)
+            if previous_stamp is not None and stamp <= previous_stamp:
+                self.fail('session timestamps are duplicated or not in ascending order')
+            if day == previous_day:
+                self.fail('two rows claim the same trading day; conflicting days are not reconciled')
+            previous_stamp, previous_day = stamp, day
+            if start_of_day(day, US_DATE_UPPER_BOUND) > observed:
+                self.fail('a row is dated after the observation instant; the response is not internally consistent')
+            if (observed.astimezone(US_DATE_UPPER_BOUND).date() - day).days > self.profile['max_history_days']:
+                self.fail(f'a row is older than the configured history bound of {self.profile["max_history_days"]} days')
+            if end_of_day(day, US_DATE_UPPER_BOUND) > observed:
+                # The session's calendar day has not ended: its last price is not a completed close.
+                excluded_open += 1
+                continue
+            if close is None:
+                skipped_null += 1
+                continue
+            if isinstance(close, bool) or not isinstance(close, (int, float)) or close != close or close <= 0 \
+                    or close in (float('inf'),):
+                self.fail('a close value is not a positive finite number')
+            sessions.append((day, stamp, float(close)))
+        if not sessions:
+            self.fail('no completed session with a close is available; the current session is never used')
+        latest = sessions[-1]
+        if (observed.astimezone(US_DATE_UPPER_BOUND).date() - latest[0]).days > self.profile['max_staleness_days']:
+            self.fail(f'the latest completed session is more than {self.profile["max_staleness_days"]} days before '
+                      f'the observation; a stale series is not presented as the latest close')
+        splits = ((result.get('events') or {}).get('splits') or {})
+        binding = {'symbol': 'chart.result[0].meta.symbol', 'currency': 'chart.result[0].meta.currency',
+                   'exchange_code': 'chart.result[0].meta.exchangeName',
+                   'instrument_type': 'chart.result[0].meta.instrumentType',
+                   'granularity': 'chart.result[0].meta.dataGranularity', 'name': 'chart.result[0].meta.longName',
+                   'session': 'chart.result[0].timestamp',
+                   'close': f'chart.result[0].indicators.quote[0].{self.profile["price_field"]}',
+                   'adjustment_basis': self.profile['adjustment_basis'],
+                   'identity_returned_by_response': 'symbol,currency,exchange_code,instrument_type,granularity,name',
+                   'identity_from_operator_config': 'ticker_to_symbol,exchange,share_class',
+                   'split_events_declared': str(len(splits)) if isinstance(splits, dict) else None}
+        entity = Entity(entity_id=ticker, name=name[:80], exchange=row['exchange'], currency=meta['currency'],
+                        share_class=row['share_class'])
+        url = self.profile['endpoint'].format(symbol=mapping['symbol'])
+        basis = self.profile['adjustment_basis']
+
+        def point(role, session, label):
+            day, stamp, close = session
+            return Observation(
+                evidence_id=f'{self.source_id}-{ticker}-{role}'[:80], entity_id=ticker, kind='price', role=role,
+                claim=f'{name}（{mapping["symbol"]}）{label}：交易日 {day.isoformat()} 收盤 {close} {meta["currency"]}／股，'
+                      f'取自次級市場資料供應者，非交易所或申報紀錄；價格調整基礎 {basis}；'
+                      f'來源未宣告公開時間，僅能以擷取當下可得性為上界。',
+                value=close, unit='per_share', currency=meta['currency'],
+                period='close' if role == 'close' else day.isoformat(), period_start=day, period_end=day,
+                period_basis='trading_day', price_adjustment=basis,
+                provider_record_id=f'{mapping["symbol"]}@{stamp}', request_key='chart', source_url=url,
+                source_published_raw=None, source_period_raw=f'timestamp={stamp}', source_unit_raw=meta['currency'],
+                publication_basis='observed_availability', published_at=observed,
+                availability_observed_at=observed, event_time=end_of_day(day, US_DATE_UPPER_BOUND),
+                retrieved_at=observed)
+
+        observations = [Observation(
+            evidence_id=f'{self.source_id}-{ticker}-identity'[:80], entity_id=ticker, kind='identity',
+            claim=f'{name}：次級市場資料供應者回應自帶代號 {meta["symbol"]}、幣別 {meta["currency"]}、交易所代碼 '
+                  f'{meta["exchangeName"]}、商品類型 {meta["instrumentType"]}，與操作人設定相符；'
+                  f'代號對應、交易市場 {row["exchange"]} 與股份類別來自操作人設定，不是來源欄位。',
+            provider_record_id=f'{mapping["symbol"]}@meta', request_key='chart', source_url=url,
+            publication_basis='observed_availability', published_at=observed, availability_observed_at=observed,
+            event_time=end_of_day(latest[0], US_DATE_UPPER_BOUND), retrieved_at=observed),
+            point('close', latest, '最新已完成交易日')]
+        notes = [f'代號對應、交易市場與股份類別來自 {self.profile["instruments_config"]} 版本 {self.instruments_version}'
+                 f'（{row.get("verified_by", "unspecified")}），不是來源欄位；回應自帶的代號、幣別、交易所代碼與商品類型已比對',
+                 '來源為次級市場資料供應者，不是交易所或申報紀錄；證據標為 secondary',
+                 '交易日取自每列時間戳，與公開／擷取時間分開保存；來源未宣告公開時間，不支援早於擷取時點的歷史截止',
+                 f'尚未結束的交易日一律排除（本次排除 {excluded_open} 列），不把盤中或剛收盤的最後價格當成收盤價',
+                 f'價格調整基礎：{basis}；僅為價格，不含股利，不是總報酬']
+        if basis == 'unknown':
+            notes.append('省略 price_change_3m／6m／12m：來源未文件化收盤序列的分割／股利調整基礎，不推定跨期可比')
+        if skipped_null:
+            notes.append(f'{skipped_null} 個已完成交易日的收盤為空，保留缺值，不以前後日補值')
+        for months in self.profile['anchor_months']:
+            target = months_before(latest[0], months)
+            candidates = [s for s in sessions if s[0] <= target]
+            if not candidates or (target - candidates[-1][0]).days > self.profile['anchor_tolerance_days']:
+                notes.append(f'close_anchor_{months}m：目標日前 {self.profile["anchor_tolerance_days"]} 日內沒有已完成'
+                             f'交易日的收盤，保留缺值，不以較遠日期替代')
+                continue
+            observations.append(point(f'close_anchor_{months}m', candidates[-1], f'{months} 個曆月前基準交易日'))
+        return ParseResult(entity=entity, observations=observations, field_binding=binding, notes=notes)
+
+
 class SecConceptAdapter:
     """SEC EDGAR XBRL company-concept facts for an operator-configured issuer."""
 
@@ -674,7 +899,7 @@ class SecConceptAdapter:
                            field_binding={'cik': 'cik', 'entity_name': 'entityName'}, notes=notes)
 
 
-ADAPTERS = {'exchange_quote': ExchangeQuoteAdapter, 'tw_income_statement': TaiwanIncomeStatementAdapter,
+ADAPTERS = {'exchange_quote': ExchangeQuoteAdapter, 'daily_price_series': DailyPriceSeriesAdapter, 'tw_income_statement': TaiwanIncomeStatementAdapter,
             'sec_concept': SecConceptAdapter}
 
 

@@ -30,7 +30,8 @@
 
 ## 實際測試與交付紀錄
 
-- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸的實際數量與結果（2026-11-15 財報增量後為 218 passed、6 deselected）。
+- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸的實際數量與結果（2026-11-15 美股日線增量後為 251 passed、8 deselected）。
+- `reports/phase-0/us-price-network-junit.xml`：NVDA／AMD 次級行情來源的實際契約測試 2 passed；沒有保存價格、原始回應或雜湊，亦未啟用權限。
 - `reports/phase-0/network-junit.xml`：真實台股網路契約（報價 2 項、損益表 2 項通過）；SEC 缺設定時保留 skipped（2 項）。
 - `reports/phase-0/source-smoke.json`：2026-11-15 台北時間實際擷取紀錄，四個台股端點／標的組合成功解析，並含損益表累計基礎的比值核對；只落盤中繼資料，不構成真實研究 E2E。
 - `reports/codex-evaluation/llm-evaluation.json` 與 [互動驗證紀錄](codex-interactive-evaluation.md)：實際單批十例、原始提案／決策／PDF 雜湊與限制。確切模型 ID 與用量無法取得時保留 null。
@@ -47,7 +48,7 @@ Review Bundle 會驗證本機互動紀錄的成品雜湊。若只剩版本化摘
 ## 尚待完成的 Phase 0 條件
 
 1. 依 [來源查核證據](taiwan-license-review-evidence.md) 核對已準備的有限端點／資料集範圍對應與顯名稿，依 AGENTS 的人工查證契約填入具名簽認與精確 scope；不得只因端點可連線就開啟權限。
-2. 操作人明示 SEC 聯絡設定，再做 NVDA／AMD 真實來源測試；補上美股價格、可靠事件等核心證據。台灣財報需另補前期可比數、現金流量、金額級距與申報時間的官方依據，並人工核對 2330／6488 的會計年度設定，才能支援成長率、PE 或自由現金流。
+2. 操作人明示 SEC 聯絡設定，再做 NVDA／AMD 真實申報來源測試；美股價格已加入次級來源的保守日線契約與兩項真實網路測試，仍缺授權及調整口徑核實，跨期漲跌幅維持 NA，詳見 [美股價格限制](us-price-source-notes.md)。仍需可靠事件等核心證據。台灣財報需另補前期可比數、現金流量、金額級距與申報時間的官方依據，並人工核對 2330／6488 的會計年度設定，才能支援成長率、PE 或自由現金流。
 3. 完成 NVDA 與 2330 的真實研究 E2E、權限及版面驗收；資料不足時只能發布清楚標示的不足摘要。
 4. 校準 Gate 核心門檻，核對自由文字推論；現有受控互動批次不證明所有新版本或投資預測正確。
 5. 完成真實跨市場事件及候選排序驗證，再按市場與能力分別決定 GO／CONDITIONAL GO／NO-GO。

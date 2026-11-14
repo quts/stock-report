@@ -1,0 +1,8 @@
+{
+  "config_version": "0.1.0",
+  "notes": "Assistant-authored feasibility mappings, not human identity or license attestations.",
+  "instruments": [
+    {"ticker": "NVDA", "exchange": "NASDAQ", "currency": "USD", "share_class": "common", "instrument_type": "common_share", "verified_by": "assistant configuration, not human attested", "provider_symbols": {"yahoo-chart-daily-close": {"symbol": "NVDA", "expected_exchange_codes": ["NMS"], "expected_instrument_type": "EQUITY", "expected_name_contains": "NVIDIA"}}},
+    {"ticker": "AMD", "exchange": "NASDAQ", "currency": "USD", "share_class": "common", "instrument_type": "common_share", "verified_by": "assistant configuration, not human attested", "provider_symbols": {"yahoo-chart-daily-close": {"symbol": "AMD", "expected_exchange_codes": ["NMS"], "expected_instrument_type": "EQUITY", "expected_name_contains": "Advanced Micro Devices"}}}
+  ]
+}

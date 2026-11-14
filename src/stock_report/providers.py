@@ -28,21 +28,31 @@ class HTTPClient:
         cache = self.cache_dir / (hashlib.sha256(url.encode()).hexdigest() + '.json') if self.cache_dir else None
         if cache and cache.exists() and time.time() - cache.stat().st_mtime < self.cache_ttl:
             return read_json(cache), {'cached': True, 'attempts': 0}
+        raw, meta = self.fetch(url, 'application/json')
+        data = json.loads(raw)
+        if cache:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            write_json(cache, data)
+        return data, meta
+
+    def get_text(self, url):
+        """Strict UTF-8 text body (CSV sources). Never cached: raw retention needs its own permission."""
+        raw, meta = self.fetch(url, 'text/csv, text/plain;q=0.9, */*;q=0.1')
+        return raw.decode('utf-8'), meta
+
+    def fetch(self, url, accept):
         for attempt in range(self.retries + 1):
             time.sleep(max(0, self.interval - (time.monotonic() - self.last)))
             self.last = time.monotonic()
             try:
-                request = Request(url, headers={'User-Agent': self.user_agent, 'Accept': 'application/json'})
+                request = Request(url, headers={'User-Agent': self.user_agent, 'Accept': accept})
                 with urlopen(request, timeout=self.timeout) as response:
                     raw = response.read(12_000_001)
                     if len(raw) > 12_000_000:
                         raise ValueError('Provider response exceeds size limit')
-                    data = json.loads(raw)
-                if cache:
-                    cache.parent.mkdir(parents=True, exist_ok=True)
-                    write_json(cache, data)
-                return data, {'cached': False, 'attempts': attempt + 1,
-                              'response_sha256': hashlib.sha256(raw).hexdigest()}
+                    content_type = getattr(response, 'headers', {}).get('Content-Type')
+                return raw, {'cached': False, 'attempts': attempt + 1, 'content_type': content_type,
+                             'response_sha256': hashlib.sha256(raw).hexdigest()}
             except HTTPError as exc:
                 if exc.code not in (429, 500, 502, 503, 504) or attempt == self.retries:
                     raise

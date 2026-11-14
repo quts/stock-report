@@ -1,7 +1,8 @@
 """All numeric derivations are replayable Python calculations."""
-from datetime import timedelta
+import calendar
+from datetime import date, timedelta
 import re
-from .models import Evidence, Metric
+from .models import Evidence, Metric, PRICE_ANCHOR_TOLERANCE_DAYS, PRICE_CHANGE_MONTHS
 
 VERSION = '1'
 
@@ -23,7 +24,7 @@ def window_problem(a, b, name):
     evidence must carry its window, and once either side carries one both must agree: an equal
     label or end year is never enough to equate two reporting windows.
     """
-    official = a.source_type == 'official' or b.source_type == 'official'
+    official = a.source_type != 'synthetic' or b.source_type != 'synthetic'
     if not has_window(a) and not has_window(b):
         return '官方財務證據缺少期間起訖，不以期別標籤推定可比' if official else None
     if not has_window(a) or not has_window(b):
@@ -41,7 +42,7 @@ def window_problem(a, b, name):
 
 def pe_problem(close, eps):
     if eps.period != 'TTM' or (has_window(eps) and eps.period_basis != 'trailing_twelve_months') \
-            or (eps.source_type == 'official' and not has_window(eps)):
+            or (eps.source_type != 'synthetic' and not has_window(eps)):
         return (f'Not Applicable：需要正的 TTM EPS；現有 EPS 期間為 {eps.period or "未標示"}'
                 f'（{eps.period_basis or "未記錄期間基礎"}），不將年度、單季或累計 EPS 年化或冒充 TTM')
     if eps.value <= 0 or close.value <= 0 or close.unit != 'per_share' or eps.unit != 'per_share':
@@ -61,6 +62,56 @@ def scale_problem(a, b):
     same = all(getattr(a, name) == getattr(b, name)
                for name in ('publisher', 'source_url', 'source_record_id', 'retrieved_at'))
     return None if same else '來源未宣告金額級距，且兩值不屬於同一來源申報紀錄與同一次擷取，不假設級距相同'
+
+PRICE_CHANGE_FORMULA = ('(close / anchor_close - 1) * 100; price change only, dividends excluded, not a total return; '
+                        'anchor = last completed session on or before the close date minus N calendar months')
+
+def months_before(day: date, months: int) -> date:
+    """Same day-of-month N calendar months earlier, clamped to that month's last day."""
+    index = day.year * 12 + day.month - 1 - months
+    year, month = divmod(index, 12)
+    return date(year, month + 1, min(day.day, calendar.monthrange(year, month + 1)[1]))
+
+def trade_date(e):
+    return e.period_end if e.period_basis == 'trading_day' and e.period_start == e.period_end else None
+
+def price_change(entity, months, close, anchor):
+    """Price change over N calendar months between two explicitly dated points of one series."""
+    name, role = f'price_change_{months}m', f'close_anchor_{months}m'
+    ids = [r.evidence_id for r in (close, anchor) if r]
+    value, period, reason = None, None, None
+    if not close or not anchor:
+        missing = '、'.join(key for key, record in (('close', close), (role, anchor)) if not record)
+        reason = f'缺少可核實且截止日前公開的價格點（{missing}）；不以其他日期或其他來源替代'
+    elif not close.currency or close.currency != anchor.currency:
+        reason = '幣別不一致，不可比較'
+    elif close.unit != 'per_share' or anchor.unit != 'per_share':
+        reason = '價格單位不是每股價格，不可比較'
+    elif any(getattr(close, key) != getattr(anchor, key) for key in ('publisher', 'source_url', 'retrieved_at')):
+        reason = '兩個價格點不屬於同一來源序列與同一次擷取，不跨來源或跨快照拼接'
+    elif trade_date(close) is None or trade_date(anchor) is None:
+        reason = '價格點缺少明確交易日，不以公開或擷取時間推定'
+    elif close.price_adjustment != anchor.price_adjustment:
+        reason = '兩個價格點的調整基礎不同，不可比較'
+    elif close.price_adjustment in (None, 'unknown'):
+        reason = 'Not Applicable：來源未文件化價格調整基礎（股票分割／股利），不推定跨期可比'
+    elif close.price_adjustment == 'unadjusted':
+        reason = 'Not Applicable：未調整價格無法排除區間內股票分割，不計算跨期變動'
+    elif close.price_adjustment != 'split_adjusted':
+        reason = 'Not Applicable：序列含股利調整，屬總報酬口徑，不作為價格變動呈現'
+    else:
+        target = months_before(trade_date(close), months)
+        gap = (target - trade_date(anchor)).days
+        period = f'{trade_date(anchor).isoformat()}→{trade_date(close).isoformat()}'
+        if gap < 0 or gap > PRICE_ANCHOR_TOLERANCE_DAYS:
+            reason = (f'基準交易日 {trade_date(anchor).isoformat()} 不在目標日 {target.isoformat()} 之前 '
+                      f'{PRICE_ANCHOR_TOLERANCE_DAYS} 日內，不視為 {months} 個月前的價格')
+        elif anchor.value <= 0 or close.value <= 0:
+            reason = 'Not Applicable：基準或最新價格非正'
+        else:
+            value = round((close.value / anchor.value - 1) * 100, 6)
+    return Metric(entity_id=entity, name=name, value=value, unit='percent', currency=None, period=period,
+                  formula=PRICE_CHANGE_FORMULA, evidence_ids=ids, missing_reason=reason)
 
 def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
     output = []
@@ -110,6 +161,8 @@ def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
             output.append(Metric(entity_id=entity, name=name, value=round(value, 6) if value is not None else None,
                                  unit=a.unit if a and unit == 'currency' else unit, currency=a.currency if a and unit == 'currency' else None,
                                  period=a.period if a else None, formula=formula, evidence_ids=ids, missing_reason=reason))
+        for months in PRICE_CHANGE_MONTHS:
+            output.append(price_change(entity, months, records.get('close'), records.get(f'close_anchor_{months}m')))
     return output
 
 def consensus(evidence, entity_id, cutoff, mapping):

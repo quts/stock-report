@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "registry_version": "0.2.0",
+  "registry_version": "0.3.0",
   "updated_at": "2026-11-14T16:57:23+00:00",
   "policy": "Unknown terms are non-shareable AND not cleared for local persistence. A source becomes 'confirmed' only after a human records the quoted excerpt, the exact terms URL, the check date and a named attestation in this file. Endpoint accessibility is never evidence of a redistribution right.",
   "sources": [
@@ -143,6 +143,21 @@
         "資料集頁面列出的資源是 mopsfin.twse.com.tw 的 CSV，API 文件指向 openapi.twse.com.tw；本專案呼叫的 www.tpex.org.tw/openapi 端點是否屬於同一授權資料集尚未確認"
       ],
       "notes": "2026-11-15 由 Claude Code 查核資料集頁面並在記憶體內檢視端點回應形狀（欄位名稱、列數、目標列唯一）；未保存任何來源數值。使用者已選擇維持 unknown、暫不啟用，故無內部保存、分享、雜湊或原始回應權限。證據見 docs/phase-0/taiwan-financial-source-notes.md。"
+    },
+    {
+      "source_id": "yahoo-chart-daily-close",
+      "publisher": "Yahoo Finance",
+      "source_class": "secondary",
+      "attribution": "Source: Yahoo Finance chart endpoint (terms unverified)",
+      "endpoint_scope": "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2y&interval=1d&events=split",
+      "terms_url": "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": ["Endpoint support, identity, adjustment basis and storage/sharing rights require verification"],
+      "notes": "Feasibility adapter only; user chose unknown and no activation. No human attestation or retention rights."
     },
     {
       "source_id": "sec-xbrl-companyconcept",
