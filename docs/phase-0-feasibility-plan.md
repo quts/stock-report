@@ -1,6 +1,6 @@
 # Stock Report — Phase 0 Feasibility & POC Plan
 
-> 狀態：待 Review 的驗證計畫；**尚未執行 POC**  
+> 狀態：已核准規格所對應的 Phase 0 驗證計畫；**尚未執行 POC**  
 > 依據：[Product Specification V0.2](./product-spec-v0.2.md)  
 > 目的：在投入正式系統開發前，驗證「免費資料來源＋少量朋友分享 PDF＋本機 Mac Codex 訂閱」是否足以支撐可信研究，並形成 Go / Conditional Go / No-Go 結論。
 
@@ -178,4 +178,4 @@ Go/No-Go 應按**市場與能力**細分：例如 US Stock Research GO、TWSE Co
 
 Phase 0 **不**實作交易下單、不做公開上線、不購買 API、不保證有全市場分析師覆蓋、不聲稱預測績效、不建立後台排程服務或大型 Agent 框架。POC 的程式只為驗證資料、權限、介面與報告能力；若需要擴大 MVP，先經 Review。
 
-本文件與產品規格是供 Reviewer 審核的**計畫**，不是任何已通過測試或資料授權的證明。Phase 0 須在規格核准後另行啟動。
+本文件是**待執行的 Phase 0 計畫**，不是任何測試通過或資料授權取得的證明。Phase 0 須另外明確啟動。
