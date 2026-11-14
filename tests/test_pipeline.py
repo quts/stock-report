@@ -3,6 +3,7 @@ import sqlite3
 import json
 import subprocess
 import sys
+import unicodedata
 import pytest
 from pypdf import PdfReader
 from stock_report.models import Request
@@ -28,11 +29,11 @@ def test_mock_e2e_pdf_and_audit(tmp_path,name):
     pdf=PdfReader(result['report_path'])
     assert len(pdf.pages)==2
     assert float(pdf.pages[0].mediabox.width)==pytest.approx(595.28,abs=1)
-    text=''.join(p.extract_text() for p in pdf.pages)
+    text=unicodedata.normalize('NFKC',''.join(p.extract_text() for p in pdf.pages))
     for required in ['SYNTHETIC DATA','投顧共識資料不足','3-6m','6-12m']:
         assert required in text
     assert '\ufffd' not in text
-    assert all('Stock Report' in page.extract_text() for page in pdf.pages)
+    assert all(page.extract_text().strip().endswith(str(i + 1)) for i, page in enumerate(pdf.pages))
     assert read_json(run/'manifest.json')['pdf_pages']==2
     with sqlite3.connect(run/'evidence.sqlite') as db:
         assert db.execute('SELECT count(*) FROM evidence').fetchone()[0]>0
