@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><style>
+@page { size: A4; margin: 15mm 16mm 17mm; @bottom-left { content: "Stock Report · Phase 0 · 研究非交易指令"; font-size: 8pt; color: #526174; } @bottom-right { content: counter(page) " / " counter(pages); font-size: 8pt; } }
+body { font-family: "Noto Sans CJK TC", sans-serif; color: #1c2c40; font-size: 10pt; line-height: 1.5; }
+h1 { font-size: 22pt; margin: 4mm 0 2mm; } h2 { font-size: 14pt; color: #145a70; margin: 4mm 0 2mm; }
+h3 { font-size: 11pt; margin: 2mm 0; } p { margin: 1.6mm 0; }
+.banner { padding: 2.5mm; background: #fff0d0; border-left: 1.5mm solid #bd7700; font-weight: bold; }
+.meta, .note { color: #526174; font-size: 9pt; } .page { break-before: page; }
+table { border-collapse: collapse; width: 100%; margin: 2mm 0; } th, td { text-align: left; border-bottom: .2mm solid #d8e1e8; padding: 1.8mm; vertical-align: top; overflow-wrap: anywhere; } th { background: #edf4f7; }
+.card { border-top: .5mm solid #a8c6d1; padding-top: 1mm; margin-bottom: 2.5mm; break-inside: avoid; }
+small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-card { font-size: 9.5pt; line-height: 1.4; }
+.sources { font-size: 9pt; overflow-wrap: anywhere; } .warning { background: #f2f5f7; padding: 2mm; }
+</style></head><body>
+<div class="banner">{% if synthetic %}DEMO / SYNTHETIC DATA · 合成測資，禁止當成真實研究{% else %}Real Data · Phase 0 研究驗證{% endif %}</div>
+<h1>{{ '個股研究' if data.request.mode == 'stock' else '重大事件研究' }}</h1>
+<p class="meta">資料截至 {{ data.request.research_as_of.isoformat() }} · 新聞窗口 {{ data.request.lookback_days }} 天</p>
+<p class="meta">Policy {{ decision.policy_version }} · {{ decision.status }} · 財報期別另列，非即時行情</p>
+{% if data.request.mode == 'stock' %}
+{% set c = companies[0] %}
+<h2>{{ c.entity.entity_id }} · {{ c.entity.name }}</h2>
+<p>{{ c.entity.exchange }} / {{ c.entity.currency }} / {{ c.entity.share_class }}</p>
+<h2>基本面與估值</h2>
+<table><tr><th>指標</th><th>數值 / 期別</th><th>證據</th></tr>
+{% for m in c.metrics %}<tr><td>{{ metric_labels[m.name] }}</td><td>{{ '%.2f'|format(m.value) }} {{ m.currency or '' }} {{ {'percent':'%', 'multiple':'倍', 'million':'百萬', 'thousand':'千'}.get(m.unit, m.unit) }} / {{ m.period }}</td><td><small>{{ m.evidence_ids|join(', ') }}</small></td></tr>{% endfor %}
+</table>
+<p class="note">不可驗證或不適用的指標已省略；公式、原始單位與缺項原因保留於本機 JSON。</p>
+<h2>重大事件與風險</h2>
+{% for e in c.events[:3] %}<p>{{ e.claim|brief(180) }} <small>[{{ e.evidence_id }}]</small></p>{% else %}<p>沒有可公開呈現的已核實事件；不可推論沒有風險。</p>{% endfor %}
+<h2>市場反應與資料限制</h2>
+<p>尚未取得可比較且具分享權限的歷史價格序列，不計算 3 / 6 / 12 個月報酬或同業估值。</p>
+{% else %}
+<h2>事件狀態與時間軸</h2>
+{% for e in event_records %}<p><b>{{ e.event_time.date() }}</b> · {{ e.claim|brief(220) }}</p><p class="note">公開 {{ e.published_at.isoformat() }} [{{ e.evidence_id }}]</p>{% else %}<p>事件尚無可發布的核實證據；相關展望降級為資料不足。</p>{% endfor %}
+<h2>公司關聯與影響路徑</h2>
+<table><tr><th>公司 / 市場</th><th>關聯類別</th><th>追溯依據</th></tr>
+{% for c in companies %}<tr><td>{{ c.entity.entity_id }} / {{ c.entity.exchange }}</td><td>{{ {'direct':'直接', 'indirect':'間接', 'hypothetical':'Hypothetical／假設'}.get(c.relationship, '未確認') }}</td><td>{{ c.relationship_evidence_ids|join(', ') or '未確認' }}</td></tr>{% endfor %}</table>
+<p>關聯不等於受益。候選選取目前只驗證固定測資順序，尚未驗證真實事件的探索與排序能力。</p>
+<h2>主要限制</h2><p>事件狀態、公司曝險與傳導假設需要分開查證。假設關聯不發布偏多、偏空或中性結論。</p>
+{% endif %}
+<h2>主要來源與使用範圍</h2>
+{% for e in sources[:2] %}<p class="sources">{{ e.publisher }} · {{ e.source_url }}<br>{{ e.attribution }}</p>{% endfor %}
+<p class="note">完整來源、證據與逐機構明細保留於本機 evidence.json / research.json，不隨分享 PDF 自動散布。</p>
+<div class="page"></div>
+<h2>{{ '個股' if data.request.mode == 'stock' else '公司' }}獨立展望 · 3–6 / 6–12 個月</h2>
+{% for c in companies %}<div class="card {{ 'event-card' if data.request.mode == 'event' else '' }}">
+<h3>{{ c.entity.entity_id }}{% if c.relationship %} · {{ {'direct':'直接', 'indirect':'間接', 'hypothetical':'Hypothetical／假設'}.get(c.relationship) }}{% endif %}</h3>
+{% for p in c.outlooks %}
+<p><span class="badge">{{ p.horizon }} · {{ labels[p.outlook] }}</span>　{{ p.interpretation|brief(150 if data.request.mode == 'stock' else 58) }}</p>
+{% if data.request.mode == 'stock' %}<p><small>支持：{{ p.supporting_evidence_ids|join(', ') or '無' }}<br>反證：{{ p.counter_evidence_ids|join(', ') or '無可用反證；不表示沒有反向風險' }}</small></p>
+<p>假設：{{ p.assumptions|join('；')|brief(120) or '無' }}</p>
+{% if p.conflict_resolution %}<p>分歧說明：{{ p.conflict_resolution|brief(120) }}</p>{% endif %}
+<p>反轉條件：{{ p.invalidation_conditions|join('；')|brief(120) or '不足以形成方向性結論' }}</p>
+{% else %}<p class="note">支持 {{ p.supporting_evidence_ids|join(', ') or '無' }} · 反證 {{ p.counter_evidence_ids|join(', ') or '無' }}</p>{% endif %}
+{% endfor %}
+{% if data.request.mode == 'event' %}<p class="note">反轉條件：{{ c.outlooks[0].invalidation_conditions|join('；')|brief(55) or '證據不足，待重新驗證' }}</p>{% endif %}
+<p><b>{{ c.consensus.warning }}</b> · 可驗證 {{ c.consensus.institutions }} 家機構，Buy {{ c.consensus.counts.Buy }} / Hold {{ c.consensus.counts.Hold }} / Sell {{ c.consensus.counts.Sell }}{% if c.consensus.counts.Unclassified %} / 未分類 {{ c.consensus.counts.Unclassified }}{% endif %}</p>
+</div>{% endfor %}
+<h2>品質與風險揭露</h2>
+<div class="warning">{{ '合成資料僅供驗證流程，不代表真實公司情況。' if synthetic else '真實資料仍可能不完整，授權與發布時間依輸入紀錄逐項檢查。' }} 非個人化投資建議；Gate 通過不代表預測正確。</div>
+<p class="note">缺財務、估值、歷史行情與評等會局部降級。未核實、截止日後、未知分享權限的內容不得進入發布結論。完整正反證據、假設、分歧與決策規則請見本機 JSON；本 PDF 為兩頁摘要。</p>
+</body></html>

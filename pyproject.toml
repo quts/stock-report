@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-report"
+version = "0.1.0"
+description = "Phase 0 feasibility proof-of-concept for the Stock Report research pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7,<3",
+    "Jinja2>=3.1,<4",
+]
+
+[project.optional-dependencies]
+pdf = ["WeasyPrint==62.3", "pydyf==0.10.0"]
+test = ["pytest>=8,<9"]
+
+[project.scripts]
+stock-report = "stock_report.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stock_report = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "network: test performs real outbound network calls (deselected by default)",
+    "pdf: test requires WeasyPrint and its native libraries",
+]
+filterwarnings = ["error::DeprecationWarning:stock_report.*"]

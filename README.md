@@ -1,0 +1,60 @@
+# Stock Report
+
+本機投資研究工具的 **Phase 0 可執行 POC**。依 [產品規格](docs/product-spec-v0.2.md) 與 [驗證計畫](docs/phase-0-feasibility-plan.md) 建立，尚未宣告正式 MVP 或 Phase 0 GO。
+
+已實作 Schema 驗證、Prepare → 提案交換 → Finalize、SQLite 證據庫、Python 確定性計算、機構評等統計、逐公司／逐期限 Policy Gate、兩頁繁體中文 PDF、稽核 JSON／Manifest 與隔離 Replay。合成資料明確標示 `DEMO / SYNTHETIC DATA`，真實資料失敗不會自動退回 Mock。
+
+## 快速執行
+
+需要 macOS Apple Container（服務已啟動）或 Docker，以及 Git。所有 Python、字型及 PDF 系統依賴只裝在映像內，不需要在主機安裝第三方函式庫。
+
+```sh
+container system start
+./scripts/runtime.sh build
+./scripts/runtime.sh test -q
+./scripts/runtime.sh demo
+./scripts/runtime.sh qa
+```
+
+Docker 使用相同 `Dockerfile` 與腳本：
+
+```sh
+CONTAINER_ENGINE=docker ./scripts/runtime.sh build
+CONTAINER_ENGINE=docker ./scripts/runtime.sh test -q
+CONTAINER_ENGINE=docker ./scripts/runtime.sh demo
+```
+
+`demo` 實際建立美股、台灣上市、上櫃、事件四份合成報告及一份 Replay，索引在 `reports/demo/index.json`。容器回傳 `/work/...` 對應 repository 下的相同相對路徑。`reports/` 預設不納入 Git。
+
+## 三段研究介面
+
+```sh
+./scripts/runtime.sh cli prepare \
+  --request examples/stock-nvda.json --provider mock
+
+# 將 RUN_ID 換成 prepare 回傳的 run_id。
+./scripts/runtime.sh cli analyze --run reports/RUN_ID
+# Codex 讀取研究輸入、analysis-instructions.txt、context.json 及 proposal.schema.json，
+# 產生 reports/RUN_ID/ai_proposal.json；不需要額外付費 LLM API。
+./scripts/runtime.sh cli finalize \
+  --run reports/RUN_ID --proposal reports/RUN_ID/ai_proposal.json
+
+./scripts/runtime.sh cli replay --run reports/RUN_ID
+```
+
+僅測試合成管線時可用 `analyze --synthetic` 產生確定性的測試提案；這不代表 Codex／LLM 的十例實測已通過。`finalize` 回傳機器可讀的 `run_id`、`status`、`gate_status`、PDF／JSON 路徑、研究截止時間、覆蓋狀態與警告。失敗回傳非零 exit code 和 `status=failed`。
+
+## 真實資料與可行性
+
+`probe` 是**明確啟用網路**的官方端點探查，記錄擷取時間、回應 Hash、少量目標資料、錯誤與授權未知狀態，不直接產生真實研究：
+
+```sh
+./scripts/runtime.sh cli probe --allow-network \
+  --user-agent 'StockReportPhase0/0.1' --output reports/phase-0
+```
+
+SEC 探查需要自行在 User-Agent 設定符合來源要求的聯絡資訊；沒有聯絡資訊便記錄阻礙，不會取用 Claude／Codex 的登入資料。條款未核對前所有真實探查資料均標為不可在分享 PDF 使用。無付費 API、無自動重新登入。
+
+已人工查證身份、發布時間與權限的標準化真實證據可經 `prepare --provider import --evidence-bundle FILE --request REQUEST` 載入。Bundle 使用 `ResearchInput` Schema，必須 `dataset_kind=real`；不得含 Synthetic 證據，且須確認內部保存權限。這是受信任的人工整理介面，**不是自動證實來源真實性或授權的機制**。`schema --output reports/schemas` 可輸出契約。
+
+操作細節、已實作範圍與限制見 [實作說明](docs/phase-0/implementation.md)、[來源可行性](docs/phase-0/provider-feasibility.md) 及 [Phase 0 Review](docs/phase-0/phase-0-review.md)。

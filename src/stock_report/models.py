@@ -1,0 +1,152 @@
+"""Strict, timezone-aware contracts for untrusted inputs."""
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, AwareDatetime, model_validator
+
+Horizon = Literal['3-6m', '6-12m']
+Outlook = Literal['bullish', 'neutral', 'bearish', 'insufficient']
+
+class Model(BaseModel):
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
+
+class Entity(Model):
+    entity_id: str = Field(pattern=r'^[A-Z0-9.\-]+$', max_length=24)
+    name: str = Field(min_length=1, max_length=80)
+    exchange: Literal['NASDAQ', 'NYSE', 'TWSE', 'TPEx']
+    currency: Literal['USD', 'TWD']
+    share_class: str = 'common'
+
+    @model_validator(mode='after')
+    def market_currency(self):
+        expected = 'TWD' if self.exchange in ('TWSE', 'TPEx') else 'USD'
+        if self.currency != expected:
+            raise ValueError('Exchange/currency mismatch for supported common shares')
+        return self
+
+class Request(Model):
+    mode: Literal['stock', 'event']
+    ticker: str | None = None
+    exchange: Literal['NASDAQ', 'NYSE', 'TWSE', 'TPEx'] | None = None
+    event_query: str | None = Field(default=None, max_length=400)
+    research_as_of: AwareDatetime
+    lookback_days: int = Field(default=30, ge=1, le=365)
+    horizons: list[Horizon] = Field(default_factory=lambda: ['3-6m', '6-12m'])
+    max_companies: int = Field(default=5, ge=1, le=5)
+    language: Literal['zh-TW'] = 'zh-TW'
+    max_pdf_pages: Literal[2] = 2
+    sharing_profile: Literal['private', 'friends'] = 'friends'
+
+    @model_validator(mode='after')
+    def validate_mode(self):
+        if self.mode == 'stock' and (not self.ticker or self.event_query):
+            raise ValueError('Stock mode requires ticker and forbids event_query')
+        if self.mode == 'event' and (not self.event_query or self.ticker or self.exchange):
+            raise ValueError('Event mode requires event_query and forbids ticker/exchange')
+        if sorted(self.horizons) != ['3-6m', '6-12m']:
+            raise ValueError('Both distinct research horizons are required')
+        return self
+
+class Evidence(Model):
+    evidence_id: str = Field(pattern=r'^[A-Za-z0-9_.-]+$', max_length=80)
+    entity_id: str
+    claim: str = Field(max_length=500)
+    kind: Literal['identity', 'financial', 'price', 'event', 'rating', 'relationship']
+    value: float | None = None
+    unit: str | None = None
+    currency: str | None = None
+    period: str | None = None
+    source_url: str
+    publisher: str
+    source_type: Literal['official', 'secondary', 'synthetic']
+    source_record_id: str
+    metric_key: Literal['revenue_current', 'revenue_prior', 'eps_current', 'eps_prior', 'net_income', 'operating_cash_flow', 'capital_expenditure', 'close'] | None = None
+    source_hash: str | None = None
+    event_time: AwareDatetime
+    published_at: AwareDatetime
+    retrieved_at: AwareDatetime
+    research_as_of: AwareDatetime
+    verification_status: Literal['verified', 'unverified', 'conflicting', 'unavailable']
+    license_status: Literal['confirmed', 'unknown', 'restricted'] = 'unknown'
+    attribution: str
+    shareable_in_pdf: bool = False
+    internal_use_allowed: bool = False
+    terms_url: str
+    license_checked_at: AwareDatetime
+    institution: str | None = None
+    analyst: str | None = None
+    raw_rating: str | None = None
+    valid_until: AwareDatetime | None = None
+    target_price: float | None = None
+
+class Relationship(Model):
+    entity_id: str
+    relationship: Literal['direct', 'indirect', 'hypothetical']
+    evidence_ids: list[str]
+
+class Metric(Model):
+    entity_id: str
+    name: str
+    value: float | None
+    unit: str
+    currency: str | None
+    period: str | None
+    formula: str
+    evidence_ids: list[str]
+    missing_reason: str | None = None
+
+class ResearchInput(Model):
+    schema_version: Literal['1'] = '1'
+    dataset_kind: Literal['mock', 'real']
+    request: Request
+    entities: list[Entity] = Field(min_length=1, max_length=5)
+    evidence: list[Evidence]
+    metrics: list[Metric]
+    relationships: list[Relationship] = Field(default_factory=list)
+    event_evidence_ids: list[str] = Field(default_factory=list)
+    versions: dict[str, str]
+
+    @model_validator(mode='after')
+    def unique_records(self):
+        ids = [e.evidence_id for e in self.evidence]
+        companies = [e.entity_id for e in self.entities]
+        if len(ids) != len(set(ids)) or len(companies) != len(set(companies)):
+            raise ValueError('Duplicate evidence or entity IDs')
+        if len(companies) > self.request.max_companies:
+            raise ValueError('Company limit exceeded')
+        if self.request.mode == 'stock' and (len(companies) != 1 or companies[0] != self.request.ticker):
+            raise ValueError('Stock identity mismatch')
+        if self.dataset_kind == 'real' and any(e.source_type == 'synthetic' for e in self.evidence):
+            raise ValueError('Synthetic evidence cannot be labeled real')
+        return self
+
+class HorizonProposal(Model):
+    entity_id: str
+    horizon: Horizon
+    outlook: Outlook
+    supporting_evidence_ids: list[str] = Field(max_length=12)
+    counter_evidence_ids: list[str] = Field(default_factory=list, max_length=12)
+    interpretation: str = Field(max_length=350)
+    assumptions: list[str] = Field(default_factory=list, max_length=4)
+    unresolved_conflicts: list[str] = Field(default_factory=list, max_length=4)
+    invalidation_conditions: list[str] = Field(default_factory=list, max_length=4)
+    conflict_resolution: str | None = Field(default=None, max_length=350)
+
+class Proposal(Model):
+    input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    model: str
+    prompt_version: Literal['1'] = '1'
+    usage: dict[str, int] | None = None
+    outlooks: list[HorizonProposal] = Field(max_length=10)
+
+class Finding(Model):
+    rule_id: str
+    entity_id: str
+    horizon: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    message: str
+    severity: Literal['hard', 'soft']
+
+class Decision(Model):
+    status: Literal['APPROVED', 'APPROVED_WITH_WARNINGS', 'REVISE', 'REJECTED']
+    findings: list[Finding]
+    outlooks: list[HorizonProposal]
+    policy_version: str
