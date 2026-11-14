@@ -32,6 +32,7 @@ def test_mock_e2e_pdf_and_audit(tmp_path,name):
     for required in ['SYNTHETIC DATA','投顧共識資料不足','3-6m','6-12m']:
         assert required in text
     assert '\ufffd' not in text
+    assert all('Stock Report' in page.extract_text() for page in pdf.pages)
     assert read_json(run/'manifest.json')['pdf_pages']==2
     with sqlite3.connect(run/'evidence.sqlite') as db:
         assert db.execute('SELECT count(*) FROM evidence').fetchone()[0]>0
