@@ -2,7 +2,7 @@
 
 ## 目前決策
 
-**可執行 POC 已擴充，尚未達正式 MVP GO。** Mock、實際官方端點契約與正式真實研究是不同層次，不能互相替代。
+**Phase 0 程式與離線驗收已完成；正式真實研究維持 NO-GO，尚未達正式 MVP GO。** 使用者已明示保持來源關閉，真實研究不啟用，也不再列為要求使用者反覆確認的待辦。離線軟體驗收、實際端點契約與正式真實研究分開記錄，不能互相替代。完整驗收可用 `scripts/runtime.sh verify` 一次執行，狀態見 `reports/phase-0/acceptance.json`。
 
 **2026-11-15 範圍變更**：使用者明示所有輸出僅供本人使用、永不分享。再散布權不再是報告條件；內部使用已確認（即使再散布欄位為 false）的證據可進入個人 PDF、指標與提案。登錄檔權限未變更，六個來源仍為 unknown 並維持封鎖。
 
@@ -13,6 +13,8 @@
 | 個人使用報告（不分享） | 已實作並以合成資料與虛構登錄檔驗證 | PDF 每頁標示僅供個人使用・不得散布；Gate 只看已確認的內部使用權限；真實來源仍 unknown，尚無真實個人報告 |
 | 匯入事件卷宗與有界候選排序 | 已實作並以合成卷宗驗證 | 依直接／間接／假設與獨立來源數排序，明列支援範圍、排除理由、上限與新聞窗口；尚非自動新聞搜尋或全市場探索。見 [操作與限制](event-ranking.md) |
 | 自動新聞索引與公司提及線索 | 已實作並以離線契約驗證；網路 NO-GO | 固定 GDELT DOC 2.0 查詢與有界別名匹配；2026-11-15 真實網路測試 HTTP 429 失敗。搜尋只產生未核實線索，不會轉為 Evidence。來源關閉時只保存契約／數量／狀態。見 [操作與限制](news-discovery.md) |
+| NVIDIA 官方新聞稿 RSS | 實際網路契約通過；來源權限未啟用 | 固定官方 Feed，明示 --source 選取，沒有隱藏 fallback；日期、XML、筆數、去重及不留存已驗證，不把官方 RSS 當成內容已核實或取得使用權。見 [操作與驗收](operations.md) |
+| 機構評等統計 | Quant 2 已實作並測試 | 正規化去重、機構映射、同時點衝突未分類、分析師／機構／消息分開計數；無真實評等 Provider，不保證覆蓋率 |
 | TWSE 2330／TPEx 6488 | 網路契約已驗證；真實報告仍 NO-GO | 實際端點回應可解析，兩者目前日期欄位為民國格式；權限 unknown，只保存檢視用中繼資料 |
 | 台灣財報（綜合損益表，一般業）2330／6488 | 離線與網路契約已驗證；真實報告仍 NO-GO | 僅最新一期年初至今累計的營收、歸屬母公司淨利、基本 EPS；保留年度／季別原值、推得的期間起訖與 `cumulative_ytd` 基礎。來源未宣告金額級距、累計基礎與申報時間，故只可得同期淨利率；年增率、PE、自由現金流明示省略。權限 unknown，只保存檢視用中繼資料。見 [財報來源查核紀錄](taiwan-financial-source-notes.md) |
 | SEC NVDA／AMD | 離線契約已驗證；網路未驗證 | CIK、名稱、年度申報與原始單位已測試；操作人尚未提供 SEC 聯絡資訊，網路測試明確跳過 |
@@ -37,7 +39,8 @@
 
 ## 實際測試與交付紀錄
 
-- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸為 393 passed、9 deselected（2026-11-15 新聞探索增量）。先前事件卷宗／排序增量為 345 passed；本輪新增 48 項離線測試，含查詢與網址限制、歧義提及、截斷、去重、窗口、未知權限不留存及錯誤內容排除。
+- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸為 432 passed、10 deselected（2026-11-15 官方 RSS、Quant 2 與操作驗收工具增量）。`scripts/runtime.sh verify` 全套完成：測試、四份合成報告及 Replay、PDF 預覽與 Review Bundle。`reports/phase-0/acceptance.json` 記錄 offline_acceptance_passed、來源全關閉及正式 MVP GO=false。
+- `reports/phase-0/rss-network-junit.xml`：官方 NVIDIA 新聞稿 RSS 的真實網路契約 1 passed。另以受控 NVDA Request 實際執行 CLI，20 項 Feed 中有 18 項符合窗口的候選統計；只保存數量與狀態，沒有保存標題、文章連結、原始回應或雜湊，紀錄為 `reports/news/nvda-feed-inspection.json`。這不是已啟用的研究證據。
 - `reports/phase-0/discovery-network-junit.xml`：新聞索引實際網路契約 1 failed（HTTP 429），沒有宣稱真實搜尋驗收通過。Review Bundle 的 research-manifest.json 明列 FAILED，合成搜尋紀錄另列，沒有混成真實證據。
 - `reports/phase-0/us-price-network-junit.xml`：NVDA／AMD 次級行情來源的實際契約測試 2 passed；沒有保存價格、原始回應或雜湊，亦未啟用權限。
 - `reports/phase-0/network-junit.xml`：真實台股網路契約（報價 2 項、損益表 2 項通過）；SEC 缺設定時保留 skipped（2 項）。
@@ -63,3 +66,5 @@ Review Bundle 會驗證本機互動紀錄的成品雜湊。若只剩版本化摘
 5. 完成真實跨市場事件及候選排序驗證，再按市場與能力分別決定 GO／CONDITIONAL GO／NO-GO。
 
 使用者已再次明示「維持關閉，繼續其他實作」，不再追問相同來源啟用。2330 查核包位於 `docs/phase-0/2330-source-activation.json`，`activation-check` 只讀檢查範圍與漂移，不能改寫登錄檔。來源啟用與真實報告仍未完成，非使用者目前待辦。
+
+本輪結案範圍是 Phase 0 軟體與封閉來源下的驗收，不是正式 MVP 或投資效能驗證。Fable 仍受用量限制，本輪由 Codex 接手完成。剩餘真實研究條件維持 NO-GO；不以繼續增加合成測試或放寬權限假裝達成。當前設定下不要求使用者再操作或回覆「繼續」才能跑既有完整流程；可直接用 verify 與 doctor 核對。

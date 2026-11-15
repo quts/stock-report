@@ -27,5 +27,6 @@ case "$command" in
   demo) run_container python scripts/demo.py "$@" ;;
   smoke) run_container python scripts/source_smoke.py "$@" ;;
   contract) run_container python scripts/contract_probe.py "$@" ;;
-  *) echo 'Usage: scripts/runtime.sh build|test|cli|demo|qa|bundle|smoke|contract [arguments]' >&2; exit 2 ;;
+  verify) run_container python scripts/verify.py "$@" ;;
+  *) echo 'Usage: scripts/runtime.sh build|test|cli|demo|qa|bundle|smoke|contract|verify [arguments]' >&2; exit 2 ;;
 esac

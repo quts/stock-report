@@ -104,6 +104,15 @@ def query_url(request, config, max_results, now):
     start = request.research_as_of - timedelta(days=request.lookback_days)
     if request.research_as_of > now or start < now - timedelta(days=60):
         raise ValueError('Discovery supports only a non-future window within the last 60 days; cutoff is never rewritten')
+    tokens = search_terms(request, config)
+    query = ' '.join('"' + token + '"' for token in tokens)
+    utc = lambda stamp: stamp.astimezone(timezone.utc).strftime('%Y%m%d%H%M%S')
+    return ENDPOINT + '?' + urlencode({'query': query, 'mode': 'ArtList', 'format': 'json',
+        'maxrecords': max_results, 'sort': 'DateDesc', 'startdatetime': utc(start),
+        'enddatetime': utc(request.research_as_of)})
+
+
+def search_terms(request, config):
     if request.mode == 'stock':
         row = next((r for r in config['entities'] if r['entity_id'] == request.ticker), None)
         if row is None:
@@ -115,11 +124,7 @@ def query_url(request, config, max_results, now):
     tokens = re.findall(r'[^\W_]+', unicodedata.normalize('NFKC', raw), re.UNICODE)
     if not tokens or len(tokens) > 12 or any(len(token) > 40 for token in tokens):
         raise ValueError('Search needs 1 to 12 plain terms, each at most 40 characters')
-    query = ' '.join('"' + token + '"' for token in tokens)
-    utc = lambda stamp: stamp.astimezone(timezone.utc).strftime('%Y%m%d%H%M%S')
-    return ENDPOINT + '?' + urlencode({'query': query, 'mode': 'ArtList', 'format': 'json',
-        'maxrecords': max_results, 'sort': 'DateDesc', 'startdatetime': utc(start),
-        'enddatetime': utc(request.research_as_of)})
+    return tokens
 
 
 def canonical_url(value):

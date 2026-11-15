@@ -10,6 +10,8 @@ from .collect import (SEC_CONTACT_ENV, build_bundle, collect, load_collection, p
                       request_template)
 from .events import EventDossier, load_universe, rank_dossier
 from .discovery import discover
+from .rss import discover_feed
+from .diagnostics import doctor
 from .licensing import load_registry
 from .models import Request
 from .pipeline import prepare, load_prepared, finalize, replay
@@ -91,12 +93,14 @@ def parser():
     news.add_argument('--allow-network', action='store_true')
     news.add_argument('--fixture', type=Path, help='Authored synthetic index fixture only')
     news.add_argument('--max-results', type=int, default=50)
+    news.add_argument('--source', choices=['gdelt-doc-v2', 'nvidia-press-rss'], default='gdelt-doc-v2')
     act = sub.add_parser('activation-check', help='Read-only check of a source activation package')
     act.add_argument('--package', required=True, type=Path)
     act.add_argument('--candidate-registry', type=Path, help='Human-edited registry to compare; never applied')
     act.add_argument('--license-registry', type=Path, default=None)
     act.add_argument('--instruments', type=Path, default=Path('config/tw-instruments.json'))
     schema = sub.add_parser('schema')
+    sub.add_parser('doctor', help='Read-only readiness and recorded validation status; no network')
     schema.add_argument('--output', required=True, type=Path)
     return p
 
@@ -185,7 +189,8 @@ def main(argv=None):
             if args.output.exists():
                 raise ValueError('Refusing to overwrite an existing discovery report')
             request = Request.model_validate(read_json(args.request))
-            result = discover(request, allow_network=args.allow_network, fixture=args.fixture,
+            method = discover_feed if args.source == 'nvidia-press-rss' else discover
+            result = method(request, allow_network=args.allow_network, fixture=args.fixture,
                               max_results=args.max_results)
             args.output.parent.mkdir(parents=True, exist_ok=True)
             write_json(args.output, result)
@@ -219,6 +224,8 @@ def main(argv=None):
         elif args.command == 'activation-check':
             result = activation_check(args.package, load_registry(args.license_registry),
                                       read_json(args.instruments), args.candidate_registry)
+        elif args.command == 'doctor':
+            result = doctor()
         elif args.command == 'probe':
             result = probes(args.output, args.user_agent, args.retries)
         else:

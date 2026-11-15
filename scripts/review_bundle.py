@@ -57,6 +57,12 @@ if news_network.exists():
     suites = ElementTree.parse(news_network).getroot().iter('testsuite')
     failed = any(int(s.get('failures', '0')) or int(s.get('errors', '0')) for s in suites)
     news_contract = {'status': 'FAILED' if failed else 'PASSED', 'artifact': news_network.name}
+rss_network = output / 'rss-network-junit.xml'
+rss_contract = {'status': 'NOT_RUN'}
+if rss_network.exists():
+    suites = ElementTree.parse(rss_network).getroot().iter('testsuite')
+    failed = any(int(s.get('failures', '0')) or int(s.get('errors', '0')) for s in suites)
+    rss_contract = {'status': 'FAILED' if failed else 'PASSED', 'artifact': rss_network.name}
 for name,label in [('stock-nvda','stock'),('event','event')]:
     row=next(r for r in index if r.get('example')==name)
     copyfile(row['report_path'],output/f'sample-{label}.pdf')
@@ -68,6 +74,7 @@ write_json(output/'research-manifest.json',{'generated_at':datetime.now(timezone
     'real_source_smoke':'source-smoke.json' if (output/'source-smoke.json').exists() else 'NOT_RUN',
     'license_registry':read_json('config/source-licenses.json')['registry_version'],
     'real_research_e2e':'NOT_PASSED', 'news_index_network_contract':news_contract,
+    'official_news_feed_network_contract':rss_contract,
     'synthetic_news_discovery':'news-discovery.json' if (output/'news-discovery.json').exists() else 'NOT_RUN'})
 coverage={}
 for row in index:

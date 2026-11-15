@@ -1,5 +1,7 @@
 # 有界新聞索引與公司線索
 
+另有明確可選的 NVIDIA 官方新聞稿 RSS（`--source nvidia-press-rss`），其實際網路契約已通過；這不會抹除 GDELT 的 HTTP 429。使用方式與兩種來源差異見 [本機操作與驗收](operations.md)。
+
 2026-11-15：Codex 曾交由本機 Claude Code Fable 接手，但 Fable 立即回報五小時用量上限，因此本增量由 Codex 實作與驗收。
 
 ## 使用方式

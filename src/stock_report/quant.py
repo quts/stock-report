@@ -2,9 +2,10 @@
 import calendar
 from datetime import date, timedelta
 import re
+import unicodedata
 from .models import Evidence, Metric, PRICE_ANCHOR_TOLERANCE_DAYS, PRICE_CHANGE_MONTHS
 
-VERSION = '1'
+VERSION = '2'
 
 def usable(e: Evidence, cutoff) -> bool:
     return (e.verification_status == 'verified' and e.published_at <= cutoff
@@ -165,26 +166,75 @@ def calculate(evidence: list[Evidence], cutoff) -> list[Metric]:
             output.append(price_change(entity, months, records.get('close'), records.get(f'close_anchor_{months}m')))
     return output
 
+def rating_key(value):
+    return ' '.join(unicodedata.normalize('NFKC', value or '').split()).casefold()
+
+
+def rating_tables(mapping):
+    """Validate configured three-way mappings without inventing institution definitions."""
+    def table(raw):
+        if not isinstance(raw, dict):
+            raise ValueError('Rating mappings must be objects')
+        result = {}
+        for key, value in raw.items():
+            if not isinstance(key, str) or not rating_key(key) or value not in ('Buy', 'Hold', 'Sell'):
+                raise ValueError('Rating mappings require nonempty labels and Buy/Hold/Sell values')
+            normalized = rating_key(key)
+            if normalized in result and result[normalized] != value:
+                raise ValueError('Conflicting normalized rating mapping labels')
+            result[normalized] = value
+        return result
+    default = table(mapping.get('default'))
+    institutions = {}
+    raw = mapping.get('institutions', {})
+    if not isinstance(raw, dict):
+        raise ValueError('Institution rating mappings must be an object')
+    for name, values in raw.items():
+        if not isinstance(name, str):
+            raise ValueError('Institution mapping names must be strings')
+        key = rating_key(name)
+        if not key or key in institutions:
+            raise ValueError('Duplicate or empty normalized institution mapping')
+        institutions[key] = table(values)
+    return default, institutions
+
+
 def consensus(evidence, entity_id, cutoff, mapping):
-    latest = {}
-    for e in evidence:
-        if e.entity_id != entity_id or e.kind != 'rating' or not e.institution or not usable(e, cutoff):
-            continue
-        if not e.valid_until or e.valid_until < cutoff:
-            continue
-        key = e.institution.strip().casefold()
-        if key not in latest or (e.published_at, e.evidence_id) > (latest[key].published_at, latest[key].evidence_id):
-            latest[key] = e
+    default, institutions = rating_tables(mapping)
+    eligible = [e for e in evidence if e.entity_id == entity_id and e.kind == 'rating'
+                and rating_key(e.institution) and usable(e, cutoff)
+                and e.research_as_of == cutoff and e.license_status == 'confirmed'
+                and e.valid_until and e.valid_until >= cutoff]
+    groups = {}
+    for e in eligible:
+        groups.setdefault(rating_key(e.institution), []).append(e)
     counts = {'Buy': 0, 'Hold': 0, 'Sell': 0, 'Unclassified': 0}
-    rows = []
-    for e in latest.values():
-        table = mapping.get('institutions', {}).get(e.institution, mapping['default'])
-        rating = table.get(e.raw_rating, 'Unclassified')
+    rows, current = [], []
+    for key in sorted(groups):
+        published = max(e.published_at for e in groups[key])
+        tied = sorted((e for e in groups[key] if e.published_at == published), key=lambda e: e.evidence_id)
+        current.extend(tied)
+        e = tied[0]
+        conflict = len({rating_key(r.raw_rating) for r in tied}) > 1
+        table = {**default, **institutions.get(key, {})}
+        rating = 'Unclassified' if conflict else table.get(rating_key(e.raw_rating), 'Unclassified')
         counts[rating] += 1
+        prices = {r.target_price for r in tied}
+        currencies = {r.currency for r in tied}
+        price = next(iter(prices)) if len(prices) == 1 else None
+        currency = next(iter(currencies)) if len(currencies) == 1 else None
+        price = price if price is not None and price > 0 and currency in ('USD', 'TWD') else None
         rows.append({'evidence_id': e.evidence_id, 'institution': e.institution, 'raw_rating': e.raw_rating,
-                     'rating': rating, 'published_at': e.published_at.isoformat(), 'target_price': e.target_price})
-    total = len(latest)
-    return {'counts': counts, 'institutions': total, 'analysts': len({e.analyst for e in latest.values() if e.analyst}),
-            'message_count': sum(e.kind == 'rating' and e.entity_id == entity_id and e.published_at <= cutoff for e in evidence),
+                     'raw_ratings': sorted({r.raw_rating or '' for r in tied}),
+                     'evidence_ids': sorted({r.evidence_id for r in tied}), 'conflicting': conflict,
+                     'rating': rating, 'published_at': e.published_at.isoformat(), 'target_price': price,
+                     'target_price_currency': currency if price is not None else None})
+    total = len(groups)
+    return {'counts': counts, 'institutions': total,
+            'analysts': len({(rating_key(e.institution), rating_key(e.analyst))
+                             for e in current if rating_key(e.analyst)}),
+            'message_count': len({e.evidence_id for e in eligible}),
+            'conflicting_institutions': sum(row['conflicting'] for row in rows),
             'ratios': {k: v / total if total else None for k, v in counts.items()}, 'rows': rows,
-            'warning': '投顧共識資料不足' if total < 3 else '僅代表可核實樣本，非全市場共識'}
+            'warning': ('投顧共識資料不足' if total < 3 else '僅代表可核實樣本，非全市場共識')
+                       + ('；同機構同時點評等衝突列為未分類' if any(row['conflicting'] for row in rows) else '')}

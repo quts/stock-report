@@ -1,6 +1,6 @@
 # Stock Report — Phase 0 Feasibility & POC Plan
 
-> 狀態：已核准規格所對應的 Phase 0 驗證計畫；**尚未執行 POC**  
+> 狀態：Phase 0 POC 已執行；當前驗收結果與正式 GO／NO-GO 依 [Phase 0 Review](phase-0/phase-0-review.md)，本計畫不是授權或測試證明。
 > 依據：[Product Specification V0.2](./product-spec-v0.2.md)  
 > 目的：在投入正式系統開發前，驗證「免費資料來源＋僅供本人使用的 PDF＋本機 Mac Codex 訂閱」是否足以支撐可信研究，並形成 Go / Conditional Go / No-Go 結論。  
 > **2026-11-15 範圍變更（使用者明示）**：輸出僅供使用者本人使用，永不分享；原「分享版 PDF／再散布授權」驗證項目已改為「個人 PDF／內部使用授權」。個人使用不等於已取得權限，unknown／restricted 來源仍封鎖。
@@ -181,4 +181,4 @@ Go/No-Go 應按**市場與能力**細分：例如 US Stock Research GO、TWSE Co
 
 Phase 0 **不**實作交易下單、不做公開上線、不做任何分享／散布功能、不購買 API、不保證有全市場分析師覆蓋、不聲稱預測績效、不建立後台排程服務或大型 Agent 框架。POC 的程式只為驗證資料、權限、介面與報告能力；若需要擴大 MVP，先經 Review。
 
-本文件是**待執行的 Phase 0 計畫**，不是任何測試通過或資料授權取得的證明。Phase 0 須另外明確啟動。
+本文件記錄 Phase 0 的驗收要求，不是資料授權取得的證明。POC 已執行，實際結果與未通過條件由 Phase 0 Review 及 reports/phase-0/acceptance.json 分別記錄；離線驗收不等於正式 MVP GO。
