@@ -1,5 +1,5 @@
 """Strict, timezone-aware contracts for untrusted inputs."""
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, AwareDatetime, model_validator
 
@@ -273,10 +273,60 @@ class EarningsPreviewReview(Model):
     limitations: list[str] = Field(default_factory=list, max_length=12)
 
 
+TW_EXCHANGES = ('TWSE', 'TPEx')
+TAIPEI = timezone(timedelta(hours=8))
+
+
+def tw_required_period_end(cutoff, fiscal_year_end_month=12):
+    """Latest period whose statutory report must already be public at the cutoff.
+
+    Securities and Exchange Act Art. 36: Q1-Q3 reports within 45 days after the quarter ends, the
+    annual report within three months after the fiscal year ends. A report is only required once
+    its deadline day has fully passed in Taipei. Only December fiscal years are supported."""
+    if fiscal_year_end_month != 12:
+        return None
+    today = cutoff.astimezone(TAIPEI).date()
+    due = []
+    for year in (today.year - 2, today.year - 1, today.year):
+        for month, day in ((3, 31), (6, 30), (9, 30)):
+            end = date(year, month, day)
+            due.append((end, end + timedelta(days=45)))
+        due.append((date(year, 12, 31), date(year + 1, 3, 31)))
+    return max(end for end, deadline in due if deadline < today)
+
+
+def tw_financial_review_state(data):
+    """Taiwan issuers have no SEC-style filing index here: freshness follows the statutory deadline."""
+    from .storage import read_json
+    cutoff, ticker = data.request.research_as_of, data.request.ticker
+    rows = [r for r in read_json('config/tw-instruments.json')['instruments'] if r['ticker'] == ticker]
+    if len(rows) != 1:
+        return ['LATEST_FINANCIAL_REVIEW_INVALID']
+    required = tw_required_period_end(cutoff, rows[0].get('fiscal_year_end_month'))
+    if required is None:
+        return ['LATEST_FINANCIAL_REVIEW_INVALID']
+    facts = [e for e in data.evidence
+             if e.entity_id == ticker and e.kind == 'financial' and e.statement_kind == 'fact'
+             and e.source_type == 'official' and e.value is not None and e.period_end is not None
+             and e.financial_metric in ('revenue', 'net_income') and e.verification_status == 'verified'
+             and e.license_status == 'confirmed' and e.internal_use_allowed
+             and e.published_at <= cutoff and e.event_time <= cutoff and e.research_as_of == cutoff]
+    if not facts:
+        return ['LATEST_FINANCIAL_REPORT_MISSING']
+    latest = max(e.period_end for e in facts)
+    if latest < required:
+        return ['LATEST_FINANCIAL_REPORT_STALE']
+    if {'revenue', 'net_income'} - {e.financial_metric for e in facts if e.period_end == latest}:
+        return ['LATEST_FINANCIAL_STATEMENTS_INCOMPLETE']
+    return []
+
+
 def financial_review_state(data):
     """A completed real stock study must include the latest published statements, not only annual facts."""
     if data.request.mode != 'stock' or data.dataset_kind != 'real':
         return []
+    if data.request.exchange in TW_EXCHANGES:
+        return tw_financial_review_state(data)
     review = data.latest_financials
     if review is None:
         return ['LATEST_FINANCIAL_REPORT_MISSING']

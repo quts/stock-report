@@ -28,6 +28,7 @@ FINANCIAL_REVIEW_MESSAGES = {
     'LATEST_FINANCIAL_DISCOVERY_UNVERIFIED': '最新申報清單未經核實來源確認',
     'LATEST_FINANCIAL_STATEMENTS_INCOMPLETE': '最新申報缺少必要的收入、淨利或營業現金流',
     'LATEST_QUARTER_MISSING': '最新季報尚未納入單季收入',
+    'LATEST_FINANCIAL_REPORT_STALE': '已納入的財報早於截止日前依法應已公告的最新一期',
     'EARNINGS_PREVIEW_SEARCH_MISSING': '尚未執行下一次財報預期新聞搜尋',
 }
 

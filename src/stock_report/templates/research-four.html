@@ -26,7 +26,7 @@ tr { break-inside:avoid; } sup { font-size:7pt; color:#12657a; } .sources { font
 
 <div class="page"></div><p class="eyebrow">最新一期財報 · 獲利與現金轉換</p>
 <h1>成長，如何變成現金？</h1>
-{% if data.latest_financials %}<p class="meta">{{ data.latest_financials.discovery.form }} · 期間截至 {{ data.latest_financials.discovery.period_end }} · 公開 {{ data.latest_financials.discovery.published_at|taipei }}（台灣）</p>{% endif %}
+{% if data.latest_financials %}<p class="meta">{{ data.latest_financials.discovery.form }} · 期間截至 {{ data.latest_financials.discovery.period_end }} · 公開 {{ data.latest_financials.discovery.published_at|taipei }}（台灣）</p>{% elif latest_statement_period %}<p class="meta">最新財報期間截至 {{ latest_statement_period }}</p>{% endif %}
 <h2>單季實績與去年同季</h2>{{ financial_table(c.quarter_rows) }}
 {% if c.balance_rows %}<h2>資金占用與資產負債</h2>{{ financial_table(c.balance_rows) }}<p class="meta">餘額比較對財年末，並非單季年增率；一般 FCF 與調整後 FCF 分列。</p>{% endif %}
 {{ paragraphs(c.research.fundamentals) }}

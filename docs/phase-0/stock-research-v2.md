@@ -32,6 +32,21 @@
 `EARNINGS_PREVIEW_SEARCH_MISSING`。這些代碼寫在 research.json 的 `completion_blockers` 與 decision.json 的 findings
 （方向會降為 insufficient），不會出現在 PDF 正文。
 
+### 2.1 台股（TWSE／TPEx）
+
+台股沒有和 SEC 10-Q／10-K 相同的申報清單，因此最新財報的時效改依**法定公告期限**判斷（證券交易法第36條：
+第一至三季於季終了後四十五日內、年度財報於會計年度終了後三個月內公告申報；
+https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=G0400001&flno=36）。
+
+- `tw_required_period_end(cutoff)`：以台北日期計算，期限當日完全結束後，該期才算「應已公告」。
+  只支援 12 月結束的會計年度（依 `config/tw-instruments.json`），其他會計年度判定為 `LATEST_FINANCIAL_REVIEW_INVALID`。
+- 截止前可用的官方 `fact` 財務證據（`financial_metric` 為 `revenue`、`net_income`），最新期別不得早於應公告期別，
+  否則為 `LATEST_FINANCIAL_REPORT_STALE`；最新期別還必須同時有營收與淨利。年初至今累計或單季皆可。
+- 來源：TWSE 綜合損益表 OpenAPI（2026-11-15 AI 查核開放，registry 0.6.2；金額級距未宣告，只作期間覆蓋與同紀錄比率），
+  以及發行公司向 SEC 申報的 6-K／20-F（`config/sec-entities.json` 將 2330.TW 對應到台積電 CIK 0001046179；
+  6-K 有明示單位、單季數字與現金流量）。
+- 台股官方開放資料集沒有現金流量表；沒有可用的現金流量證據時，報告的資料範圍會寫明。
+
 ## 3. 前瞻陳述的分類
 
 `Evidence.statement_kind`：`fact`、`reported_claim`（媒體報導的說法）、`management_guidance`、`analyst_estimate`、
@@ -113,7 +128,6 @@ bundle-report.json 新增 `latest_financial_report_status` 與 `earnings_preview
 
 ## 7. 未解決事項
 
-- `financial_review_state` 目前只支援 SEC（美股 10-K／10-Q）；台股最新財報尚未納入這項要求。
-  `max_pdf_pages=4` 的真實台股研究會被擋下，需改用 `max_pdf_pages=2` 的舊版型。
+- 台股時效檢查只支援曆年制；其他上市櫃公司若無 SEC 申報，現金流量與單季數字需另找已查核來源。
 - `reviewed_html` 只登錄了 DELL IR 單一頁面；其他發行人需要另外查核並登錄。
 - 媒體來源目前只開放 Le Monde Economy RSS。其他主流媒體的條款查核結果尚未確認，維持封鎖。
