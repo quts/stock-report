@@ -125,3 +125,7 @@ NVDA 個股修正已加入受查核 SEC 8-K 文件採集與重大事件優先呈
 ### 個股研究 V2（2026-11-15）
 
 真實個股研究必須納入截止時點前最新一期財報（SEC submissions 發現 → 最新申報的財務事實），並附上下一次財報預期的搜尋紀錄（`bundle --earnings-preview`）。主流媒體經查核後可作為 secondary 來源，收錄時與官方事實分開標示。公司指引、具名分析師／共識預測、情境假設三者分開呈現。四頁報告由提案的 `company_research` 段落組成，正文使用 `[n]` 註腳。操作與 Schema 見 [個股研究 V2](docs/phase-0/stock-research-v2.md)。
+
+### 投資研究版型（2026-11-15）
+
+`report_profile=investment`（`max_pdf_pages` 4–8）在既有管線上加入確定性的投資研究層，台股與美股共用：季度序列與 TTM、財務分析、依產業選擇的估值方法、Bull／Base／Bear 情境、指引 vs 共識比較、事件影響排序、資料完整性，以及發布前品質檢查。任一關鍵檢查失敗時，報告會在首頁標示為受限報告。`prepare` 會輸出 `investment_inputs.json` 給提案引用，`finalize` 另寫 `investment.json`。美股季度資料可用 `collect --source sec-xbrl-companyconcept --source-profile '{"series":"quarterly"}'` 取得。設計與限制見 [差距分析](docs/phase-0/investment-engine-gap-analysis.md)，新舊報告比較見 [報告比較](docs/phase-0/investment-engine-report-comparison.md)。

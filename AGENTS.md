@@ -20,6 +20,7 @@
 - 個人 PDF 的權限依據是已確認（confirmed）且有查核依據（`source_reviewed`）的 `internal_use_allowed`，不需要再散布簽認；`pdf_share_allowed`／`shareable_in_pdf` 為舊欄位，不是 Gate，也不得自行設為 true。個人使用不等於已取得權限：unknown／restricted 來源仍封鎖。
 - 個人 PDF 權限不涵蓋本機原始稽核留存：回應雜湊與原始回應另需 `store_response_hash`／`store_raw_response`；未核對來源條款時禁止呈現其數據。
 - 使用者於 2026-11-15 變更個股研究（V2）：PDF 1–4 頁（預設 4）。真實個股研究必須納入截止前最新一期財報（`latest_financials`），並附上下一次財報預期搜尋紀錄（`earnings_preview`）；缺任一項時 finalize 不發布四頁報告，不得改用年報或累計數冒充最新季度。提案須填 `company_research` 六個段落並引用可用證據。公司指引、具名 analyst／consensus 預測、scenario 分開；查不到可靠共識就照實寫，不捏造。主流媒體只能作 secondary 來源，且需先通過來源查核。台股最新財報依證券交易法第36條法定期限判斷是否過期。細節見 docs/phase-0/stock-research-v2.md。
+- 投資研究版型（`report_profile=investment`）：數字只能取自證據或 `investment_inputs.json`。提案須含 `thesis` 與 bull／base／bear `scenarios`，每個假設標明 basis，倍數沒有歷史或同業依據時標 `model_assumption`，不給機率。查不到的必要資料以 `bundle --data-gaps` 記錄實際狀態，不能把取得失敗寫成資料不存在。品質檢查失敗時照實發布受限報告。
 - 驗證使用 `scripts/runtime.sh test -q`。範例使用 `demo`，版面檢視使用 `qa`，Review Bundle 使用 `bundle`。真實探查需要明示 `cli probe --allow-network`。
 
 # 官方來源增量操作

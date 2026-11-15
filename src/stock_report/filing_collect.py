@@ -33,7 +33,9 @@ class FilingFact(Model):
     period_basis: Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'instant'] | None = None
     statement_kind: Literal['fact', 'reported_claim', 'management_guidance', 'analyst_estimate', 'consensus_estimate', 'scenario'] = 'fact'
     target_period: str | None = None
+    target_period_end: date | None = None
     institution: str | None = None
+    accounting_basis: Literal['gaap', 'ifrs', 'non_gaap', 'company_adjusted', 'not_applicable'] | None = None
 
 
 class FilingPlan(Model):
@@ -128,6 +130,7 @@ def collect_filings(ticker, *, registry, allow_network, plan, client, now=None):
             period=fact.period, period_start=fact.period_start, period_end=fact.period_end,
             period_basis=fact.period_basis, statement_kind=fact.statement_kind,
             target_period=fact.target_period, institution=fact.institution,
+            target_period_end=fact.target_period_end, accounting_basis=fact.accounting_basis,
             source_url=fact.url, source_published_raw=fact.publication_date,
             publication_basis='source_declared_date', published_at=pub, event_time=event,
             retrieved_at=observed))

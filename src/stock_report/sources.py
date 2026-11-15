@@ -65,6 +65,8 @@ class Observation(Model):
     request_key: str = Field(max_length=120)
     source_url: str
     article_url: str | None = Field(default=None, pattern=r'^https://[^\s]+$', max_length=1000)
+    accounting_basis: Literal['gaap', 'ifrs', 'non_gaap', 'company_adjusted', 'not_applicable'] | None = None
+    target_period_end: date | None = None
     source_published_raw: str | None = Field(default=None, max_length=120)
     source_period_raw: str | None = Field(default=None, max_length=120)
     source_unit_raw: str | None = Field(default=None, max_length=60)
@@ -263,6 +265,27 @@ PROFILES = {
         'coverage_mode': 'historical_filings',
         'annual_forms': ['10-K'],
         'min_period_days': 300, 'max_period_days': 400,
+        # `quarterly` emits every 10-Q/10-K window (single quarter, year-to-date, fiscal year and
+        # balance-sheet instants) of the roles below for the most recent `max_quarters` periods.
+        'series': 'annual', 'max_quarters': 12,
+        'quarterly_roles': {
+            'revenue': {'concepts': ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues'], 'units': ['USD'], 'unit': 'USD', 'required': True},
+            'gross_profit': {'concepts': ['GrossProfit'], 'units': ['USD'], 'unit': 'USD'},
+            'operating_income': {'concepts': ['OperatingIncomeLoss'], 'units': ['USD'], 'unit': 'USD'},
+            'net_income': {'concepts': ['NetIncomeLoss'], 'units': ['USD'], 'unit': 'USD', 'required': True},
+            'diluted_eps': {'concepts': ['EarningsPerShareDiluted'], 'units': ['USD/shares'], 'unit': 'per_share'},
+            'diluted_shares': {'concepts': ['WeightedAverageNumberOfDilutedSharesOutstanding'], 'units': ['shares'], 'unit': 'shares'},
+            'operating_cash_flow': {'concepts': ['NetCashProvidedByUsedInOperatingActivities'], 'units': ['USD'], 'unit': 'USD'},
+            'capital_expenditure': {'concepts': ['PaymentsToAcquirePropertyPlantAndEquipment'], 'units': ['USD'], 'unit': 'USD'},
+            'depreciation_amortization': {'concepts': ['DepreciationDepletionAndAmortization', 'DepreciationAndAmortization'], 'units': ['USD'], 'unit': 'USD'},
+            'cash_equivalents': {'concepts': ['CashAndCashEquivalentsAtCarryingValue'], 'units': ['USD'], 'unit': 'USD'},
+            'accounts_receivable_net': {'concepts': ['AccountsReceivableNetCurrent'], 'units': ['USD'], 'unit': 'USD'},
+            'inventory': {'concepts': ['InventoryNet'], 'units': ['USD'], 'unit': 'USD'},
+            'accounts_payable': {'concepts': ['AccountsPayableCurrent'], 'units': ['USD'], 'unit': 'USD'},
+            'short_term_debt': {'concepts': ['DebtCurrent', 'LongTermDebtCurrent'], 'units': ['USD'], 'unit': 'USD'},
+            'long_term_debt': {'concepts': ['LongTermDebtNoncurrent'], 'units': ['USD'], 'unit': 'USD'},
+            'total_equity': {'concepts': ['StockholdersEquity'], 'units': ['USD'], 'unit': 'USD'},
+        },
         'roles': {
             'revenue': {'concepts': ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet'],
                         'units': ['USD'], 'unit': 'USD', 'required': True,
@@ -791,7 +814,8 @@ class SecConceptAdapter:
         if not re.fullmatch(r'\d{10}', cik):
             raise ValueError('Configured CIK must be ten digits')
         specs = []
-        for role, spec in self.profile['roles'].items():
+        roles = self.profile['quarterly_roles'] if self.profile.get('series') == 'quarterly' else self.profile['roles']
+        for role, spec in roles.items():
             for concept in spec['concepts']:
                 specs.append(RequestSpec(key=f'{role}:{concept}', required=False,
                                          url=self.profile['endpoint'].format(cik=cik, concept=concept)))
@@ -837,7 +861,103 @@ class SecConceptAdapter:
                 selected[end] = row
         return sorted(selected.values(), key=lambda r: r['end_date'], reverse=True)
 
+    QUARTER_BASES = (('single_quarter', 80, 100), ('cumulative_ytd', 170, 290), ('fiscal_year', 350, 380))
+
+    def quarterly_facts(self, payload, spec):
+        """Every 10-Q/10-K window of one concept; the latest filing of a window is kept."""
+        units = payload.get('units')
+        unit_key = bind_field(units, spec['units']) if isinstance(units, dict) else None
+        if unit_key is None or not isinstance(units[unit_key], list):
+            return []
+        selected = {}
+        for fact in units[unit_key]:
+            if not isinstance(fact, dict) or str(fact.get('form', '')).split('/')[0] not in ('10-Q', '10-K'):
+                continue
+            end, filed, accn, value = fact.get('end'), fact.get('filed'), fact.get('accn'), to_number(fact.get('val'))
+            if not (end and filed and accn) or value is None:
+                continue
+            end_date, filed_date = parse_source_date(end, ['iso'])[0], parse_source_date(filed, ['iso'])[0]
+            if filed_date < end_date:
+                raise SourceContractError(f'{self.source_id}: filing date precedes the period end it reports')
+            start_date, basis = None, 'instant'
+            if fact.get('start'):
+                start_date = parse_source_date(fact['start'], ['iso'])[0]
+                span = (end_date - start_date).days
+                basis = next((name for name, low, high in self.QUARTER_BASES if low <= span <= high), None)
+                if basis is None:
+                    continue
+            row = dict(value=value, start_date=start_date, end_date=end_date, filed_date=filed_date, accn=accn,
+                       form=fact.get('form'), fy=fact.get('fy'), fp=fact.get('fp'), basis=basis, unit_key=unit_key)
+            key = (start_date, end_date)
+            if key not in selected or (filed_date, accn) > (selected[key]['filed_date'], selected[key]['accn']):
+                selected[key] = row
+        return list(selected.values())
+
+    def parse_quarterly(self, ticker, payloads, collected_at):
+        config = self.entity_config(ticker)
+        notes, observations, identity_source, entity_name = [], [], None, None
+        for role, spec in self.profile['quarterly_roles'].items():
+            rows, used, payload = [], None, None
+            for concept in spec['concepts']:
+                candidate = payloads.get(f'{role}:{concept}')
+                if not isinstance(candidate, dict):
+                    continue
+                found = self.quarterly_facts(candidate, spec)
+                # A concept change is never spliced: the concept with the newest window wins.
+                if found and (not rows or max(r['end_date'] for r in found) > max(r['end_date'] for r in rows)):
+                    rows, used, payload = found, concept, candidate
+            if not rows:
+                if spec.get('required'):
+                    raise SourceContractError(f'{self.source_id}: no quarterly facts for required role {role}')
+                notes.append(f'{role}: 無 10-Q/10-K 事實，保留缺值（not_found）')
+                continue
+            if payload.get('cik') is None or int(payload['cik']) != int(config['cik']):
+                raise SourceContractError(f'{self.source_id}: response CIK does not match configured issuer for {ticker}')
+            name = str(payload.get('entityName', '')).strip()
+            expected = config.get('expected_entity_name_contains')
+            if expected and expected.casefold() not in name.casefold():
+                raise SourceContractError(f'{self.source_id}: response entityName does not match {expected!r}')
+            entity_name = entity_name or name
+            if spec['unit'] in ('USD',) and rows[0]['unit_key'] != config['currency']:
+                raise SourceContractError(f'{self.source_id}: {role} is not reported in {config["currency"]}')
+            ends = sorted({r['end_date'] for r in rows}, reverse=True)[:self.profile['max_quarters']]
+            url = self.profile['endpoint'].format(cik=config['cik'], concept=used)
+            for row in sorted((r for r in rows if r['end_date'] in ends), key=lambda r: (r['end_date'], r['basis'])):
+                tag = {'single_quarter': 'q', 'cumulative_ytd': 'ytd', 'fiscal_year': 'fy', 'instant': 'i'}[row['basis']]
+                observations.append(Observation(
+                    evidence_id=f'sec-{ticker}-{role}-{row["end_date"].isoformat()}-{tag}'[:80], entity_id=ticker,
+                    kind='financial', financial_metric=role, accounting_basis='gaap',
+                    value=row['value'], unit=spec['unit'], currency=config['currency'] if spec['unit'] != 'shares' else None,
+                    period=f'{row["fy"]}{row["fp"]}' if row['fy'] and row['fp'] else None,
+                    period_start=row['start_date'] or row['end_date'], period_end=row['end_date'], period_basis=row['basis'],
+                    claim=f'us-gaap:{used} {row["value"]} {row["unit_key"]}，期間 '
+                          f'{row["start_date"] or ""}~{row["end_date"]}（{row["basis"]}），來自 {row["form"]} {row["accn"]}，'
+                          f'申報日 {row["filed_date"]}。',
+                    provider_record_id=f'{row["accn"]}:{used}:{row["start_date"]}:{row["end_date"]}'[:120],
+                    request_key=f'{role}:{used}', source_url=url, source_published_raw=row['filed_date'].isoformat(),
+                    source_period_raw=f'{row["start_date"]}..{row["end_date"]} fy={row["fy"]} fp={row["fp"]}'[:120],
+                    source_unit_raw=row['unit_key'], publication_basis='source_declared_date',
+                    published_at=end_of_day(row['filed_date'], US_DATE_UPPER_BOUND),
+                    event_time=end_of_day(row['end_date'], US_DATE_UPPER_BOUND), retrieved_at=collected_at))
+                if identity_source is None or row['filed_date'] > identity_source['filed_date']:
+                    identity_source = {**row, 'url': url, 'request_key': f'{role}:{used}'}
+        if identity_source is None or not entity_name:
+            raise SourceContractError(f'{self.source_id}: no filing established the issuer identity')
+        entity = Entity(entity_id=ticker, name=entity_name[:80], exchange=config['exchange'],
+                        currency=config['currency'], share_class=config['share_class'])
+        stamp = end_of_day(identity_source['filed_date'], US_DATE_UPPER_BOUND)
+        observations.insert(0, Observation(
+            evidence_id=f'sec-{ticker}-identity'[:80], entity_id=ticker, kind='identity',
+            claim=f'{entity_name}（CIK {int(config["cik"])}）取自 companyconcept 回應的 entityName 與 cik 欄位。',
+            provider_record_id=f'{identity_source["accn"]}:response.entityName', request_key=identity_source['request_key'],
+            source_url=identity_source['url'], source_published_raw=identity_source['filed_date'].isoformat(),
+            publication_basis='source_declared_date', published_at=stamp, event_time=stamp, retrieved_at=collected_at))
+        notes.append('季度序列：單季、年初至今、年度與資產負債時點分開保存；單季推導由分析層以同一申報口徑計算')
+        return ParseResult(entity=entity, observations=observations, field_binding=dict(SEC_IDENTITY_FIELDS), notes=notes)
+
     def parse(self, ticker, payloads, collected_at):
+        if self.profile.get('series') == 'quarterly':
+            return self.parse_quarterly(ticker, payloads, collected_at)
         config = self.entity_config(ticker)
         notes, observations, identity_source = [], [], None
         entity_name = None

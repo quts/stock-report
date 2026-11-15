@@ -15,7 +15,7 @@ import re
 from typing import Literal
 from pydantic import AwareDatetime, Field, model_validator
 from .events import EventSource, Review, effective_tier, independent_origins, record_problem, SECONDARY_ORIGINS_REQUIRED
-from .models import (EventCategory, EventReview, EventReviewStatus, Evidence, MaterialLead, Model, Request,
+from .models import (EventCategory, EventReview, EventReviewStatus, Evidence, ImpactArea, MaterialLead, Model, Request,
                      ResearchInput, ReviewedEvent)
 from .quant import calculate
 from .sources import FILING_PROFILES
@@ -33,6 +33,7 @@ class StockEvent(Model):
     status: Literal['occurred', 'in_effect', 'officially_announced', 'proposed', 'rumored']
     event_time: AwareDatetime
     sources: list[EventSource] = Field(min_length=1, max_length=6)
+    impact_areas: list[ImpactArea] = Field(default_factory=list, max_length=6)
 
 
 class EventScan(Model):
@@ -206,7 +207,8 @@ def merge_stock_events(bundle, dossier, registry=None, sec_entities=None):
             verified.append((ReviewedEvent(event_id=event.event_id, title=event.title, category=event.category,
                                            materiality=event.materiality, status=event.status,
                                            event_time=event.event_time, verification=level,
-                                           evidence_ids=sorted(e.evidence_id for _, e in keep)),
+                                           evidence_ids=sorted(e.evidence_id for _, e in keep),
+                                           impact_areas=event.impact_areas),
                              [e for _, e in keep]))
     if len(leads) > 24:
         block('too_many_unresolved_leads', '未解決線索超過上限；請先整理卷宗')
@@ -242,6 +244,7 @@ def merge_stock_events(bundle, dossier, registry=None, sec_entities=None):
                          evidence=evidence, metrics=calculate(evidence, cutoff),
                          relationships=bundle.relationships, event_evidence_ids=bundle.event_evidence_ids,
                          event_review=event_review, latest_financials=bundle.latest_financials,
-                         earnings_preview=bundle.earnings_preview, versions=bundle.versions)
+                         earnings_preview=bundle.earnings_preview, data_gaps=bundle.data_gaps,
+                         versions=bundle.versions)
     report['bundle_sha256'] = digest(data)
     return data, report

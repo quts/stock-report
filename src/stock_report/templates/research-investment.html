@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><style>
+@page { size:A4; margin:13mm 15mm 15mm; @bottom-left { content:'個人研究 · 僅供本人使用'; font:8pt sans-serif; color:#64748b; } @bottom-right { content:counter(page); font:8pt sans-serif; } }
+body { font-family:'Noto Sans CJK TC',sans-serif; color:#203047; font-size:9.6pt; line-height:1.45; }
+h1 { font-size:22pt; line-height:1.2; margin:1mm 0 2mm; } h2 { font-size:13.5pt; color:#12657a; margin:3.5mm 0 1.5mm; } h3 { font-size:10.5pt; margin:2.5mm 0 1mm; }
+p { margin:1.3mm 0; } .meta { color:#64748b; font-size:8.3pt; } .eyebrow { color:#12657a; font-size:8.6pt; letter-spacing:.6pt; }
+.page { break-before:page; } .lead { background:#edf6f8; border-left:1mm solid #17778b; padding:1.8mm 3mm; margin:1.6mm 0; }
+.limited { background:#fff1e6; border-left:1mm solid #c2410c; padding:2mm 3mm; margin:1.5mm 0; font-size:9pt; }
+table { width:100%; border-collapse:collapse; font-size:8.4pt; margin:1.5mm 0; } th,td { padding:1.1mm 1.3mm; text-align:left; vertical-align:top; border-bottom:.2mm solid #dce5eb; }
+th { background:#edf3f7; color:#30485d; } td.n, th.n { text-align:right; white-space:nowrap; } tr { break-inside:avoid; }
+sup { font-size:6.8pt; color:#12657a; } .tag { font-size:7.6pt; padding:0 1mm; border-radius:1mm; background:#edf3f7; color:#30485d; }
+.tag.model_assumption { background:#fff1e6; color:#9a3412; } .tag.management_guidance { background:#ecfdf5; color:#065f46; } .tag.consensus { background:#eef2ff; color:#3730a3; }
+.two { display:flex; gap:4mm; } .two > div { flex:1; } .chart { margin:1mm 0; } .small { font-size:7.6pt; color:#526174; }
+.sources { font-size:7.2pt; line-height:1.3; } .sources p { margin:.6mm 0; } .synthetic { background:#fff0d0; padding:2mm; font-weight:bold; }
+</style></head><body>
+{% set c=companies[0] %}{% set val=inv.valuation %}{% set mk=val.market %}{% set gates=inv.gates %}
+{% macro paragraphs(items) %}{% for p in items %}<p>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% endfor %}{% endmacro %}
+{% macro metric(name) %}{% for m in inv.analysis.metrics if m.name == name %}{{ m }}{% endfor %}{% endmacro %}
+{% if synthetic %}<div class="synthetic">DEMO / SYNTHETIC DATA · 合成案例</div>{% endif %}
+<p class="eyebrow">投資研究 · {{ c.entity.exchange }} / {{ currency }} · {{ inv.analysis.profile_label }}</p>
+<h1>{{ c.entity.entity_id }} · {{ c.entity.name }}</h1>
+<p class="meta">截至 {{ data.request.research_as_of|taipei }}（台灣）{% if latest_statement_period %} · 最新財報期間截至 {{ latest_statement_period }}{% endif %}</p>
+{% if gates and gates.grade == 'limited' %}<div class="limited"><b>受限報告：</b>以下品質檢查未通過，本報告不是完整的投資研究——{% for ch in gates.checks if ch.severity == 'critical' %}{{ ch.check }}（{{ ch.detail }}）{% if not loop.last %}；{% endif %}{% endfor %}</div>{% endif %}
+
+<h2>摘要</h2>
+<h3>業務與財務展望</h3>{{ paragraphs(c.research.key_takeaways) }}
+<h3>估值評估</h3>
+<p>{% if mk.price.status == 'available' %}參考價 {{ mk.price.value|num }}（{{ mk.price.trade_date }} 收盤）<sup>{{ mk.price.evidence_ids|cite }}</sup>{% if mk.market_cap %}，市值約 {{ mk.market_cap|money }}{% endif %}。{% for r in val.results if r.status == 'available' %}{{ r.label }} {{ r.value|num(1) }}{{ 'x' if r.unit == 'x' else '%' }}{% if not loop.last %}、{% endif %}{% endfor %}。{% else %}估值不可用：{{ mk.price.note }}。{% endif %}
+{% if val.assessment == 'current_multiples_only' %}目前只有當前倍數，缺少歷史區間與同業參照，無法判斷估值高低。{% elif val.assessment == 'unavailable' %}因缺少可用價格或估值輸入，本報告不判斷估值高低。{% endif %}</p>
+{% if thesis %}<h3>投資論點</h3>
+<p><b>市場目前隱含的預期：</b>{{ thesis.market_pricing.text }} <sup>{{ thesis.market_pricing.evidence_ids|cite }}</sup></p>
+{% for p in thesis.key_assumptions %}<p><b>關鍵假設：</b>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% endfor %}{% endif %}
+<h3>主要風險</h3>
+{% if thesis %}{% for p in thesis.opposing %}<p>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% endfor %}{% endif %}
+{% for f in inv.analysis.flags %}<p>{{ f }}</p>{% endfor %}
+<h3>證據品質與缺漏</h3>
+<p>{% set gaps = inv.completeness.fields|selectattr('status', 'ne', 'available')|list %}{% if gaps %}缺漏 {{ gaps|length }} 項：{% for g in gaps %}{{ g.label }}（{{ g.status|status }}）{% if not loop.last %}、{% endif %}{% endfor %}。{% else %}必要資料齊全。{% endif %}</p>
+
+<div class="page"></div><p class="eyebrow">財務表現 · 最近 {{ inv.analysis.quarters|length }} 季</p>
+<h1>成長、利潤率與現金轉換</h1>
+<table><tr><th>期間</th><th class="n">營收</th><th class="n">年增</th><th class="n">毛利率</th><th class="n">營益率</th><th class="n">淨利率</th><th class="n">稀釋 EPS</th></tr>
+{% for q in inv.analysis.quarters %}<tr><td>{{ q.label }}{% if q.derived %}*{% endif %} <sup>{{ q.revenue.evidence_ids|cite }}</sup></td><td class="n">{{ q.revenue.value|money }}</td><td class="n">{{ q.revenue_yoy|pct }}</td><td class="n">{{ q.gross_margin|pct }}</td><td class="n">{{ q.operating_margin|pct }}</td><td class="n">{{ q.net_margin|pct }}</td><td class="n">{{ q.diluted_eps.value|num if q.diluted_eps else '—' }}</td></tr>{% endfor %}</table>
+<p class="small">* 單季由累計數推導（同一口徑、同一起始日相減）。期間標籤以會計年度表示。</p>
+<div class="two">{% if charts.revenue_eps %}<div class="chart">{{ charts.revenue_eps|safe }}</div>{% endif %}{% if charts.margins %}<div class="chart">{{ charts.margins|safe }}</div>{% endif %}</div>
+<h3>現金轉換與財務健全度</h3>
+<table><tr><th>指標</th><th class="n">數值</th><th>期間</th><th>說明</th></tr>
+{% for m in inv.analysis.metrics if m.name in ('operating_cash_flow_to_net_income','free_cash_flow','fcf_conversion','capex_intensity','working_capital_change','inventory_growth','receivables_growth','net_debt','ebitda_ttm','net_debt_to_ebitda','eps_ttm','growth_acceleration','roic') %}
+<tr><td>{{ {'operating_cash_flow_to_net_income':'營業現金流／淨利','free_cash_flow':'自由現金流','fcf_conversion':'FCF 轉換率','capex_intensity':'資本支出強度','working_capital_change':'營運資金變動','inventory_growth':'存貨變動','receivables_growth':'應收帳款變動','net_debt':'淨負債（負值為淨現金）','ebitda_ttm':'EBITDA（TTM）','net_debt_to_ebitda':'淨負債／EBITDA','eps_ttm':'EPS（TTM）','growth_acceleration':'成長加速度','roic':'ROIC'}[m.name] }}</td>
+<td class="n">{% if m.status != 'available' %}{{ m.status|status }}{% elif m.unit in ('USD','TWD') %}{{ m.value|money }}{% elif m.unit == 'percent' %}{{ m.value|pct }}{% elif m.unit == 'percentage_points' %}{{ '%+.1f'|format(m.value) }} pp{% elif m.unit == 'ratio' %}{{ m.value|num }}x{% else %}{{ m.value|num }}{% endif %}</td>
+<td class="small">{{ m.window or '' }}</td><td class="small">{{ m.note or '' }}</td></tr>{% endfor %}</table>
+<h3>產業驅動因素（{{ inv.analysis.profile_label }}）</h3>
+<p class="small">本產業看：{{ inv.analysis.interpretation_focus|join('；') }}。</p>
+{{ paragraphs(c.research.fundamentals) }}
+
+<p class="eyebrow">預期與催化劑</p>
+<h2 style="font-size:16pt">市場接下來要驗證什麼？</h2>
+<h3>公司指引與市場共識（分開列示）</h3>
+<table><tr><th>來源類型</th><th>指標</th><th>目標期間</th><th class="n">數值</th></tr>
+{% for g in inv.expectations.guidance %}<tr><td><span class="tag management_guidance">公司指引</span> {{ g.provider }}</td><td>{{ statement_labels.get(g.metric, g.metric) }}</td><td>截至 {{ g.target_period_end }}</td><td class="n">{% if g.unit == 'percent' %}{{ g.low|pct }}{% if g.high != g.low %}–{{ g.high|pct }}{% endif %}{% else %}{{ g.low|money(g.currency or g.unit) }}{% if g.high != g.low %}–{{ g.high|money(g.currency or g.unit) }}{% endif %}{% endif %} <sup>{{ g.evidence_ids|cite }}</sup></td></tr>{% endfor %}
+{% for g in inv.expectations.consensus %}<tr><td><span class="tag consensus">市場共識</span> {{ g.provider }}</td><td>{{ statement_labels.get(g.metric, g.metric) }}</td><td>截至 {{ g.target_period_end }}</td><td class="n">{{ g.low|num }}{% if g.high != g.low %}–{{ g.high|num }}{% endif %} <sup>{{ g.evidence_ids|cite }}</sup></td></tr>{% endfor %}</table>
+{% for n in inv.expectations.notes %}<p class="small">{{ n }}</p>{% endfor %}
+{% for r in inv.expectations.comparisons %}<p>{{ {'actual_vs_guidance':'實績對照先前指引','guidance_vs_consensus':'指引對照共識','consensus_revision':'共識修正','actual_vs_consensus':'實績對照共識'}[r.type] }}：{{ statement_labels.get(r.metric, r.metric) }}（{{ r.target_period_end }}）{% if r.position %}{{ {'within':'落在指引區間內','above':'高於指引上限','below':'低於指引下限'}[r.position] }}{% endif %}{% if r.difference_percent is defined and r.difference_percent is not none %} 差異 {{ r.difference_percent|pct }}{% endif %}{% if r.surprise_percent is defined and r.surprise_percent is not none %} 差異 {{ r.surprise_percent|pct }}{% endif %} <sup>{{ r.evidence_ids|cite }}</sup></p>{% endfor %}
+{{ paragraphs(c.research.earnings_preview) }}
+<h3>重大事件（依投資影響排序）</h3>
+<table><tr><th>日期</th><th>事件</th><th>影響面向</th><th>狀態</th></tr>
+{% for e in inv.events.events %}<tr><td>{{ e.event_time[:10] }}</td><td>{{ e.title }} <sup>{{ e.evidence_ids|cite }}</sup></td><td class="small">{{ e.impact_areas|join('、') or '—' }}</td><td class="small">{{ '已公告、尚未完成' if e.announced_only else '已發生' }}</td></tr>{% endfor %}</table>
+{% if inv.events.low_impact %}<p class="small">低影響事件另列附錄：{% for e in inv.events.low_impact %}{{ e.title }}{% if not loop.last %}、{% endif %}{% endfor %}。</p>{% endif %}
+{{ paragraphs(c.research.news) }}
+{% set cats = [] %}{% for s in inv.scenarios.scenarios %}{% for k in s.catalysts %}{% if k not in cats %}{% set _ = cats.append(k) %}{% endif %}{% endfor %}{% endfor %}
+{% if cats %}<h3>催化劑</h3><p>{{ cats|join('；') }}</p>{% endif %}
+
+<div class="page"></div><p class="eyebrow">估值與情境</p>
+<h1>價格反映了什麼？</h1>
+<h3>估值方法（依產業與資料品質選擇）</h3>
+<table><tr><th>方法</th><th>狀態</th><th class="n">數值</th><th>公式與輸入</th><th>限制</th></tr>
+{% for r in val.results %}<tr><td>{{ r.label }}</td><td>{{ r.status|status }}</td><td class="n">{% if r.value is not none %}{{ r.value|num(1) }}{{ 'x' if r.unit == 'x' else '%' }}{% else %}—{% endif %}</td>
+<td class="small">{{ r.formula or '' }}{% for i in r.inputs %}<br>{{ i.name }} = {{ i.value|money(i.unit) if i.unit in ('USD','TWD') else i.value|num }} {% if i.window %}（{{ i.window }}）{% endif %}<sup>{{ i.evidence_ids|cite }}</sup>{% endfor %}</td><td class="small">{{ r.limitations|join('；') }}</td></tr>{% endfor %}</table>
+<h3>Bull／Base／Bear 情境</h3>
+{% if inv.scenarios.scenarios %}
+<table><tr><th>情境</th><th>關鍵假設</th><th>估值</th><th class="n">隱含股價</th><th class="n">相對參考價</th></tr>
+{% for s in inv.scenarios.scenarios %}<tr><td><b>{{ s.name|title }}</b><br><span class="small">{{ s.target_period }}</span></td>
+<td class="small">{% for a in s.assumptions %}<span class="tag {{ a.basis }}">{{ basis_labels[a.basis] }}</span> {{ a.name }} = {{ a.value|num }} {{ a.unit }}{% if a.evidence_ids %} <sup>{{ a.evidence_ids|cite }}</sup>{% endif %}<br>{% endfor %}{{ s.financial_outcome }}</td>
+<td class="small">{{ s.valuation.metric }} {{ s.valuation.metric_value|num }} × {{ s.valuation.multiple|num(1) }}（{{ s.valuation.method }}，<span class="tag {{ 'model_assumption' if s.valuation.multiple_basis == 'model_assumption' else '' }}">{{ {'current_trailing':'目前倍數','historical_range':'歷史區間','peer_median':'同業中位數','model_assumption':'模型假設'}[s.valuation.multiple_basis] }}</span>）</td>
+<td class="n">{{ s.implied_price|num(0) }}</td><td class="n">{{ s.change_vs_reference_percent|pct if s.change_vs_reference_percent is not none else '無參考價' }}</td></tr>{% endfor %}</table>
+{% if charts.scenarios %}<div class="chart">{{ charts.scenarios|safe }}</div>{% endif %}
+{% if inv.scenarios.sensitivity %}{% set sen = inv.scenarios.sensitivity %}<h3>敏感度（Base：{{ sen.metric }} × 倍數）</h3>
+<table><tr><th>{{ sen.metric }} 變動 ＼ 倍數變動</th>{% for m in sen.multiple_factors %}<th class="n">{{ '%+d'|format(((m - 1) * 100)|round|int) }}%</th>{% endfor %}</tr>
+{% for row in sen.grid %}<tr><td>{{ '%+d'|format(((sen.metric_factors[loop.index0] - 1) * 100)|round|int) }}%</td>{% for v in row %}<td class="n">{{ v|num(0) }}</td>{% endfor %}</tr>{% endfor %}</table>{% endif %}
+<p class="small">情境不附機率；它們是條件式結果，不是預測。模型假設以橘色標示。</p>
+<h3>論點推翻條件</h3>
+<p>{% for s in inv.scenarios.scenarios %}<b>{{ s.name|title }}：</b>{{ s.invalidation_conditions|join('；') }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+{% else %}<p>沒有提供情境假設，不計算隱含股價。</p>{% endif %}
+{% if inv.scenarios.problems %}<p class="small">情境檢查：{{ inv.scenarios.problems|join('；') }}</p>{% endif %}
+<h3>3-6m／6-12m 研究結論</h3>
+{% for p in c.reader_outlooks %}<p><b>{{ p.horizon }} · {{ labels[p.outlook] }}：</b>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% endfor %}
+{% if thesis %}<p class="small">支持證據：{% for p in thesis.supporting %}{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup>{% endfor %}</p>{% endif %}
+
+<p class="eyebrow">資料品質與來源</p>
+<h2 style="font-size:16pt">這份研究知道什麼、不知道什麼</h2>
+<table><tr><th>資料</th><th>狀態</th><th>必要</th><th>說明</th></tr>
+{% for f in inv.completeness.fields %}<tr><td>{{ f.label }}</td><td>{{ f.status|status }}</td><td>{{ '是' if f.mandatory else '' }}</td><td class="small">{{ f.note or '' }}{% if f.sources_tried %}（已嘗試：{{ f.sources_tried|join('、') }}）{% endif %}</td></tr>{% endfor %}</table>
+{% if gates %}<h3>發布前品質檢查</h3>
+<table><tr><th>檢查</th><th>結果</th><th>說明</th></tr>{% for ch in gates.checks %}<tr><td>{{ ch.check }}</td><td>{{ '通過' if ch.passed else ('未通過（關鍵）' if ch.severity == 'critical' else '警告') }}</td><td class="small">{{ ch.detail }}</td></tr>{% endfor %}</table>{% endif %}
+<h3>資料範圍</h3><div class="small">{% for item in limitations %}<p>{{ item }}</p>{% endfor %}<p>數字皆由程式依證據計算；指引、共識、模型假設分開標示。供本人研究，不作個人化交易指令。</p></div>
+<h3>來源索引</h3><div class="sources">{% for e in display_sources %}<p>[{{ references[e.evidence_id] }}] {{ e.publisher }} · {{ e.published_at.date() }} · <a href="{{ e.article_url or e.source_url }}">原始來源</a> · {{ e.attribution }}</p>{% endfor %}</div>
+</body></html>

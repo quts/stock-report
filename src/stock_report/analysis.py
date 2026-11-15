@@ -18,6 +18,10 @@ event_review.events 的已核實重大事件必須納入判斷；未解決線索
 下一財報預期須區分 management_guidance、具名 analyst_estimate/consensus_estimate 及情境假設。查無可靠市場共識就只寫公司指引與應觀察項目，不能捏造預測。
 主流媒體是secondary來源，報導事實與評論/預測分開；未完成權限核對的來源只記於搜尋紀錄，不能引用其數字或衍生推論。
 股價估值不足不應刪掉有證據的公司基本面及營運分析；限制集中在末頁。company_research的事實分析獨立於outlook股價方向，但不得暗示被Gate拒絕的買賣建議。
+投資版型（report_profile=investment）另讀 investment_inputs.json：季度序列、財務指標、估值結果與資料缺口都已由 Python 計算，正文數字只能取自證據或該檔。
+thesis：market_pricing 說明目前股價隱含的預期（估值不可用時照實說明無法判斷），key_assumptions 列最影響報酬的假設，supporting／opposing 分列正反證據，invalidation 寫可驗證的推翻條件。
+scenarios：bull、base、bear 各一；每個假設標明 basis（historical_fact、management_guidance、consensus、model_assumption）並引用證據，指引不得標為 consensus。
+valuation_metric_value 由假設推得並在 financial_outcome 說明算法；倍數基礎沒有歷史或同業資料時必須標 model_assumption。不得給機率，不得捏造目標價或共識。
 '''
 
 
@@ -27,7 +31,12 @@ def exchange(data, directory):
         'dataset_kind': data.dataset_kind, 'research_scope': research_scope(data),
         'event_review_state': event_review_state(data), 'required_pairs': [[e.entity_id, h] for e in data.entities for h in data.request.horizons]})
     from .statement_quant import statement_metrics
+    from . import engine
     write_json(directory / 'statement_metrics.json', statement_metrics(data))
+    inputs = engine.run(data)
+    if inputs is not None:
+        # Deterministic series, metrics, valuation and data gaps the proposal must build on.
+        write_json(directory / 'investment_inputs.json', engine.public(inputs))
     (directory / 'analysis-instructions.txt').write_text(PROMPT)
 
 
