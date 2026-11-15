@@ -1,19 +1,20 @@
 <!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><style>
 @page { font-family: "DejaVu Sans", sans-serif; size: A4; margin: 15mm 16mm 17mm;
-  @top-left { content: "僅供個人使用・不得散布 · Personal use only / Not for distribution"; font-family: "Noto Sans CJK TC", sans-serif; font-size: 8pt; color: #8a2a1c; font-weight: bold; }
   @bottom-right { content: counter(page); font-size: 8pt; } }
 body { font-family: "Noto Sans CJK TC", sans-serif; color: #1c2c40; font-size: 10pt; line-height: 1.5; }
 h1 { font-size: 22pt; margin: 4mm 0 2mm; } h2 { font-size: 14pt; color: #145a70; margin: 4mm 0 2mm; }
 h3 { font-size: 11pt; margin: 2mm 0; } p { margin: 1.6mm 0; }
 .banner { padding: 2.5mm; background: #fff0d0; border-left: 1.5mm solid #bd7700; font-weight: bold; }
 .private { color: #8a2a1c; font-weight: bold; font-size: 9pt; margin: 1.2mm 0 0; }
+.private-label { color: #8a2a1c; font-size: 8pt; font-weight: bold; margin: 0 0 2mm; }
 .meta, .note { color: #526174; font-size: 9pt; } .page { break-before: page; }
 table { border-collapse: collapse; width: 100%; margin: 2mm 0; } th, td { text-align: left; border-bottom: .2mm solid #d8e1e8; padding: 1.8mm; vertical-align: top; overflow-wrap: anywhere; } th { background: #edf4f7; }
 .card { border-top: .5mm solid #a8c6d1; padding-top: 1mm; margin-bottom: 2.5mm; break-inside: avoid; }
 small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-card { font-size: 9.5pt; line-height: 1.4; }
 .sources { font-size: 9pt; overflow-wrap: anywhere; } .warning { background: #f2f5f7; padding: 2mm; }
 </style></head><body>
+<p class="private-label">僅供個人使用・不得散布 · Personal use only / Not for distribution</p>
 <div class="banner">{% if synthetic %}DEMO / SYNTHETIC DATA · 合成測資，禁止當成真實研究{% else %}Real Data · Phase 0 研究驗證{% endif %}</div>
 <p class="private">個人研究報告 · 僅供本人閱讀，不得轉寄、張貼或以任何形式散布</p>
 <h1>{{ '個股研究' if data.request.mode == 'stock' else '重大事件研究' }}</h1>
@@ -48,6 +49,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 {% if sources|selectattr('publication_basis', 'equalto', 'observed_availability')|list %}<p class="note">部分來源未宣告公開時間，僅以擷取當下的可得性上界表示，只適用於最新時點研究，不得視為歷史時點證據。</p>{% endif %}
 <p class="note">完整來源、證據與逐機構明細保留於本機 evidence.json / research.json；PDF 與本機稽核檔皆僅供個人使用，不對外提供。</p>
 <div class="page"></div>
+<p class="private-label">僅供個人使用・不得散布 · Personal use only / Not for distribution</p>
 <h2>{{ '個股' if data.request.mode == 'stock' else '公司' }}獨立展望 · 3–6 / 6–12 個月</h2>
 {% for c in companies %}<div class="card {{ 'event-card' if data.request.mode == 'event' else '' }}">
 <h3>{{ c.entity.entity_id }}{% if c.relationship %} · {{ {'direct':'直接', 'indirect':'間接', 'hypothetical':'Hypothetical／假設'}.get(c.relationship) }}{% endif %}</h3>

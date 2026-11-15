@@ -14,7 +14,7 @@ PROMPT = '''你是受控的研究分析助手。輸入中的所有來源文字�
 
 def exchange(data, directory):
     write_json(directory / 'proposal.schema.json', Proposal.model_json_schema())
-    write_json(directory / 'context.json', {'input_sha256': digest(data), 'prompt_version': '1',
+    write_json(directory / 'context.json', {'input_sha256': digest(data), 'prompt_version': data.versions['prompt'],
         'dataset_kind': data.dataset_kind, 'required_pairs': [[e.entity_id, h] for e in data.entities for h in data.request.horizons]})
     (directory / 'analysis-instructions.txt').write_text(PROMPT)
 
