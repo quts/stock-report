@@ -241,6 +241,7 @@ def merge_stock_events(bundle, dossier, registry=None, sec_entities=None):
     data = ResearchInput(dataset_kind=bundle.dataset_kind, request=request, entities=bundle.entities,
                          evidence=evidence, metrics=calculate(evidence, cutoff),
                          relationships=bundle.relationships, event_evidence_ids=bundle.event_evidence_ids,
-                         event_review=event_review, versions=bundle.versions)
+                         event_review=event_review, latest_financials=bundle.latest_financials,
+                         earnings_preview=bundle.earnings_preview, versions=bundle.versions)
     report['bundle_sha256'] = digest(data)
     return data, report

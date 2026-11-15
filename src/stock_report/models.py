@@ -26,7 +26,7 @@ PublicationBasis = Literal['source_declared_timestamp', 'source_declared_date', 
 # comparability on its own: two windows are only compared when their recorded start/end dates and
 # basis say they may be. `cumulative_ytd` is a fiscal-year-to-date interim figure and is never
 # annualized or treated as a trailing-twelve-month value.
-PeriodBasis = Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'trailing_twelve_months', 'trading_day']
+PeriodBasis = Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'trailing_twelve_months', 'trading_day', 'instant']
 
 
 def check_period_window(start, end, basis):
@@ -63,7 +63,7 @@ class Request(Model):
     horizons: list[Horizon] = Field(default_factory=lambda: ['3-6m', '6-12m'])
     max_companies: int = Field(default=5, ge=1, le=5)
     language: Literal['zh-TW'] = 'zh-TW'
-    max_pdf_pages: Literal[2] = 2
+    max_pdf_pages: int = Field(default=4, ge=1, le=4)
     # Outputs are exclusively for the operator's personal use. No sharing profile exists, and a
     # request asking for one is rejected instead of being quietly downgraded.
     sharing_profile: Literal['private'] = 'private'
@@ -83,6 +83,9 @@ class Evidence(Model):
     entity_id: str
     claim: str = Field(max_length=500)
     kind: Literal['identity', 'financial', 'price', 'event', 'rating', 'relationship']
+    financial_metric: str | None = Field(default=None, max_length=80)
+    statement_kind: Literal['fact', 'reported_claim', 'management_guidance', 'analyst_estimate', 'consensus_estimate', 'scenario'] = 'fact'
+    target_period: str | None = Field(default=None, max_length=80)
     value: float | None = None
     unit: str | None = None
     currency: str | None = None
@@ -92,6 +95,7 @@ class Evidence(Model):
     period_basis: PeriodBasis | None = None
     price_adjustment: PriceAdjustment | None = None
     source_url: str
+    article_url: str | None = Field(default=None, pattern=r'^https://[^\s]+$', max_length=1000)
     publisher: str
     source_type: Literal['official', 'secondary', 'synthetic']
     source_record_id: str
@@ -126,6 +130,10 @@ class Evidence(Model):
     @model_validator(mode='after')
     def publication_time_is_modeled_truthfully(self):
         check_period_window(self.period_start, self.period_end, self.period_basis)
+        if self.statement_kind in ('management_guidance', 'analyst_estimate', 'consensus_estimate') and not self.target_period:
+            raise ValueError('Forward estimates require an explicit target period')
+        if self.statement_kind in ('analyst_estimate', 'consensus_estimate') and not self.institution:
+            raise ValueError('External estimates require a named analyst or consensus provider')
         if self.publication_basis == 'observed_availability':
             if self.availability_observed_at is None or self.availability_observed_at != self.published_at:
                 raise ValueError('Observed availability must be recorded explicitly and carried as the publication upper bound')
@@ -234,6 +242,77 @@ def research_scope(data):
         else 'stock_research'
 
 
+class FilingDiscovery(Model):
+    """Latest eligible filing found in a licensed official submissions index at the cutoff."""
+    entity_id: str
+    cik: str = Field(pattern=r'^\d{10}$')
+    as_of: AwareDatetime
+    discovered_at: AwareDatetime
+    form: Literal['10-K', '10-Q', '10-K/A', '10-Q/A']
+    accession: str = Field(pattern=r'^\d{10}-\d{2}-\d{6}$')
+    period_end: date
+    published_at: AwareDatetime
+    document_url: str
+    discovery_evidence_id: str
+
+
+class LatestFinancialReview(Model):
+    discovery: FilingDiscovery
+    evidence_ids: list[str] = Field(default_factory=list, max_length=160)
+
+
+class EarningsPreviewReview(Model):
+    status: Literal['completed', 'unavailable', 'not_run']
+    as_of: AwareDatetime
+    searched_at: AwareDatetime
+    search_queries: list[str] = Field(min_length=1, max_length=16)
+    sources_checked: list[str] = Field(min_length=1, max_length=24)
+    next_earnings_at: AwareDatetime | None = None
+    schedule_evidence_ids: list[str] = Field(default_factory=list, max_length=6)
+    expectation_evidence_ids: list[str] = Field(default_factory=list, max_length=24)
+    limitations: list[str] = Field(default_factory=list, max_length=12)
+
+
+def financial_review_state(data):
+    """A completed real stock study must include the latest published statements, not only annual facts."""
+    if data.request.mode != 'stock' or data.dataset_kind != 'real':
+        return []
+    review = data.latest_financials
+    if review is None:
+        return ['LATEST_FINANCIAL_REPORT_MISSING']
+    discovery, cutoff = review.discovery, data.request.research_as_of
+    from .storage import read_json
+    configured = [row for row in read_json('config/sec-entities.json')['entities']
+                  if row['ticker'] == data.request.ticker]
+    if (discovery.entity_id != data.request.ticker or discovery.as_of != cutoff
+            or discovery.discovered_at < cutoff or discovery.published_at > cutoff
+            or discovery.period_end > cutoff.date() or len(configured) != 1
+            or configured[0]['cik'] != discovery.cik
+            or not discovery.document_url.startswith(f'https://www.sec.gov/Archives/edgar/data/{int(discovery.cik)}/{discovery.accession.replace("-", "")}/')):
+        return ['LATEST_FINANCIAL_REVIEW_INVALID']
+    index = {e.evidence_id: e for e in data.evidence}
+    def usable(e):
+        return bool(e and e.entity_id == data.request.ticker and e.verification_status == 'verified'
+                    and e.license_status == 'confirmed' and e.internal_use_allowed
+                    and e.published_at <= cutoff and e.event_time <= cutoff and e.research_as_of == cutoff)
+    discovery_record = index.get(discovery.discovery_evidence_id)
+    if (not usable(discovery_record) or discovery_record.license_source_id != 'sec-submissions-history'
+            or discovery_record.source_url != f'https://data.sec.gov/submissions/CIK{discovery.cik}.json'
+            or discovery_record.source_record_id != discovery.accession):
+        return ['LATEST_FINANCIAL_DISCOVERY_UNVERIFIED']
+    rows = [index.get(eid) for eid in review.evidence_ids]
+    rows = [e for e in rows if usable(e) and e.kind == 'financial' and e.value is not None
+            and e.statement_kind == 'fact' and e.source_url == discovery.document_url
+            and e.period_end == discovery.period_end]
+    required = {'revenue', 'net_income', 'operating_cash_flow'}
+    if not required <= {e.financial_metric for e in rows}:
+        return ['LATEST_FINANCIAL_STATEMENTS_INCOMPLETE']
+    if discovery.form.startswith('10-Q') and not any(e.financial_metric == 'revenue'
+                                           and e.period_basis == 'single_quarter' for e in rows):
+        return ['LATEST_QUARTER_MISSING']
+    return []
+
+
 class ResearchInput(Model):
     schema_version: Literal['1'] = '1'
     dataset_kind: Literal['mock', 'real']
@@ -245,6 +324,8 @@ class ResearchInput(Model):
     event_evidence_ids: list[str] = Field(default_factory=list)
     # Recent-event review for a stock request. None means no review was recorded at all.
     event_review: EventReview | None = None
+    latest_financials: LatestFinancialReview | None = None
+    earnings_preview: EarningsPreviewReview | None = None
     versions: dict[str, str]
 
     @model_validator(mode='after')
@@ -259,6 +340,20 @@ class ResearchInput(Model):
             raise ValueError('Stock identity mismatch')
         if self.dataset_kind == 'real' and any(e.source_type == 'synthetic' for e in self.evidence):
             raise ValueError('Synthetic evidence cannot be labeled real')
+        preview = self.earnings_preview
+        if preview is not None:
+            if preview.as_of != self.request.research_as_of or preview.searched_at < preview.as_of:
+                raise ValueError('Earnings preview review must cover the supplied cutoff')
+            if preview.next_earnings_at is not None and preview.next_earnings_at <= preview.as_of:
+                raise ValueError('Next earnings time must be a future scheduled event')
+            index = {e.evidence_id: e for e in self.evidence}
+            for eid in preview.schedule_evidence_ids + preview.expectation_evidence_ids:
+                e = index.get(eid)
+                if e is None or e.entity_id != self.request.ticker or e.published_at > preview.as_of:
+                    raise ValueError('Earnings preview cites absent, wrong-issuer or future evidence')
+            for eid in preview.expectation_evidence_ids:
+                if index[eid].statement_kind not in ('management_guidance', 'analyst_estimate', 'consensus_estimate'):
+                    raise ValueError('Earnings expectations must classify guidance or external estimates explicitly')
         review = self.event_review
         if review is not None:
             if self.request.mode != 'stock':
@@ -280,6 +375,21 @@ class ResearchInput(Model):
                     raise ValueError('A reviewed event cannot postdate the research cutoff')
         return self
 
+
+class CitedParagraph(Model):
+    text: str = Field(min_length=1, max_length=1600)
+    evidence_ids: list[str] = Field(min_length=1, max_length=16)
+
+
+class CompanyResearch(Model):
+    entity_id: str
+    overview: list[CitedParagraph] = Field(default_factory=list, max_length=4)
+    key_takeaways: list[CitedParagraph] = Field(default_factory=list, max_length=4)
+    fundamentals: list[CitedParagraph] = Field(default_factory=list, max_length=8)
+    news: list[CitedParagraph] = Field(default_factory=list, max_length=8)
+    earnings_preview: list[CitedParagraph] = Field(default_factory=list, max_length=6)
+    monitoring: list[CitedParagraph] = Field(default_factory=list, max_length=6)
+
 class HorizonProposal(Model):
     entity_id: str
     horizon: Horizon
@@ -295,9 +405,10 @@ class HorizonProposal(Model):
 class Proposal(Model):
     input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     model: str
-    prompt_version: Literal['3'] = '3'
+    prompt_version: Literal['4'] = '4'
     usage: dict[str, int] | None = None
     outlooks: list[HorizonProposal] = Field(max_length=10)
+    company_research: list[CompanyResearch] = Field(default_factory=list, max_length=5)
 
 class Finding(Model):
     rule_id: str

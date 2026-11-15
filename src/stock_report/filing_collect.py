@@ -1,9 +1,10 @@
 """Fetch a reviewer-curated set of EDGAR facts, retaining normalized observations only."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 import re
 import uuid
 from pydantic import Field
+from typing import Literal
 from .models import Model, Entity
 from .sources import Observation, FILING_PROFILES
 from .storage import read_json
@@ -20,12 +21,25 @@ class FilingFact(Model):
     # Only dates independently reviewed against the filing/index may be supplied.
     publication_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
     event_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    kind: Literal['event', 'financial'] = 'event'
+    financial_metric: str | None = Field(default=None, max_length=80)
+    numeric_text: str | None = Field(default=None, max_length=80)
+    number_scale: Literal[1, 1000, 1000000, 1000000000] = 1
+    unit: str | None = None
+    currency: str | None = None
+    period: str | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    period_basis: Literal['fiscal_year', 'cumulative_ytd', 'single_quarter', 'instant'] | None = None
+    statement_kind: Literal['fact', 'reported_claim', 'management_guidance', 'analyst_estimate', 'consensus_estimate', 'scenario'] = 'fact'
+    target_period: str | None = None
+    institution: str | None = None
 
 
 class FilingPlan(Model):
     reviewed_by: str = Field(min_length=1, max_length=120)
     authorization: str = Field(min_length=1, max_length=300)
-    facts: list[FilingFact] = Field(min_length=1, max_length=24)
+    facts: list[FilingFact] = Field(min_length=1, max_length=64)
 
 
 class Text(HTMLParser):
@@ -91,14 +105,29 @@ def collect_filings(ticker, *, registry, allow_network, plan, client, now=None):
             raise ValueError('Issuer name not established by filing content')
         if any(normalized(q) not in text for q in fact.excerpts):
             raise ValueError(f'{fact.evidence_id}: reviewed excerpt absent from live filing')
+        value = None
+        if fact.numeric_text is not None:
+            if not any(normalized(fact.numeric_text) in normalized(q) for q in fact.excerpts):
+                raise ValueError('Numeric token must be inside a reviewed live excerpt')
+            token = fact.numeric_text.replace(',', '').replace('$', '').strip()
+            if token.startswith('(') and token.endswith(')'):
+                token = '-' + token[1:-1]
+            value = float(token) * fact.number_scale
+        if fact.kind == 'financial' and (value is None or not fact.financial_metric
+                                         or fact.period_end is None or fact.period_basis is None):
+            raise ValueError('Financial observations require a numeric token, metric and reporting window')
         # A date-only publication stamp is a conservative availability upper bound.
         pub = datetime.fromisoformat(fact.publication_date + 'T23:59:59.999999-05:00')
         event = datetime.fromisoformat(fact.event_date + 'T00:00:00-05:00')
         observed = now or datetime.now(timezone.utc)
         if pub > observed or event > observed:
             raise ValueError('Future filing date cannot establish an occurred event')
-        observations.append(Observation(evidence_id=fact.evidence_id, entity_id=ticker, kind='event',
+        observations.append(Observation(evidence_id=fact.evidence_id, entity_id=ticker, kind=fact.kind,
             claim=fact.claim, provider_record_id=fact.evidence_id, request_key=fact.url,
+            financial_metric=fact.financial_metric, value=value, unit=fact.unit, currency=fact.currency,
+            period=fact.period, period_start=fact.period_start, period_end=fact.period_end,
+            period_basis=fact.period_basis, statement_kind=fact.statement_kind,
+            target_period=fact.target_period, institution=fact.institution,
             source_url=fact.url, source_published_raw=fact.publication_date,
             publication_basis='source_declared_date', published_at=pub, event_time=event,
             retrieved_at=observed))

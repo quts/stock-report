@@ -17,6 +17,7 @@ from .models import Request, ResearchInput
 from .pipeline import prepare, load_prepared, finalize, replay
 from .providers import probes
 from .sources import PROFILES, FILING_PROFILES
+from .reviewed_collect import REVIEWED_PROFILES
 from .stock_events import StockEventDossier, merge_stock_events
 from .storage import read_json, write_json
 
@@ -54,7 +55,7 @@ def parser():
     rep.add_argument('--run', required=True, type=Path)
     rep.add_argument('--output', type=Path, default=Path('reports'))
     col = sub.add_parser('collect', help='Collect official-source records before any research cutoff is applied')
-    col.add_argument('--source', required=True, choices=sorted({**PROFILES, **FILING_PROFILES}))
+    col.add_argument('--source', required=True, choices=sorted({**PROFILES, **FILING_PROFILES, **REVIEWED_PROFILES}))
     col.add_argument('--ticker', required=True)
     col.add_argument('--output', type=Path, default=Path('reports/collections'))
     col.add_argument('--allow-network', action='store_true', help='Required for real collection; no mock fallback')

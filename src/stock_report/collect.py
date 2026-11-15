@@ -13,18 +13,19 @@ from pathlib import Path
 from typing import Literal
 import uuid
 from pydantic import AwareDatetime, Field
-from .models import Entity, Evidence, Model, Request, ResearchInput, SourceClass
+from .models import Entity, Evidence, Model, Request, ResearchInput, SourceClass, FilingDiscovery, LatestFinancialReview
 from .mock import VERSIONS
 from .providers import HTTPClient
 from .quant import calculate
 from .licensing import endpoint_in_scope
 from .sources import Observation, build_adapter, merge_profile
+from .reviewed_collect import REVIEWED_PROFILES, collect_reviewed
 from .storage import read_json, write_json
 
 CORE_SOURCE_RECORDS_REQUIRED = 2
 SEC_CONTACT_ENV = 'STOCK_REPORT_SEC_CONTACT'
 DEFAULT_USER_AGENT = 'stock-report-phase0/0.1 (research proof-of-concept)'
-SEC_SOURCES = ('sec-xbrl-companyconcept', 'sec-edgar-archives-filing')
+SEC_SOURCES = ('sec-xbrl-companyconcept', 'sec-edgar-archives-filing', 'sec-submissions-history')
 
 
 class Collection(Model):
@@ -40,7 +41,7 @@ class Collection(Model):
     requested_ticker: str
     collected_at: AwareDatetime
     entity: Entity
-    observations: list[Observation] = Field(min_length=1)
+    observations: list[Observation] = Field(default_factory=list)
     license: dict
     field_binding: dict[str, str | None] = Field(default_factory=dict)
     transport: list[dict] = Field(default_factory=list)
@@ -51,6 +52,7 @@ class Collection(Model):
     # never shared; delete it if the terms turn out to forbid retention.
     retention: Literal['research_input_allowed', 'feasibility_only'] = 'feasibility_only'
     notes: list[str] = Field(default_factory=list)
+    filing_discovery: FilingDiscovery | None = None
 
 
 def resolve_sec_contact(explicit=None, environ=None):
@@ -75,6 +77,12 @@ def user_agent_for(source_id, user_agent=None, sec_contact=None, environ=None):
 def collect(source_id, ticker, *, registry, allow_network=False, fixture=None, client=None, now=None,
             sec_contact=None, environ=None, profile_overrides=None, user_agent=None, retries=1,
             interval=1.0, cache_dir=None, clock=None):
+    if source_id in REVIEWED_PROFILES:
+        if not allow_network or fixture is not None:
+            raise ValueError('Reviewed source collection requires explicit network access; no fixture fallback')
+        agent = user_agent_for(source_id, user_agent, sec_contact, environ)
+        return collect_reviewed(source_id, ticker, registry=registry, plan=profile_overrides,
+                                client=client or HTTPClient(agent, retries=retries, interval=interval), now=now)
     if source_id == 'sec-edgar-archives-filing':
         from .filing_collect import collect_filings
         if fixture is not None:
@@ -268,9 +276,12 @@ def to_evidence(observation, request, license_snapshot, capture_mode, verified_c
                 and bool(verified_capture))
     return Evidence(
         evidence_id=observation.evidence_id, entity_id=observation.entity_id, claim=observation.claim,
+        financial_metric=observation.financial_metric, statement_kind=observation.statement_kind,
+        target_period=observation.target_period, institution=observation.institution,
         kind=observation.kind, value=observation.value, unit=observation.unit, currency=observation.currency,
         period=observation.period, period_start=observation.period_start, period_end=observation.period_end,
         period_basis=observation.period_basis, source_url=observation.source_url, publisher=license_snapshot['publisher'],
+        article_url=observation.article_url,
         # A fixture is authored content whatever it imitates; a real capture keeps the class of its
         # source, so a secondary provider is never presented as an official record.
         source_type=source_class if capture_mode == 'network' else 'synthetic',
@@ -370,7 +381,9 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
             else:
                 evidence.append(record)
                 kept_here += 1
-        if kept_here == 0:
+        empty_feed = (REVIEWED_PROFILES.get(collection.source_id, {}).get('adapter') == 'reviewed_rss'
+                      and not collection.observations)
+        if kept_here == 0 and not empty_feed:
             blockers.append({'code': 'collection_contributed_no_usable_evidence', 'source_id': collection.source_id,
                              'detail': sorted({row['reason'] for row in exclusions
                                                if row['source_id'] == collection.source_id})})
@@ -422,6 +435,14 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
                          metrics=calculate(evidence, cutoff), relationships=[], event_evidence_ids=[],
                          versions={**VERSIONS, 'dataset': 'real-collected-1' if dataset_kind == 'real'
                                    else 'fixture-capture-1'})
+    discoveries = [c.filing_discovery for c in collections if c.filing_discovery is not None]
+    if discoveries:
+        if len(discoveries) != 1:
+            raise ValueError('Use one official latest-filing discovery per stock run')
+        discovery = discoveries[0]
+        data.latest_financials = LatestFinancialReview(discovery=discovery,
+            evidence_ids=[e.evidence_id for e in evidence if e.kind == 'financial'
+                          and e.source_url == discovery.document_url])
     report['metrics'] = [{'name': m.name, 'value': m.value, 'missing_reason': m.missing_reason} for m in data.metrics]
     return data, report
 

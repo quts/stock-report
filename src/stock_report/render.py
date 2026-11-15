@@ -6,7 +6,9 @@ a rendering condition. Unknown, restricted or internally unlicensed records neve
 from importlib.resources import files
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .policy import reportable
-from .models import event_review_state, research_scope
+from .models import event_review_state, research_scope, financial_review_state
+from .statement_quant import statement_metrics, format_amount, LABELS as STATEMENT_LABELS
+from datetime import timezone, timedelta
 from .quant import consensus, calculate
 
 LABELS = {'bullish': '偏多', 'neutral': '中性', 'bearish': '偏空', 'insufficient': '資料不足'}
@@ -14,7 +16,7 @@ METRICS = {'revenue_growth': '營收成長率', 'eps_growth': 'EPS 成長率', '
            'free_cash_flow': '自由現金流', 'pe': '本益比'}
 
 
-def projection(data, decision, mapping):
+def projection(data, decision, mapping, company_research=None):
     entity_ids = {e.entity_id for e in data.entities}
     if data.request.mode == 'event':
         entity_ids.add('EVENT')
@@ -23,6 +25,8 @@ def projection(data, decision, mapping):
     major_ids = {eid for event in (data.event_review.events if data.event_review else [])
                  if event.materiality == 'major' for eid in event.evidence_ids}
     companies = []
+    narrative = {s.entity_id: s for s in (company_research or [])}
+    statements = statement_metrics(data)
     for entity in data.entities:
         identity_ok = any(e.entity_id == entity.entity_id and e.kind == 'identity' for e in allowed.values())
         if not identity_ok:
@@ -41,21 +45,56 @@ def projection(data, decision, mapping):
             'consensus': consensus(company_evidence, entity.entity_id, data.request.research_as_of, mapping),
             'relationship': relation.relationship if valid_relation else None,
             'relationship_evidence_ids': relation.evidence_ids if valid_relation else []})
+        company = companies[-1]
+        company['research'] = narrative.get(entity.entity_id)
+        rows = [r for r in statements if r['entity_id'] == entity.entity_id and 'current_value' in r]
+        core = ('revenue', 'gross_profit', 'operating_income', 'net_income', 'diluted_eps',
+                'operating_cash_flow', 'free_cash_flow', 'adjusted_free_cash_flow')
+        company['quarter_rows'] = sorted([r for r in rows if r['basis'] == 'single_quarter' and r['name'] in core],
+                                         key=lambda r: core.index(r['name']))
+        company['segment_rows'] = [r for r in rows if r['basis'] == 'single_quarter'
+                                   and r['name'] in ('isg_revenue', 'isg_operating_income', 'csg_revenue', 'csg_operating_income')]
+        company['balance_rows'] = [r for r in rows if r['basis'] == 'instant' and r['name'] in (
+            'accounts_receivable_net', 'accounts_receivable', 'inventory', 'financing_receivables_net')]
+        company['guidance'] = [e for e in company_evidence if e.statement_kind in (
+            'management_guidance', 'analyst_estimate', 'consensus_estimate')]
+        reviewed_ids = {eid for event in (data.event_review.events if data.event_review else []) for eid in event.evidence_ids}
+        company['timeline'] = [e for e in company['events'] if e.evidence_id in reviewed_ids
+                               and e.statement_kind == 'fact']
+        company['reader_outlooks'] = [{'horizon': p.horizon, 'outlook': p.outlook,
+            'text': p.interpretation.split('｜分析說明：')[-1] if '｜分析說明：' in p.interpretation
+                    else p.interpretation, 'evidence_ids': p.supporting_evidence_ids + p.counter_evidence_ids,
+            'conditions': p.invalidation_conditions} for p in company['outlooks']]
     # Material events lead the short source list; duplicate financial endpoints add no context.
-    unique_sources = list({e.source_url: e for e in sorted(allowed.values(), key=lambda e: e.kind == 'event', reverse=True)}.values())
+    unique_sources = list({(e.source_url, e.article_url): e for e in sorted(allowed.values(), key=lambda e: e.kind == 'event', reverse=True)}.values())
+    source_numbers = {(e.source_url, e.article_url): i + 1 for i, e in enumerate(unique_sources)}
+    references = {eid: source_numbers[(e.source_url, e.article_url)] for eid, e in allowed.items()}
+    limitations = []
+    if financial_review_state(data): limitations.append('最新一期財報尚未完整納入；本報告只涵蓋已列示的財務資料。')
+    if not any(e.kind == 'price' for e in allowed.values()): limitations.append('未取得現價與可比較估值，未提供目標價或即時交易判斷。')
+    if not any(e.kind == 'rating' for e in allowed.values()): limitations.append('未取得可驗證的機構評等共識。')
+    if data.earnings_preview: limitations.extend(data.earnings_preview.limitations)
+    if data.event_review: limitations.extend(lead.summary for lead in data.event_review.unresolved_leads)
     return {'research_scope': research_scope(data), 'completion_blockers': event_review_state(data), 'data': data, 'decision': decision, 'companies': companies, 'labels': LABELS, 'metric_labels': METRICS,
             'event_records': [allowed[eid] for eid in data.event_evidence_ids if eid in allowed and allowed[eid].kind == 'event' and allowed[eid].entity_id == 'EVENT'],
-            'sources': list(allowed.values()), 'display_sources': unique_sources, 'synthetic': data.dataset_kind == 'mock'}
+            'sources': list(allowed.values()), 'display_sources': unique_sources, 'synthetic': data.dataset_kind == 'mock',
+            'references': references, 'source_numbers': source_numbers, 'limitations': list(dict.fromkeys(limitations)),
+            'statement_labels': STATEMENT_LABELS}
 
 
-def render(data, decision, mapping, path):
+def render(data, decision, mapping, path, company_research=None):
     from weasyprint import HTML
     def deny_resources(url, *args, **kwargs):
         raise ValueError('External and local URL resource fetching is disabled')
     env = Environment(loader=FileSystemLoader(str(files('stock_report').joinpath('templates'))),
                       autoescape=select_autoescape(['html']))
     env.filters['brief'] = lambda value, n=140: str(value) if len(str(value)) <= n else str(value)[:n] + '…（完整內容見本機 JSON）'
-    html = env.get_template('report.html').render(**projection(data, decision, mapping))
+    context = projection(data, decision, mapping, company_research)
+    env.filters['cite'] = lambda ids: ''.join(f'[{n}]' for n in sorted({context['references'][eid] for eid in ids if eid in context['references']}))
+    env.filters['amount'] = lambda e: format_amount(e.value, e.unit, e.currency)
+    env.filters['taipei'] = lambda stamp: stamp.astimezone(timezone(timedelta(hours=8))).strftime('%Y/%m/%d %H:%M')
+    template = 'research-four.html' if data.request.mode == 'stock' and data.request.max_pdf_pages >= 4 and company_research else 'report.html'
+    html = env.get_template(template).render(**context)
     document = HTML(string=html, url_fetcher=deny_resources).render()
     if not 1 <= len(document.pages) <= data.request.max_pdf_pages:
         raise ValueError(f'PDF layout exceeds page budget: {len(document.pages)} pages; no report published')

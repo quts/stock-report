@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><style>
+@page { size:A4; margin:14mm 16mm 16mm; @bottom-left { content:'個人研究 · 僅供本人使用'; font:8pt sans-serif; color:#64748b; } @bottom-right { content:counter(page); font:8pt sans-serif; } }
+body { font-family:'Noto Sans CJK TC',sans-serif; color:#203047; font-size:10pt; line-height:1.48; }
+h1 { font-size:25pt; line-height:1.2; margin:2mm 0 3mm; } h2 { font-size:15pt; color:#12657a; margin:4mm 0 2mm; } h3 { font-size:11pt; margin:3mm 0 1mm; }
+p { margin:1.6mm 0; } .meta { color:#64748b; font-size:8.5pt; } .eyebrow { color:#12657a; font-size:9pt; letter-spacing:.7pt; }
+.page { break-before:page; } .lead { background:#edf6f8; border-left:1mm solid #17778b; padding:2mm 3mm; margin:2mm 0; }
+table { width:100%; border-collapse:collapse; font-size:9pt; margin:2mm 0; } th,td { padding:1.4mm; text-align:left; vertical-align:top; border-bottom:.2mm solid #dce5eb; } th { background:#edf3f7; color:#30485d; }
+tr { break-inside:avoid; } sup { font-size:7pt; color:#12657a; } .sources { font-size:7.4pt; line-height:1.35; } .sources p { margin:1mm 0; } .limits { font-size:8pt; color:#526174; }
+.timeline p { font-size:9pt; } .tag { font-size:8pt; color:#12657a; } .synthetic { background:#fff0d0; padding:2mm; font-weight:bold; }
+</style></head><body>
+{% set c=companies[0] %}
+{% macro paragraphs(items) %}{% for p in items %}<p>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% endfor %}{% endmacro %}
+{% macro financial_table(rows) %}
+<table><tr><th>項目</th><th>本期</th><th>比較期</th><th>變動</th></tr>
+{% for r in rows %}<tr><td>{{ r.label }} <sup>{{ r.evidence_ids|cite }}</sup></td><td>{{ r.current_display }}</td><td>{{ r.prior_display }}</td><td>{% if r.change_percent is not none %}{{ '%+.1f'|format(r.change_percent) }}%{% else %}—{% endif %}</td></tr>{% endfor %}</table>
+{% endmacro %}
+{% if synthetic %}<div class="synthetic">DEMO / SYNTHETIC DATA · 合成案例</div>{% endif %}
+<p class="eyebrow">公司研究 · {{ c.entity.exchange }} / {{ c.entity.currency }}</p>
+<h1>{{ c.entity.entity_id }} · 公司與投資焦點</h1>
+<p class="meta">{{ c.entity.name }} · {{ c.entity.share_class }} · 截至 {{ data.request.research_as_of|taipei }}（台灣）</p>
+<h2>公司如何賺錢</h2>{{ paragraphs(c.research.overview) }}
+<h2>這次研究的重點</h2><div class="lead">{{ paragraphs(c.research.key_takeaways) }}</div>
+{% if c.segment_rows %}<h2>最新季度部門表現</h2>{{ financial_table(c.segment_rows) }}<p class="meta">比較期為去年同季；金額與口徑依原申報。</p>{% endif %}
+{% if c.latest_quote %}<p class="meta">最近可用收盤 {{ c.latest_quote|amount }} · {{ c.latest_quote.event_time.date() }} <sup>{{ [c.latest_quote.evidence_id]|cite }}</sup></p>{% endif %}
+
+<div class="page"></div><p class="eyebrow">最新一期財報 · 獲利與現金轉換</p>
+<h1>成長，如何變成現金？</h1>
+{% if data.latest_financials %}<p class="meta">{{ data.latest_financials.discovery.form }} · 期間截至 {{ data.latest_financials.discovery.period_end }} · 公開 {{ data.latest_financials.discovery.published_at|taipei }}（台灣）</p>{% endif %}
+<h2>單季實績與去年同季</h2>{{ financial_table(c.quarter_rows) }}
+{% if c.balance_rows %}<h2>資金占用與資產負債</h2>{{ financial_table(c.balance_rows) }}<p class="meta">餘額比較對財年末，並非單季年增率；一般 FCF 與調整後 FCF 分列。</p>{% endif %}
+{{ paragraphs(c.research.fundamentals) }}
+
+<div class="page"></div><p class="eyebrow">消息面 · 下一次財報預期</p>
+<h1>市場接下來看什麼？</h1>
+{% if data.earnings_preview and data.earnings_preview.next_earnings_at %}<div class="lead"><b>下一次財報電話會議：{{ data.earnings_preview.next_earnings_at|taipei }}（台灣）</b> <sup>{{ data.earnings_preview.schedule_evidence_ids|cite }}</sup></div>{% endif %}
+{% if c.guidance %}<h2>公司指引與外部預期</h2>
+<table><tr><th>類型／目標期間</th><th>項目</th><th>數值</th></tr>{% for e in c.guidance %}<tr><td>{{ {'management_guidance':'公司指引','analyst_estimate':'具名分析師預測','consensus_estimate':'市場共識'}.get(e.statement_kind) }} · {{ e.target_period }}</td><td>{{ statement_labels.get(e.financial_metric, e.financial_metric or '預期') }} <sup>{{ [e.evidence_id]|cite }}</sup></td><td>{{ e|amount }}</td></tr>{% endfor %}</table>
+<p class="meta">指引與預測是對未來的估計，並非已實現業績。公司指引不等同市場共識。</p>{% endif %}
+{{ paragraphs(c.research.earnings_preview) }}
+<h2>近期消息及影響路徑</h2>{{ paragraphs(c.research.news) }}
+{% if c.timeline %}<div class="timeline">{% for e in c.timeline %}<p><b>{{ e.published_at.date() }}</b> <span class="tag">{{ '媒體報導' if e.source_type=='secondary' else '公司／官方公告' }}</span> · {{ e.claim }} <sup>{{ [e.evidence_id]|cite }}</sup></p>{% endfor %}</div>{% endif %}
+
+<div class="page"></div><p class="eyebrow">中長期觀察 · 驗證條件與來源</p>
+<h1>未來兩個研究期間</h1>
+{% for p in c.reader_outlooks %}<h3>{{ p.horizon }} 個月</h3><p>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% if p.conditions %}<p class="meta">追蹤：{{ p.conditions|join('；') }}</p>{% endif %}{% endfor %}
+<h2>接下來的驗證清單</h2>{{ paragraphs(c.research.monitoring) }}
+<h3>資料範圍</h3><div class="limits">{% for item in limitations %}<p>{{ item }}</p>{% endfor %}<p>本報告區分已公布事實、公司指引、外部估計與情境假設；供本人研究，不作個人化交易指令。</p></div>
+<h3>來源索引</h3><div class="sources">{% for e in display_sources %}<p>[{{ references[e.evidence_id] }}] {{ e.publisher }} · {{ e.published_at.date() }} · <a href="{{ e.article_url or e.source_url }}">原始來源</a> · {{ e.attribution }}</p>{% endfor %}</div>
+</body></html>

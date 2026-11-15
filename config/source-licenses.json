@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
-  "registry_version": "0.5.3",
-  "updated_at": "2026-11-15T07:17:19.963635+00:00",
+  "registry_version": "0.6.1",
+  "updated_at": "2026-11-15T08:51:32.926018+00:00",
   "policy": "Lawful, free access for personal non-distributed use only. Under the user's 2026-11-15 authorization, a sufficient AI review of official source, identity, time, terms and free access may confirm a specific source. Human attestations remain separately recorded. Unknown or restricted sources stay closed. Accessibility alone is not permission; no sharing, paid API, raw response or response hash retention is enabled by AI review.",
   "sources": [
     {
@@ -429,6 +429,256 @@
         ],
         "unresolved": []
       }
+    },
+    {
+      "source_id": "sec-submissions-history",
+      "publisher": "U.S. Securities and Exchange Commission",
+      "source_class": "official",
+      "endpoint_scope": "https://data.sec.gov/submissions/CIK{cik}.json",
+      "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "attribution": "Source: U.S. SEC EDGAR submissions history; normalized filing metadata, private use only.",
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex financial research agent",
+        "reviewed_at": "2026-11-15T08:32:37Z",
+        "authorization": "使用者2026-11-15授權AI查核官方來源；最新要求最新一期財報為必要。AGENTS.md，僅本人自用不散布。",
+        "reviewed_endpoint_scope": "https://data.sec.gov/submissions/CIK{cik}.json",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "https://data.sec.gov/submissions/CIK##########.json",
+            "conclusion": "SEC官方API文件指定公司申報歷史端點；只保存正規化申報中繼資料。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "Where the ########## is the entity’s 10-digit central index key (CIK), including leading zeros.",
+            "conclusion": "以十位CIK綁定發行人；另核對回應的名稱、股票代碼與交易所。DELL由官方10-Q封面及CIK1571996交叉驗證。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "The JSON structures are updated throughout the day, in real time, as submissions are disseminated.",
+            "conclusion": "申報歷史包含發布與接受時間；依截止日前已可得的申報選最新一期，不以報告期間代替公開時間，也不假設零延遲。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "All Government-created content on sec.gov and EDGAR public filing content are free to access and reuse.",
+            "conclusion": "SEC官方FAQ明示公開申報可免費存取再利用。僅個人正規化資料；保留來源標示，原始回應、回應雜湊與分享維持關閉。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "These APIs do not require any authentication or API keys to access.",
+            "conclusion": "官方API無須認證或API Key；僅用操作人提供的聯絡資訊宣告User-Agent，依SEC速率限制保守存取。"
+          }
+        ],
+        "unresolved": []
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+          "checked_at": "2026-11-15T08:32:37Z",
+          "checked_by": "assistant",
+          "checker": "Codex financial research agent",
+          "excerpt": "https://data.sec.gov/submissions/CIK##########.json",
+          "excerpt_covers": "SEC官方指定公司申報歷史JSON端點。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T08:32:37Z",
+          "checked_by": "assistant",
+          "checker": "Codex financial research agent",
+          "excerpt": "All Government-created content on sec.gov and EDGAR public filing content are free to access and reuse.",
+          "excerpt_covers": "公開申報資料免費存取及再利用；本候選僅正規化資料供個人使用。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T08:32:37Z",
+          "checked_by": "assistant",
+          "checker": "Codex financial research agent",
+          "excerpt": "Please declare your user agent in request headers:",
+          "excerpt_covers": "需宣告User-Agent，含操作人提供的聯絡資訊；同頁最大速率每秒10請求，本專案採更保守限制。"
+        }
+      ]
+    },
+    {
+      "source_id": "dell-ir-next-earnings-1661",
+      "publisher": "Dell Technologies",
+      "source_class": "official",
+      "attribution": "資料來源：Dell Technologies；© 2026 Dell Inc.；僅供本人私人研究。",
+      "endpoint_scope": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+      "terms_url": "https://www.dell.com/en-us/legal/lp/site-terms-of-use-copyright",
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex research agent dell_media_preview",
+        "reviewed_at": "2026-11-15T08:34:18+00:00",
+        "authorization": "使用者2026-11-15授權AI查核來源並要求最新財報及下次財報預期新聞；AGENTS.md，僅本人自用不散布。",
+        "reviewed_endpoint_scope": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "Source: Dell Technologies",
+            "conclusion": "Dell官方投資人關係網域的公司自發公告；不是媒體獨立採訪。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "NYSE: DELL",
+            "conclusion": "公告列出NYSE:DELL，和已設定CIK1571996的Dell Technologies身份一致。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "Released November 10, 2026",
+            "conclusion": "來源明示公開日期，日期型上界採美東UTC-05當日末；不得倒填為較早時點。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.dell.com/en-us/legal/lp/site-terms-of-use-copyright",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "solely for personal, noncommercial use only",
+            "conclusion": "官方copyright頁允許個人非商業使用的顯示、複製及下載。僅正規化公告日程事實及短引文、保留權利標示；不取圖片、全文改作或公開散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "public",
+            "conclusion": "已透過官方公開頁完整讀取，無登入、付款或API Key；公告並明示電話會議向公眾提供。範圍只限此公告事實。"
+          }
+        ]
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.dell.com/en-us/legal/lp/site-terms-of-use-copyright",
+          "checked_at": "2026-11-15T08:34:18+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex research agent dell_media_preview",
+          "excerpt": "solely for personal, noncommercial use only",
+          "excerpt_covers": "單一官方公告日程的正規化事實供本人研究；保留權利標示，不存原始回應、雜湊，不散布。"
+        },
+        {
+          "terms_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+          "checked_at": "2026-11-15T08:34:18+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex research agent dell_media_preview",
+          "excerpt": "Source: Dell Technologies",
+          "excerpt_covers": "Dell官方投資人關係網域的公司自發公告；不是媒體獨立採訪。"
+        }
+      ],
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "declared_status": "confirmed",
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": []
+    },
+    {
+      "source_id": "lemonde-economy-rss",
+      "publisher": "Le Monde",
+      "source_class": "secondary",
+      "attribution": "資料來源：Le Monde 經濟 RSS 標題與摘要；僅供本人私人閱讀與研究，不散布。",
+      "endpoint_scope": "https://www.lemonde.fr/en/economy/rss_full.xml",
+      "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+          "checked_at": "2026-11-15T08:48:03+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex research agent dell_media_preview",
+          "excerpt": "strictly personal, non-professional and non-collective use",
+          "excerpt_covers": "官方RSS專用頁授權單人非職業、非集體讀取；僅此經濟RSS的標題、摘要、日期、原始連結及發稿者，不含原文、圖片、全文或全站爬取。"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex research agent dell_media_preview",
+        "reviewed_at": "2026-11-15T08:48:03+00:00",
+        "authorization": "使用者2026-11-15明示納入主流媒體，並授權AI查核官方來源；AGENTS.md。僅本人私人非職業使用，不分享、不散布、不作模型或軟體開發訓練。",
+        "reviewed_endpoint_scope": "https://www.lemonde.fr/en/economy/rss_full.xml",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "Economy",
+            "conclusion": "官方RSS說明頁的Economy項目列出本經濟feed；實測endpoint與官方https網域一致，限定單一RSS而非文章全文或全站。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "Le Monde",
+            "conclusion": "官方來源身份已核對；08:46:33 UTC的Apple Container即時採集成功，parser驗證channel.title包含monde。只有來源契約與數量中繼資料被保存，未假造任何未見的RSS標題。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "latest articles published",
+            "conclusion": "官方RSS頁明示發布後提供最新文章。即時parser對實際item.pubDate進行時區感知解析並排除未來時間；15筆符合的Observation均使用source_declared_timestamp。此說明不把RSS頁本身的發布日期當作新聞日期，也不宣稱歷史feed完整。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "strictly personal",
+            "conclusion": "RSS專用許可明示單人非職業、非集體使用與自動feed聚合。一般條款另禁全站crawl、大量蒐集及開發/訓練；本次僅既有軟體讀取一個feed供本人研究，不作這些用途、不追抓全文。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "Any other use must be authorized and a fee paid.",
+            "conclusion": "官方頁對許可範圍外用途另要求授權與付費；本次狹義個人RSS在Apple Container實測無登入、API Key或付款直接成功。僅保存metadata的inspection證實傳輸成功，不把完整網站或訂閱文章也視為免費。"
+          }
+        ]
+      },
+      "notes": "僅為來源登錄候選，未修改config。啟用前須activation-check，通過後提升registry_version並重新採集；unknown期間的舊採集不能沿用新權限。媒體摘要仍是secondary敘述，不能自動變成公司已驗證事實或市場共識。"
     }
   ]
 }

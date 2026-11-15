@@ -6,9 +6,9 @@ import hashlib
 import uuid
 from . import __version__
 from .analysis import exchange
-from .models import Request, ResearchInput, Proposal, event_review_state, research_scope
+from .models import Request, ResearchInput, Proposal, event_review_state, research_scope, financial_review_state
 from .mock import fixture, VERSIONS
-from .policy import evaluate, reportable
+from .policy import evaluate, reportable, validate_company_research
 from .quant import calculate, consensus
 from .render import render
 from .storage import digest, read_json, write_json, save_evidence
@@ -25,7 +25,7 @@ def runtime_versions(mapping, data=None):
     # The dataset label follows the snapshot, so a real run is never stamped as synthetic.
     dataset = data.versions.get('dataset', VERSIONS['dataset']) if data is not None else VERSIONS['dataset']
     return {**VERSIONS, 'dataset': dataset, 'package': __version__, 'ratings': digest(mapping),
-            'template_sha256': byte_hash(files('stock_report').joinpath('templates/report.html')),
+            'template_sha256': digest({p.name: byte_hash(p) for p in Path(str(files('stock_report').joinpath('templates'))).glob('*.html')}),
             'code_sha256': digest({p.name: byte_hash(p) for p in Path(str(files('stock_report'))).glob('*.py')})}
 
 
@@ -46,7 +46,10 @@ SNAPSHOT_NOTICE = ('僅為財務快照：近期重大事件查核未完成，不
 
 def completion(data):
     """Explicit, machine-readable answer to "is this complete stock research?" for every delivery."""
-    state = event_review_state(data)
+    state = event_review_state(data) + financial_review_state(data)
+    if data.request.mode == 'stock' and data.dataset_kind == 'real':
+        if data.earnings_preview is None or data.earnings_preview.status == 'not_run':
+            state.append('EARNINGS_PREVIEW_SEARCH_MISSING')
     review = data.event_review
     result = {'research_scope': research_scope(data), 'completion_blockers': state,
               'event_review': None if review is None else {
@@ -58,6 +61,9 @@ def completion(data):
     if data.request.mode == 'stock':
         result['research_complete'] = not state
         result['event_review_status'] = review.status if review is not None else 'not_run'
+        result['latest_financial_report_status'] = financial_review_state(data) or ['covered']
+        result['latest_financials'] = data.latest_financials.model_dump(mode='json') if data.latest_financials else None
+        result['earnings_preview'] = data.earnings_preview.model_dump(mode='json') if data.earnings_preview else None
     return result
 
 
@@ -122,6 +128,13 @@ def finalize(directory, proposal_path, mapping_path):
     if (directory / 'manifest.json').exists():
         raise ValueError('Run already finalized; use replay to write a new isolated run')
     proposal = Proposal.model_validate(read_json(proposal_path))
+    if data.dataset_kind == 'real' and data.request.mode == 'stock' and data.request.max_pdf_pages >= 4:
+        if financial_review_state(data):
+            raise ValueError('The latest published financial report is required for a four-page stock report')
+        if data.earnings_preview is None or data.earnings_preview.status == 'not_run':
+            raise ValueError('Next-earnings news and expectations must be searched before publication')
+        if not proposal.company_research:
+            raise ValueError('Four-page stock research requires substantive cited company analysis')
     mapping = read_json(mapping_path)
     if any(v not in ('Buy', 'Hold', 'Sell') for table in [mapping.get('default', {})] + list(mapping.get('institutions', {}).values()) for v in table.values()):
         raise ValueError('Invalid rating mapping')
@@ -130,10 +143,11 @@ def finalize(directory, proposal_path, mapping_path):
     if data.dataset_kind == 'real' and proposal.model.startswith('synthetic'):
         raise ValueError('Synthetic proposal cannot be applied to real data')
     decision = evaluate(data, proposal)
+    company_research = validate_company_research(data, proposal)
     # File output is transactional: the personal PDF is written only after all checks pass.
     temp_pdf = directory / '.report.pending.pdf'
     try:
-        pages = render(data, decision, mapping, temp_pdf)
+        pages = render(data, decision, mapping, temp_pdf, company_research=company_research)
     except Exception:
         temp_pdf.unlink(missing_ok=True)
         raise
@@ -146,11 +160,14 @@ def finalize(directory, proposal_path, mapping_path):
               'consensus': {e.entity_id: consensus(data.evidence, e.entity_id, data.request.research_as_of, mapping) for e in data.entities},
               'distribution': DISTRIBUTION, **completion(data),
               'privacy': 'Personal use only. Local audit JSON; never distributed'}
+    report['company_research'] = [section.model_dump(mode='json') for section in company_research]
     write_json(directory / 'research.json', report)
     write_json(directory / 'decision.json', decision)
     write_json(directory / 'ai_proposal.json', proposal)
     write_json(directory / 'rating_mapping.json', mapping)
     artifacts = ['research_input.json', 'ai_proposal.json', 'rating_mapping.json', 'evidence.json', 'evidence.sqlite', 'decision.json', 'research.json', 'report.pdf']
+    if (directory / 'statement_metrics.json').exists():
+        artifacts.append('statement_metrics.json')
     manifest = {'run_id': prepared['run_id'], 'created_at': datetime.now(timezone.utc).isoformat(),
                 'research_as_of': data.request.research_as_of.isoformat(), 'dataset_kind': data.dataset_kind,
                 'versions': runtime_versions(mapping, data), 'proposal_model': proposal.model, 'usage': proposal.usage,

@@ -6,10 +6,10 @@ whether a record is confirmed for internal use. The legacy redistribution flag
 Personal use is not a permission in itself: unknown or restricted sources stay blocked.
 """
 import re
-from .models import Decision, Finding, HorizonProposal, event_review_state
+from .models import Decision, Finding, HorizonProposal, event_review_state, financial_review_state
 from .quant import calculate, usable
 
-VERSION = 'phase0-3'
+VERSION = 'phase0-4'
 GENERIC_INSUFFICIENT = '核心資料不足，無方向性結論。'
 # An insufficient outlook may explain what is missing; it may never read as a direction. This is a
 # lexical guard, not comprehension: any hit discards the text in favour of the generic wording.
@@ -22,6 +22,36 @@ EVENT_REVIEW_MESSAGES = {
     'EVENT_REVIEW_FAILED': '近期重大事件查核失敗；不代表沒有重大事件，不發布方向性結論',
     'MATERIAL_LEAD_UNRESOLVED': '存在未解決的重大事件線索；不發布方向性結論',
 }
+FINANCIAL_REVIEW_MESSAGES = {
+    'LATEST_FINANCIAL_REPORT_MISSING': '尚未查核並納入截止日前最新一期財報',
+    'LATEST_FINANCIAL_REVIEW_INVALID': '最新財報查核的身份或時點不一致',
+    'LATEST_FINANCIAL_DISCOVERY_UNVERIFIED': '最新申報清單未經核實來源確認',
+    'LATEST_FINANCIAL_STATEMENTS_INCOMPLETE': '最新申報缺少必要的收入、淨利或營業現金流',
+    'LATEST_QUARTER_MISSING': '最新季報尚未納入單季收入',
+    'EARNINGS_PREVIEW_SEARCH_MISSING': '尚未執行下一次財報預期新聞搜尋',
+}
+
+
+def validate_company_research(data, proposal):
+    """Factual business analysis survives a valuation downgrade, but never a bad citation."""
+    sections, seen = [], set()
+    index = {e.evidence_id: e for e in data.evidence}
+    entities = {e.entity_id for e in data.entities}
+    for section in proposal.company_research:
+        if section.entity_id not in entities or section.entity_id in seen:
+            raise ValueError('Company research must name a unique supported entity')
+        seen.add(section.entity_id)
+        if data.dataset_kind == 'real' and data.request.max_pdf_pages >= 4 and any(
+                not getattr(section, field) for field in ('overview', 'key_takeaways', 'fundamentals',
+                                                        'news', 'earnings_preview', 'monitoring')):
+            raise ValueError('Four-page research requires all substantive company analysis sections')
+        for field in ('overview', 'key_takeaways', 'fundamentals', 'news', 'earnings_preview', 'monitoring'):
+            for paragraph in getattr(section, field):
+                if any(eid not in index or index[eid].entity_id != section.entity_id
+                       or not reportable(index[eid], data.request) for eid in paragraph.evidence_ids):
+                    raise ValueError('Company research contains unavailable or unlicensed evidence')
+        sections.append(section)
+    return sections
 
 
 def directional_text(*texts):
@@ -51,7 +81,10 @@ def evaluate(data, proposal):
     expected = {(e, h) for e in entities for h in data.request.horizons}
     if len(pairs) != len(set(pairs)) or set(pairs) != expected:
         raise ValueError('Proposal must contain exactly one outlook per entity and horizon')
-    review_state = event_review_state(data)
+    review_state = event_review_state(data) + financial_review_state(data)
+    if data.dataset_kind == 'real' and data.request.mode == 'stock' and (
+            data.earnings_preview is None or data.earnings_preview.status == 'not_run'):
+        review_state.append('EARNINGS_PREVIEW_SEARCH_MISSING')
     for p in proposal.outlooks:
         problems, bad_refs, reasons = [], set(), []
         def add(rule, message, ids=(), severity='hard'):
@@ -90,7 +123,7 @@ def evaluate(data, proposal):
         if p.outlook != 'insufficient' and (len(independent) < 2 or not p.invalidation_conditions):
             add('CORE_INSUFFICIENT', '核心證據不足或缺少反轉條件；門檻尚待 Phase 0 校準')
         for code in review_state:
-            add(code, EVENT_REVIEW_MESSAGES[code])
+            add(code, {**EVENT_REVIEW_MESSAGES, **FINANCIAL_REVIEW_MESSAGES}[code])
         if data.request.mode == 'event':
             event_refs = [index.get(eid) for eid in data.event_evidence_ids]
             if not event_refs or not all(e and e.kind == 'event' and e.entity_id == 'EVENT' and reportable(e, data.request) for e in event_refs):

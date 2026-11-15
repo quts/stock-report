@@ -62,7 +62,7 @@ def sec_collection(registry, **kwargs):
 
 
 def nvda_request(as_of=NOW):
-    return Request(mode='stock', ticker='NVDA', exchange='NASDAQ', research_as_of=as_of)
+    return Request(mode='stock', ticker='NVDA', exchange='NASDAQ', research_as_of=as_of, max_pdf_pages=2)
 
 
 def tsmc_request(as_of=NOW):

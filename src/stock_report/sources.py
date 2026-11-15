@@ -46,6 +46,10 @@ class Observation(Model):
     evidence_id: str = Field(pattern=r'^[A-Za-z0-9_.-]+$', max_length=80)
     entity_id: str
     kind: Literal['identity', 'financial', 'price', 'event']
+    financial_metric: str | None = Field(default=None, max_length=80)
+    statement_kind: Literal['fact', 'reported_claim', 'management_guidance', 'analyst_estimate', 'consensus_estimate', 'scenario'] = 'fact'
+    target_period: str | None = Field(default=None, max_length=80)
+    institution: str | None = Field(default=None, max_length=120)
     role: MetricRole | None = None
     claim: str = Field(max_length=500)
     value: float | None = None
@@ -60,6 +64,7 @@ class Observation(Model):
     provider_record_id: str = Field(min_length=1, max_length=120)
     request_key: str = Field(max_length=120)
     source_url: str
+    article_url: str | None = Field(default=None, pattern=r'^https://[^\s]+$', max_length=1000)
     source_published_raw: str | None = Field(default=None, max_length=120)
     source_period_raw: str | None = Field(default=None, max_length=120)
     source_unit_raw: str | None = Field(default=None, max_length=60)
