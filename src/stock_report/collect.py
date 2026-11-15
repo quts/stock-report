@@ -24,7 +24,7 @@ from .storage import read_json, write_json
 CORE_SOURCE_RECORDS_REQUIRED = 2
 SEC_CONTACT_ENV = 'STOCK_REPORT_SEC_CONTACT'
 DEFAULT_USER_AGENT = 'stock-report-phase0/0.1 (research proof-of-concept)'
-SEC_SOURCES = ('sec-xbrl-companyconcept',)
+SEC_SOURCES = ('sec-xbrl-companyconcept', 'sec-edgar-archives-filing')
 
 
 class Collection(Model):
@@ -75,6 +75,16 @@ def user_agent_for(source_id, user_agent=None, sec_contact=None, environ=None):
 def collect(source_id, ticker, *, registry, allow_network=False, fixture=None, client=None, now=None,
             sec_contact=None, environ=None, profile_overrides=None, user_agent=None, retries=1,
             interval=1.0, cache_dir=None, clock=None):
+    if source_id == 'sec-edgar-archives-filing':
+        from .filing_collect import collect_filings
+        if fixture is not None:
+            raise ValueError('Reviewed filing collection does not accept fixture captures')
+        if not allow_network:
+            raise ValueError('Real filing collection requires --allow-network')
+        agent = user_agent_for(source_id, user_agent, sec_contact, environ)
+        return collect_filings(ticker, registry=registry, allow_network=allow_network,
+                               plan=profile_overrides, client=client or HTTPClient(agent, retries=retries,
+                               interval=interval), now=now)
     profile = merge_profile(source_id, profile_overrides)
     snapshot = registry.snapshot(source_id)
     licence = registry.get(source_id)

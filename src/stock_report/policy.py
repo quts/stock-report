@@ -143,7 +143,7 @@ def evaluate(data, proposal):
                 interpretation=text if len(text) <= 350 else text[:349] + '…',
                 assumptions=list(p.assumptions) if own else [],
                 unresolved_conflicts=['；'.join(problems)[:300]] if problems else [],
-                invalidation_conditions=[]))
+                invalidation_conditions=list(p.invalidation_conditions) if own else []))
         else:
             approved.append(p)
     rejected = sum(p.outlook == 'insufficient' for p in approved)

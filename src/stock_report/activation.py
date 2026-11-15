@@ -30,7 +30,7 @@ from typing import Literal
 from pydantic import AwareDatetime, Field, model_validator
 from .licensing import LicenseRegistry, PERMISSIONS, Scope
 from .models import Model
-from .sources import PROFILES, SEC_IDENTITY_FIELDS
+from .sources import PROFILES, FILING_PROFILES, SEC_IDENTITY_FIELDS
 from .storage import read_json
 
 # Labels that identify an assistant or a test fixture. A candidate whose human attestation carries
@@ -252,13 +252,21 @@ def package_drift(package, registry, instruments):
     if len({item.source_id for item in package.items}) != len(package.items):
         problems.append('審查包重複列出同一來源')
     for item in package.items:
-        profile, source = PROFILES.get(item.source_id), known.get(item.source_id)
+        profile, source = (PROFILES.get(item.source_id) or FILING_PROFILES.get(item.source_id)), known.get(item.source_id)
         if profile is None or source is None:
             problems.append(f'{item.source_id} 不在來源契約或授權登錄檔')
             continue
         if not (item.endpoint == profile['endpoint'] == source.endpoint_scope):
             problems.append(f'{item.source_id}：端點與來源契約或登錄範圍不一致')
-        problems += (sec_item_drift if sec else tw_item_drift)(item, profile, target)
+        if profile.get('adapter') == 'sec_filing_document':
+            if not sec or item.sec_binding is not None:
+                problems.append(f'{item.source_id}：申報文件必須使用 SEC 標的，不能聲稱 XBRL 欄位契約')
+            if item.field_binding != profile['identity_binding']:
+                problems.append(f'{item.source_id}：申報身份欄位契約不符')
+            if sec and profile['entities_config'] != target.entity_config:
+                problems.append(f'{item.source_id}：申報標的設定不符')
+        else:
+            problems += (sec_item_drift if sec else tw_item_drift)(item, profile, target)
     return problems
 
 

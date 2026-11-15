@@ -45,7 +45,7 @@ class Observation(Model):
     """One normalized provider record, before any research cutoff is applied."""
     evidence_id: str = Field(pattern=r'^[A-Za-z0-9_.-]+$', max_length=80)
     entity_id: str
-    kind: Literal['identity', 'financial', 'price']
+    kind: Literal['identity', 'financial', 'price', 'event']
     role: MetricRole | None = None
     claim: str = Field(max_length=500)
     value: float | None = None

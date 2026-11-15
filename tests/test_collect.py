@@ -251,7 +251,9 @@ def test_attested_sec_collection_builds_a_real_bundle_and_prepares(attested, tmp
     result = prepare(request, tmp_path, data.model_dump(mode='json'))
     assert result['coverage']['NVDA']['financial'] == 'available'
     assert result['coverage']['NVDA']['price'] == 'unavailable'
-    assert result['warnings'] == ['Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)']
+    assert result['warnings'][0] == 'Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)'
+    assert result['research_complete'] is False
+    assert 'EVENT_REVIEW_MISSING' in result['completion_blockers']
     assert read_json(Path(result['research_input_path']))['dataset_kind'] == 'real'
 
 
@@ -265,8 +267,9 @@ def test_real_evidence_passes_through_the_gate_without_bypass(attested):
         for horizon in ('3-6m', '6-12m')])
     decision = evaluate(data, proposal)
     rules = {f.rule_id for f in decision.findings}
-    assert decision.status == 'APPROVED_WITH_WARNINGS'
-    assert [p.outlook for p in decision.outlooks] == ['bullish', 'bullish']
+    assert decision.status == 'REJECTED'
+    assert [p.outlook for p in decision.outlooks] == ['insufficient', 'insufficient']
+    assert 'EVENT_REVIEW_MISSING' in rules
     assert 'SINGLE_SOURCE' in rules and 'RATINGS_MISSING' in rules
     assert not {'LICENSE', 'FUTURE_DATA', 'UNVERIFIED', 'QUANT_MISMATCH'} & rules
 

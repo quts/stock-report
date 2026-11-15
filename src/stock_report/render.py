@@ -6,6 +6,7 @@ a rendering condition. Unknown, restricted or internally unlicensed records neve
 from importlib.resources import files
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .policy import reportable
+from .models import event_review_state, research_scope
 from .quant import consensus, calculate
 
 LABELS = {'bullish': '偏多', 'neutral': '中性', 'bearish': '偏空', 'insufficient': '資料不足'}
@@ -19,6 +20,8 @@ def projection(data, decision, mapping):
         entity_ids.add('EVENT')
     allowed = {e.evidence_id: e for e in data.evidence if e.entity_id in entity_ids and reportable(e, data.request)}
     computed = calculate(data.evidence, data.request.research_as_of)
+    major_ids = {eid for event in (data.event_review.events if data.event_review else [])
+                 if event.materiality == 'major' for eid in event.evidence_ids}
     companies = []
     for entity in data.entities:
         identity_ok = any(e.entity_id == entity.entity_id and e.kind == 'identity' for e in allowed.values())
@@ -33,14 +36,16 @@ def projection(data, decision, mapping):
         relation = next((r for r in data.relationships if r.entity_id == entity.entity_id), None)
         valid_relation = relation and relation.evidence_ids and all(eid in allowed and allowed[eid].kind == 'relationship' and allowed[eid].entity_id == entity.entity_id for eid in relation.evidence_ids)
         companies.append({'entity': entity, 'metrics': metrics, 'latest_quote': latest_quote,
-            'events': [e for e in company_evidence if e.kind == 'event'],
+            'events': sorted([e for e in company_evidence if e.kind == 'event'], key=lambda e: (e.evidence_id in major_ids, e.event_time, e.evidence_id), reverse=True),
             'outlooks': [p for p in decision.outlooks if p.entity_id == entity.entity_id],
             'consensus': consensus(company_evidence, entity.entity_id, data.request.research_as_of, mapping),
             'relationship': relation.relationship if valid_relation else None,
             'relationship_evidence_ids': relation.evidence_ids if valid_relation else []})
-    return {'data': data, 'decision': decision, 'companies': companies, 'labels': LABELS, 'metric_labels': METRICS,
+    # Material events lead the short source list; duplicate financial endpoints add no context.
+    unique_sources = list({e.source_url: e for e in sorted(allowed.values(), key=lambda e: e.kind == 'event', reverse=True)}.values())
+    return {'research_scope': research_scope(data), 'completion_blockers': event_review_state(data), 'data': data, 'decision': decision, 'companies': companies, 'labels': LABELS, 'metric_labels': METRICS,
             'event_records': [allowed[eid] for eid in data.event_evidence_ids if eid in allowed and allowed[eid].kind == 'event' and allowed[eid].entity_id == 'EVENT'],
-            'sources': list(allowed.values()), 'synthetic': data.dataset_kind == 'mock'}
+            'sources': list(allowed.values()), 'display_sources': unique_sources, 'synthetic': data.dataset_kind == 'mock'}
 
 
 def render(data, decision, mapping, path):

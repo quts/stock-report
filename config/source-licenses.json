@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "registry_version": "0.5.1",
+  "registry_version": "0.5.3",
   "updated_at": "2026-11-15T07:17:19.963635+00:00",
   "policy": "Lawful, free access for personal non-distributed use only. Under the user's 2026-11-15 authorization, a sufficient AI review of official source, identity, time, terms and free access may confirm a specific source. Human attestations remain separately recorded. Unknown or restricted sources stay closed. Accessibility alone is not permission; no sharing, paid API, raw response or response hash retention is enabled by AI review.",
   "sources": [
@@ -345,6 +345,89 @@
             "conclusion": "官方API不需認證或API Key，本次直接採集成功；不使用付費服務。"
           }
         ]
+      }
+    },
+    {
+      "source_id": "sec-edgar-archives-filing",
+      "publisher": "U.S. Securities and Exchange Commission",
+      "source_class": "official",
+      "attribution": "Source: SEC EDGAR issuer filings; normalized facts for personal use only.",
+      "endpoint_scope": "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}",
+      "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+          "checked_at": "2026-11-15T07:48:31.683860+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex",
+          "excerpt": "SEC Accession No. 0001045810-26-000082",
+          "excerpt_covers": "SEC官方申報索引連到8-K與EX-99.1，僅正規化公開申報事實。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T07:48:31.683860+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex",
+          "excerpt": "EDGAR public filing content are free to access and reuse.",
+          "excerpt_covers": "官方FAQ允許公開申報內容免費存取再利用；僅正規化事實供個人PDF，原始回應、雜湊與分享維持關閉。"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex",
+        "reviewed_at": "2026-11-15T07:48:31.683860+00:00",
+        "authorization": "使用者2026-11-15授權AI查核官方來源；AGENTS.md；最低合法免費、僅本人自用不散布。",
+        "reviewed_endpoint_scope": "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "SEC Accession No. 0001045810-26-000082",
+            "conclusion": "SEC官方申報索引連到8-K與EX-99.1，僅正規化公開申報事實。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/nvda-20261111.htm",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "NVIDIA CORPORATION",
+            "conclusion": "SEC檔案路徑CIK1045810與公司名稱、NVDA及NASDAQ封面一致。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "2026-11-12 08:52:41",
+            "conclusion": "索引記載接受時間；本次採較保守的11/12美東固定UTC-05當日末作公開上界。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "EDGAR public filing content are free to access and reuse.",
+            "conclusion": "官方FAQ允許公開申報內容免費存取再利用；僅正規化事實供個人PDF，原始回應、雜湊與分享維持關閉。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "EDGAR public filing content are free to access and reuse.",
+            "conclusion": "公開申報無需登入或API Key；自動採集宣告操作人提供的聯絡資訊，速率不超過每秒一請求。"
+          }
+        ],
+        "unresolved": []
       }
     }
   ]

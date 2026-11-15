@@ -74,15 +74,17 @@ def test_internally_allowed_non_shareable_evidence_reaches_the_personal_pdf(tmp_
     write_json(run / 'ai_proposal.json', bullish(stored))
     result = finalize(run, run / 'ai_proposal.json', Path('config/ratings.json'))
     decision = read_json(run / 'decision.json')
-    assert result['gate_status'] == 'APPROVED_WITH_WARNINGS'
-    assert [p['outlook'] for p in decision['outlooks']] == ['bullish', 'bullish']
+    assert result['gate_status'] == 'REJECTED'
+    assert result['research_complete'] is False
+    assert [p['outlook'] for p in decision['outlooks']] == ['insufficient', 'insufficient']
     assert 'LICENSE' not in {f['rule_id'] for f in decision['findings']}
     # Supporting metrics and proposal citations built on non-shareable evidence are rendered.
     pages = pages_text(result['report_path'])
     text = ''.join(pages)
     assert len(pages) == 2 and 'Real Data' in text and 'SYNTHETIC' not in text
     assert '23.45' in text and '19.44' in text and 'sec-NVDA-revenue_current' in text
-    assert '偏多' in text and '測試用解讀' in text
+    assert '資料不足' in text and '偏多' not in text
+    assert '財務快照' in text and '事件查核未完成' in text
     assert all(LABEL_ZH in page and LABEL_EN in page for page in pages)
     manifest = read_json(run / 'manifest.json')
     assert manifest['distribution'] == 'personal_use_only' and manifest['shareable_files'] == []

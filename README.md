@@ -119,3 +119,5 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
 內部使用已確認但再散布欄位為 false 的證據可進入個人 PDF；個人報告不需要再散布簽認。`sharing_profile` 只接受 `private`。PDF 與本機 JSON／SQLite 稽核檔都不得對外提供。
 
 操作細節、已實作範圍與限制見 [實作說明](docs/phase-0/implementation.md)、[來源可行性](docs/phase-0/provider-feasibility.md) 及 [Phase 0 Review](docs/phase-0/phase-0-review.md)。
+
+NVDA 個股修正已加入受查核 SEC 8-K 文件採集與重大事件優先呈現；它是有界、由審閱者整理的真實來源流程，不是自動全網事件搜尋。未完成事件查核或仍有重大線索時，不得宣稱研究完成。操作與驗收見 [修正紀錄](docs/phase-0/nvda-event-report-correction.md)。
