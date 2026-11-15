@@ -195,7 +195,8 @@ def inspection_record(collection):
             'transport': [{k: v for k, v in row.items() if k in ('key', 'status', 'attempts', 'cached')}
                           for row in collection.transport],
             'license': {k: collection.license[k] for k in ('source_id', 'registry_version', 'status',
-                                                           'human_attested', 'endpoint_scope',
+                                                           'human_attested', 'source_reviewed',
+                                                           'review_basis', 'endpoint_scope',
                                                            'internal_use_allowed', 'pdf_share_allowed',
                                                            'store_response_hash', 'store_raw_response')},
             'blockers': persistence_blockers(collection), 'notes': collection.notes}
@@ -230,6 +231,11 @@ def effective_license(collection, registry):
     for name in ('internal_use_allowed', 'pdf_share_allowed', 'store_response_hash', 'store_raw_response'):
         merged[name] = bool(current.get(name)) and bool(recorded.get(name))
     merged['human_attested'] = bool(current.get('human_attested')) and bool(recorded.get('human_attested'))
+    # Captures recorded before `source_reviewed` existed only knew the human attestation.
+    merged['source_reviewed'] = (bool(current.get('source_reviewed'))
+                                 and bool(recorded.get('source_reviewed', recorded.get('human_attested'))))
+    if not merged['source_reviewed']:
+        merged['review_basis'] = None
     if current['status'] != recorded.get('status'):
         merged['status'] = 'restricted' if 'restricted' in (current['status'], recorded.get('status')) else 'unknown'
     if current['status'] != recorded.get('status') or current['registry_version'] != recorded.get('registry_version'):
@@ -242,12 +248,13 @@ def effective_license(collection, registry):
 
 def to_evidence(observation, request, license_snapshot, capture_mode, verified_capture, response_hash=None,
                 source_class='official'):
-    """`verified` means: mechanical source contract checks passed, a human recorded the source
-    attestation in the registry, and the capture itself is accepted as real for this run.
+    """`verified` means: mechanical source contract checks passed, the registry records a source
+    review (a human attestation, or a sufficient assistant review with official evidence made under
+    the user's authorization), and the capture itself is accepted as real for this run.
 
     A fixture capture is authored test content, so its evidence stays `synthetic`: the model
     layer then refuses to carry it inside a `real` dataset at all."""
-    verified = (license_snapshot['status'] == 'confirmed' and license_snapshot['human_attested']
+    verified = (license_snapshot['status'] == 'confirmed' and bool(license_snapshot.get('source_reviewed'))
                 and bool(verified_capture))
     return Evidence(
         evidence_id=observation.evidence_id, entity_id=observation.entity_id, claim=observation.claim,
@@ -296,7 +303,7 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
     entity = None
     if request.mode != 'stock':
         blockers.append({'code': 'event_mode_real_collection_not_implemented',
-                         'detail': '採集流程只支援個股；事件研究須以人工查證的事件卷宗經 event-rank 產生證據包，'
+                         'detail': '採集流程只支援個股；事件研究須以已查核（人工或合格 AI 查核）的事件卷宗經 event-rank 產生證據包，'
                                    '不以單一公司採集冒充事件研究'})
     if not collections:
         blockers.append({'code': 'no_collection_supplied', 'detail': '沒有任何採集結果，不能產生真實證據包'})
@@ -362,6 +369,7 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
                         'coverage_mode': collection.coverage_mode,
                         'collected_at': collection.collected_at.isoformat(), 'endpoint': collection.endpoint,
                         'license_status': snapshot['status'], 'human_attested': snapshot['human_attested'],
+                        'source_reviewed': snapshot['source_reviewed'], 'review_basis': snapshot.get('review_basis'),
                         'registry_version': snapshot['registry_version'], 'observations': len(collection.observations),
                         'kept': kept_here, 'field_binding': collection.field_binding, 'notes': collection.notes})
     if entity is not None:

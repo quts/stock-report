@@ -75,7 +75,7 @@ def prepare(request, root, source=None, synthetic_source=False):
     write_json(directory / 'prepared.json', {'run_id': run_id, 'input_sha256': digest(data), 'status': 'prepared'})
     return {'run_id': run_id, 'status': 'prepared', 'research_input_path': str(directory / 'research_input.json'),
             'research_as_of': request.research_as_of.isoformat(), 'coverage': coverage(data),
-            'warnings': ['DEMO / SYNTHETIC DATA'] if data.dataset_kind == 'mock' else ['Real evidence import requires human source/license verification']}
+            'warnings': ['DEMO / SYNTHETIC DATA'] if data.dataset_kind == 'mock' else ['Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)']}
 
 
 def load_prepared(directory):

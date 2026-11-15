@@ -1,5 +1,7 @@
 # 開 PR 前的本機 Code Review
 
+> 本文件保留開PR前的審查歷史。使用者後續已授權AI完成來源查核，以下「人工核對順序」不再是啟用前提；現行政策及結果見 [AI來源查核](ai-source-review.md)。
+
 日期：2026-11-15（Asia/Taipei）。Reviewer：Codex。比較範圍：`main...codex/phase-0`；以 `a0027f2` 為 review 起點，以下修正納入本次 PR。這是風險導向的本機審查，不是投資效能、法律授權或完整 MVP 的簽認。
 
 ## 審查結果與修正

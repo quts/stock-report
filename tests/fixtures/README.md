@@ -14,5 +14,10 @@
   「已確認內部使用」程式路徑（`pdf_share_allowed` 一律為 false），不代表任何來源已授權內部使用；
   本專案報告僅供個人使用，不存在分享版。
 
+- `licenses-closed.json`、`activation-package-closed.json`、`tw-instruments-closed.json` 是 **封閉狀態的快照測資**
+  （全部來源 `unknown`、登錄版本 0.4.1 及其對應查核包／標的設定）。離線測試一律以它們驗證封鎖與啟用檢查，
+  不讀取實際登錄檔的啟用狀態；實際登錄檔啟用任何來源都不應改變測試結果。
+- `tests/review_fixtures.py` 以程式產生的 AI 來源查核（`source_review`）內容同為虛構，只驗證程式路徑。
+
 採集流程會把 `--fixture` 標記為 `capture_mode=fixture`；`bundle` 預設拒絕這類採集，
 只有離線測試明確傳入 `--allow-fixture-capture` 才會接受。

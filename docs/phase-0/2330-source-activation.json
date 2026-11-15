@@ -4,8 +4,8 @@
   "prepared_at": "2026-11-15T00:00:00+08:00",
   "prepared_by": "Claude Code（Fable）助手；2026-11-15 為整理日期，00:00 是日期佔位而非精確時刻",
   "prepared_by_kind": "assistant",
-  "status": "awaiting_human_attestation",
-  "registry_baseline_version": "0.4.1",
+  "status": "awaiting_source_review",
+  "registry_baseline_version": "0.5.0",
   "target": {
     "ticker": "2330.TW",
     "code": "2330",
@@ -17,7 +17,7 @@
   "items": [
     {
       "source_id": "twse-openapi-stock-day-all",
-      "recommendation": "ready_for_human_review",
+      "recommendation": "ready_for_source_review",
       "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
       "dataset_page": "https://data.gov.tw/dataset/11549",
       "dataset_resource": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data",
@@ -69,17 +69,17 @@
       },
       "proposed_attribution": "金融監督管理委員會證券期貨局／臺灣證券交易所，2026，盤後資訊 > 個股日成交資訊（11549）；依政府資料開放授權條款第1版釋出：https://data.gov.tw/license。原機關未推薦本研究。",
       "report_effect": "啟用後 2330.TW 只有身份與單筆最新收盤價：核心來源紀錄 1 筆，低於方向門檻 2 筆。只能產生兩個期限皆為「資料不足」的個人 PDF，不會有方向性結論、成長率、本益比或跨期漲跌幅。",
-      "human_checklist": [
-        "親自開啟 https://data.gov.tw/dataset/11549，確認授權方式仍為「政府資料開放授權條款－第1版」，並逐字抄錄該標示作為 checked_by=human 的引用。",
-        "親自開啟 https://data.gov.tw/license，逐字抄錄允許利用與顯名義務的條文作為第二筆 checked_by=human 的引用。",
-        "確認資料集頁面的 API 文件連結確實指向 TWSE OpenAPI，且您接受以 openapi.twse.com.tw 的 STOCK_DAY_ALL JSON 視為該資料集的同一資料（目前只有名稱與收盤兩欄的實測一致）。",
-        "確認 2330 為臺灣證券交易所上市普通股「台積電」，並接受 config/tw-instruments.json 的身份設定。",
-        "僅在使用者另行完成核對並明示確認後，由 Codex 準備登錄檔副本：只修改此來源，declared_status=confirmed、scope 僅 internal_use_allowed=true、採用顯名文字與實際查核者及簽認時間，提升 registry_version 並保留既有助理查核紀錄。",
-        "由 Codex 執行 activation-check --candidate-registry，確認沒有超出使用者核對範圍後才採用；不要求使用者自行編輯 JSON。"
+      "human_checklist": [],
+      "review_checklist": [
+        "AI已重新開啟官方資料集11549與授權條款，記錄免費及開放利用、顯名依據，不冒稱人工查核。",
+        "AI已核對官方API文件及指定CSV/JSON之2330名稱、日期、收盤；見ai-twse-binding.json。",
+        "AI已核對台積電官方FAQ及2025 Form20-F Item9的普通股上市身份；時間只採觀測可得上界。",
+        "僅開啟正規化資料之internal_use_allowed；其餘權限關閉，依使用者新政策由Codex執行與驗收。",
+        "activation-check只比較0.4.1封閉基準與0.5.0候選，查核依據記在source_review，並非人工簽認。"
       ],
       "open_questions": [
         "資料發布時間與更新時點沒有官方宣告；啟用後仍只能做最新時點研究。",
-        "JSON 端點與資料集的對應僅有兩個欄位的實測比對，是否足夠由簽認人判斷。"
+        "本次確認僅限2330名稱、日期、收盤與來源對應，不推及其他資料集。"
       ]
     },
     {
@@ -139,9 +139,9 @@
   ],
   "human_attestation": null,
   "notes": [
-    "使用者已再次選擇「維持關閉，繼續其他實作」。本包只保留作未啟用參考，不是再次要求核對的待辦；不再主動追問相同啟用。",
+    "使用者2026-11-15最新授權取代先前維持關閉：由AI核對官方來源、身份、時間、條款與免費取得，充分才啟用；本包記錄0.4.1至0.5.0有限變更，詳見ai-source-review.md。",
     "本審查包由助理整理，不授與任何權限，也不是人工來源查證；使用者對電腦或開發工作的概括授權不等於來源審查。",
-    "登錄檔 config/source-licenses.json 未被修改，所有來源維持 unknown。",
+    "登錄檔0.5.0僅TWSE最近收盤來源經AI查核confirmed；其餘來源維持unknown，所有分享/原始回應/回應雜湊權限關閉。",
     "啟用範圍以來源（端點）為單位；2330.TW 的限定來自 config/tw-instruments.json 僅設定此一 TWSE 標的，未設定的代號會被採集器拒絕。"
   ]
 }

@@ -1,10 +1,10 @@
 # Stock Report
 
-完整離線驗收使用 `scripts/runtime.sh verify`；唯讀狀態檢查使用 `scripts/runtime.sh cli doctor`。官方 NVIDIA RSS 已加入為明確可選的新聞來源，評等統計會保留同時點衝突；詳見 [本機操作與驗收](docs/phase-0/operations.md)。來源仍依使用者決定關閉。
+完整離線驗收使用 `scripts/runtime.sh verify`；唯讀狀態檢查使用 `scripts/runtime.sh cli doctor`。依使用者新政策，由 AI 查核合法、免費、個人自用的官方依據；本次僅啟用 2330 身份與最近收盤，其他來源仍封鎖，詳見 [AI 來源查核與實際驗收](docs/phase-0/ai-source-review.md)。
 
 `news-discover` 已加入自動新聞索引查詢與支援公司提及比對，詳見 [搜尋操作與限制](docs/phase-0/news-discovery.md)。搜尋只產生待查線索，不等於事件成立或公司受益；來源關閉時，真實結果只保留契約與數量中繼資料。
 
-事件卷宗與候選排序已加入 `event-rank`，詳見 [操作與限制](docs/phase-0/event-ranking.md)。排序依據可用關聯證據，不代表投資方向；目前仍不會自動搜尋全網新聞。`demo` 的事件報告會先經排序再產生 PDF。2330 來源查核包為未啟用參考，使用者已再次選擇維持來源關閉，不需要重複確認。
+事件卷宗與候選排序已加入 `event-rank`，詳見 [操作與限制](docs/phase-0/event-ranking.md)。排序依據可用關聯證據，不代表投資方向；目前仍不會自動搜尋全網新聞。`demo` 的事件報告會先經排序再產生 PDF。2330 有限來源已由 AI 核對並產生真實資料不足摘要，不再要求逐項人工簽認。
 
 本機投資研究工具的 **Phase 0 可執行 POC**。依 [產品規格](docs/product-spec-v0.2.md) 與 [驗證計畫](docs/phase-0-feasibility-plan.md) 建立，尚未宣告正式 MVP 或 Phase 0 GO。
 
@@ -96,13 +96,15 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
 ```
 
 授權狀態來自版本化登錄檔 `config/source-licenses.json`：`unknown`／`restricted` 不可用於個人報告也不可本機留存，
-`confirmed` 必須附人工逐字條款引用與具名 attestation。**目前六個來源都是 `unknown`**，
-因此 collect 目前只保存檢視用中繼資料，不能把該檔傳入 request-template／bundle 當成研究輸入。
-內部權限確認後需重新採集，才會產生 collection.json；核心證據不足時可輸出不足摘要。公開時間依來源分為
+`confirmed` 必須有查核依據：人工逐字條款引用與具名 attestation（`human_attestation`），或使用者授權的 AI 來源查核
+`source_review`（`assistant_source_review`：官方來源、身份、發布時間、使用條款、免費取得五個面向各附官方網址與逐字引用，
+只開啟個人自用的 `internal_use_allowed`，不是人工簽認）。查不清楚的來源維持 `unknown`。各來源目前狀態與查核依據以登錄檔及
+`cli doctor` 的 `enabled_sources`／`enabled_source_review_basis` 為準。`unknown` 來源的 collect 只保存檢視用中繼資料，
+不能把該檔傳入 request-template／bundle 當成研究輸入。內部權限確認後需重新採集，才會產生 collection.json；核心證據不足時可輸出不足摘要。公開時間依來源分為
 來源宣告日期與「擷取當下可得性上界」；後者只適用最新時點研究，既有歷史時點不會被改寫。
 欄位契約與限制見 [來源可行性](docs/phase-0/provider-feasibility.md)。
 
-已人工查證身份、發布時間與權限的標準化真實證據也可直接經 `prepare --provider import --evidence-bundle FILE --request REQUEST` 載入。Bundle 使用 `ResearchInput` Schema，必須 `dataset_kind=real`；不得含 Synthetic 證據，且須確認內部保存權限。這是受信任的人工整理介面，**不是自動證實來源真實性或授權的機制**。`schema --output reports/schemas` 可輸出契約。
+已查核（人工，或使用者授權且依官方依據的 AI 查核）身份、發布時間與權限的標準化真實證據也可直接經 `prepare --provider import --evidence-bundle FILE --request REQUEST` 載入。Bundle 使用 `ResearchInput` Schema，必須 `dataset_kind=real`；不得含 Synthetic 證據，且須確認內部保存權限。這是受信任的整理介面，**不是自動證實來源真實性或授權的機制**。`schema --output reports/schemas` 可輸出契約。
 
 ### 個人 PDF 與本機原始稽核資料的權限
 

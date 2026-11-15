@@ -8,12 +8,15 @@ from pypdf import PdfReader
 from stock_report.cli import main
 from stock_report.events import (EventDossier, EventSource, Link, load_universe, rank_dossier,
                                  synthetic_dossier)
-from stock_report.licensing import load_registry
+from stock_report.licensing import LicenseRegistry, load_registry
 from stock_report.models import Request
 from stock_report.pipeline import prepare
 from stock_report.storage import digest, read_json, write_json
+from review_fixtures import assistant_reviewed_payload
 
 EXAMPLE = Path('examples/events/dossier-synthetic.json')
+TWSE_SOURCE = 'twse-openapi-stock-day-all'
+TWSE_ENDPOINT = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'
 
 
 @pytest.fixture
@@ -316,11 +319,54 @@ def test_dossier_kinds_never_mix(dossier):
         EventDossier.model_validate(payload)
 
 
-def test_real_dossier_requires_a_human_review(dossier, universe):
+def test_assistant_review_without_recorded_authorization_does_not_qualify(dossier, universe):
     data, report = rank_dossier(as_real(dossier, 'assistant'), universe, load_registry())
-    assert data is None and 'dossier_requires_human_review' in codes(report)
+    assert data is None and 'dossier_requires_qualified_review' in codes(report)
+    assert report['review']['qualified'] is False
     assert report['event']['verification']['excluded'] == [
-        {'evidence_id': 'EVENT-announcement', 'reason': 'not_covered_by_human_review'}]
+        {'evidence_id': 'EVENT-announcement', 'reason': 'not_covered_by_source_review'}]
+
+
+def authorized_assistant(dossier):
+    real = as_real(dossier, 'assistant')
+    real.review.authorization = 'unit test stand-in for the user authorization'
+    return real
+
+
+def test_authorized_assistant_review_opens_nothing_outside_the_registry(dossier, universe):
+    """The assistant's own label is not evidence: unregistered or closed sources stay excluded."""
+    real = authorized_assistant(dossier)
+    data, report = rank_dossier(real, universe, load_registry())
+    assert data is None and 'dossier_requires_qualified_review' not in codes(report)
+    assert report['review']['qualified'] and report['data_label'] == 'REAL (assistant-reviewed import)'
+    assert report['event']['verification']['excluded'] == [
+        {'evidence_id': 'EVENT-announcement', 'reason': 'assistant_review_requires_registered_source'}]
+    data, report = rank_dossier(real, universe, None)
+    assert data is None and 'assistant_review_requires_registry' in codes(report)
+    # Bound to a registered source that is still unknown: closed.
+    for e in real.evidence:
+        edit(real, e.evidence_id, license_source_id=TWSE_SOURCE, source_url=TWSE_ENDPOINT)
+    data, report = rank_dossier(real, universe, load_registry())
+    assert data is None
+    assert report['event']['verification']['excluded'][0]['reason'] == 'registry_keeps_source_closed'
+
+
+@pytest.mark.parametrize('basis', ['assistant', 'human'])
+def test_authorized_assistant_review_uses_only_registry_reviewed_sources(dossier, universe, basis):
+    real = authorized_assistant(dossier)
+    for e in list(real.evidence):
+        edit(real, e.evidence_id, license_source_id=TWSE_SOURCE, source_url=TWSE_ENDPOINT,
+             source_record_id=e.evidence_id)
+    registry = (LicenseRegistry.model_validate(assistant_reviewed_payload([TWSE_SOURCE])) if basis == 'assistant'
+                else load_registry('tests/fixtures/licenses-attested.json'))
+    data, report = rank_dossier(real, universe, registry)
+    assert report['status'] == 'ready' and data.dataset_kind == 'real'
+    assert report['review']['reviewed_by'] == 'assistant'
+    assert any('非人工簽認' in w for w in report['warnings'])
+    # One record re-pointed outside the reviewed endpoint drops out; nothing inherits the review.
+    edit(real, 'AMD-relationship', source_url='https://openapi.twse.com.tw/v1/other/dataset')
+    _, report = rank_dossier(real, universe, registry)
+    assert reasons(report)['AMD'] == 'relationship_evidence_unusable'
 
 
 def test_human_reviewed_real_dossier_yields_a_real_bundle(dossier, universe, tmp_path):
@@ -329,18 +375,18 @@ def test_human_reviewed_real_dossier_yields_a_real_bundle(dossier, universe, tmp
     assert report['status'] == 'ready' and report['data_label'].startswith('REAL')
     assert data.dataset_kind == 'real' and data.versions['dataset'] == 'real-event-dossier-1'
     prepared = prepare(real.request, tmp_path, data.model_dump(mode='json'))
-    assert prepared['warnings'] == ['Real evidence import requires human source/license verification']
+    assert prepared['warnings'] == ['Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)']
     with pytest.raises(ValueError, match='synthetic event provider only accepts'):
         prepare(real.request, tmp_path, data.model_dump(mode='json'), synthetic_source=True)
 
 
-def test_evidence_outside_the_human_review_list_is_excluded(dossier, universe):
+def test_evidence_outside_the_review_list_is_excluded(dossier, universe):
     real = as_real(dossier)
     real.review.evidence_ids.remove('AMD-relationship')
     real.review.evidence_ids.remove('NVDA-net_income')
     data, report = rank_dossier(real, universe, load_registry())
     assert reasons(report)['AMD'] == 'relationship_evidence_unusable'
-    assert {'evidence_id': 'NVDA-net_income', 'reason': 'not_covered_by_human_review'} in report['bundle_evidence_exclusions']
+    assert {'evidence_id': 'NVDA-net_income', 'reason': 'not_covered_by_source_review'} in report['bundle_evidence_exclusions']
     assert 'NVDA-net_income' not in {e.evidence_id for e in data.evidence}
 
 
@@ -351,7 +397,7 @@ def test_dossier_cannot_open_a_source_the_registry_keeps_closed(dossier, univers
     edit(real, '2330.TW-identity', license_source_id='twse-openapi-stock-day-all',
          source_url='https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL')
     data, report = rank_dossier(real, universe, load_registry())
-    # The current registry keeps every source unknown: the identity is unusable, so 2330 drops out.
+    # The closed registry fixture keeps every source unknown: the identity is unusable, so 2330 drops out.
     assert reasons(report)['2330.TW'] == 'identity_evidence_unavailable'
     assert '2330.TW' not in {e.entity_id for e in data.evidence}
     attested = load_registry('tests/fixtures/licenses-attested.json')
@@ -409,11 +455,11 @@ def test_cli_blocked_dossier_exits_nonzero_and_leaves_no_bundle(tmp_path, capsys
     assert sorted(p.name for p in directory.iterdir()) == ['event-ranking.json']
 
 
-def test_cli_real_dossier_without_human_review_is_blocked(tmp_path, capsys, dossier):
+def test_cli_real_dossier_without_qualified_review_is_blocked(tmp_path, capsys, dossier):
     path = tmp_path / 'dossier.json'
     write_json(path, as_real(dossier, 'assistant'))
     code, blocked = run_cli(capsys, 'event-rank', '--dossier', str(path), '--output', str(tmp_path / 'events'))
-    assert code == 1 and 'dossier_requires_human_review' in {b['code'] for b in blocked['blockers']}
+    assert code == 1 and 'dossier_requires_qualified_review' in {b['code'] for b in blocked['blockers']}
 
 
 def test_synthetic_event_provider_rejects_misuse(tmp_path, capsys, dossier, universe):

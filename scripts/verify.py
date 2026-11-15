@@ -21,10 +21,12 @@ for name, command in steps:
     if result.returncode:
         write_json(output / 'acceptance.json', {'status': 'failed', 'steps': results})
         raise SystemExit(result.returncode)
+readiness = doctor()
 report = {'status': 'offline_acceptance_passed', 'completed_at': datetime.now(timezone.utc).isoformat(),
-          'steps': results, 'readiness': doctor(), 'network_called': False,
+          'steps': results, 'readiness': readiness, 'network_called': False,
           'model_evaluation': 'Recorded session batch; not reexecuted by verify' if (output/'llm-evaluation-current.json').exists()
                               else 'NOT_RUN; synthetic analysis verifies software only',
-          'formal_mvp_go': False, 'real_research_e2e': 'NOT_PASSED; sources closed by user choice'}
+          'formal_mvp_go': False, 'real_research_e2e': 'NOT_PASSED; ' + ('no source has a sufficient recorded review' if not readiness['enabled_sources']
+                                                 else 'enabled sources alone are not an end-to-end real research run')}
 write_json(output / 'acceptance.json', report)
 print((output / 'acceptance.json').resolve())

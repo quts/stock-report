@@ -30,7 +30,7 @@ ENDPOINTS = {'https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci': ('twse_inc
 
 @pytest.fixture
 def registry():
-    return load_registry('config/source-licenses.json')
+    return load_registry('tests/fixtures/licenses-closed.json')
 
 
 @pytest.fixture
@@ -292,8 +292,9 @@ def test_project_configuration_declares_both_targets_explicitly():
     for ticker in ('2330.TW', '6488.TWO'):
         assert rows[ticker]['financial_statement_format'] == 'general'
         assert rows[ticker]['fiscal_year_end_month'] == 12
-        assert rows[ticker]['verified_by'] == 'assistant-poc-declaration'
-        assert '不得視為人工簽認' in rows[ticker]['financial_basis_evidence']
+        # Who verified the instrument, and on what evidence, must be recorded; the wording is
+        # configuration owned by the source review and is not pinned here.
+        assert rows[ticker]['verified_by'] and rows[ticker]['financial_basis_evidence']
 
 
 # --- period model --------------------------------------------------------------------------
@@ -308,7 +309,7 @@ def test_a_period_window_needs_both_ends_and_a_basis():
 
 # --- collection, licence and persistence ---------------------------------------------------
 
-def test_default_registry_keeps_both_income_sources_unknown(registry):
+def test_closed_registry_snapshot_keeps_both_income_sources_unknown(registry):
     for source in (TWSE_INCOME, TPEX_INCOME):
         snapshot = registry.snapshot(source)
         assert snapshot['status'] == 'unknown' and not snapshot['human_attested'] and snapshot['attested_by'] is None

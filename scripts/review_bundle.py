@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from shutil import copyfile
 from stock_report.diagnostics import recorded_tests
 from stock_report.evaluation import load_evaluation
+from stock_report.licensing import load_registry
 from stock_report.analysis import synthetic_proposal
 from stock_report.mock import fixture
 from stock_report.models import Request
@@ -86,6 +87,7 @@ write_json(output/'data-coverage.json',{'mock_coverage':coverage,
     'license_registry':{'version':registry['registry_version'],
       'statuses':{s['source_id']:s['declared_status'] for s in registry['sources']},
       'internal_use_sources':[s['source_id'] for s in registry['sources'] if s['scope'].get('internal_use_allowed')],
+      'review_basis':{s.source_id:s.review_basis() for s in load_registry('config/source-licenses.json').sources},
       'distribution':'personal_use_only; no source is cleared for redistribution'},
     'denominator':'No fabricated aggregate coverage percentage; each named field/provider is reported separately'})
 write_json(output/'llm-evaluation.json',load_evaluation(
@@ -99,7 +101,8 @@ for name in ('provider-feasibility.md','phase-0-review.md','codex-interactive-ev
              'codex-interactive-evaluation.json','taiwan-license-review-evidence.md','taiwan-source-binding.json',
              'pre-human-review.md','financial-source-binding.json','2330-source-activation.json',
              'taiwan-financial-source-notes.md','us-price-source-notes.md','codex-interactive-v2.json',
-             'event-ranking.md','news-discovery.md','operations.md','local-code-review.md'):
+             'event-ranking.md','news-discovery.md','operations.md','local-code-review.md',
+             'ai-source-review.md','ai-twse-binding.json'):
     source=Path('docs/phase-0')/name
     if source.exists():copyfile(source,output/name)
 print(output.resolve())

@@ -146,8 +146,8 @@ def test_import_refuses_evidence_without_confirmed_internal_use(tmp_path, change
     assert not list(tmp_path.iterdir())
 
 
-def test_default_registry_stays_closed_and_blocks_a_personal_report():
-    registry = load_registry('config/source-licenses.json')
+def test_closed_registry_blocks_a_personal_report():
+    registry = load_registry('tests/fixtures/licenses-closed.json')
     assert all(s.declared_status == 'unknown' for s in registry.sources)
     assert not any(registry.snapshot(s.source_id)['internal_use_allowed'] for s in registry.sources)
     collection = collect(SEC, 'NVDA', registry=registry, allow_network=True,

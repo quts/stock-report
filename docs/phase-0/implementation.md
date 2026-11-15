@@ -66,7 +66,9 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke 
 普通股身份另依 `config/tw-instruments.json` 明示的 POC 標的設定，不以代號形狀推定。
 
 來源授權由版本化登錄檔 `config/source-licenses.json` 決定：`unknown`／`restricted` 不可用於個人報告也不可本機留存，
-`confirmed` 需要人工逐字條款引用與具名 attestation 才能通過驗證。Evidence 另存
+`confirmed` 需要查核依據才能通過驗證：人工逐字條款引用與具名 attestation，或使用者授權的 AI 來源查核 `source_review`
+（五個面向各附官方網址與逐字引用、無未決問題、只開啟 `internal_use_allowed`）。快照同時輸出 `human_attested`（僅真人簽認）、
+`source_reviewed` 與 `review_basis`；採集與證據包的 `verified` 依 `source_reviewed` 判定，並取採集當時與目前登錄檔兩者中較嚴格的結果。Evidence 另存
 `license_source_id` 與 `license_registry_version` 以供追溯。
 
 `metric_key` 為正規化的計算角色，與來源本身的 `source_record_id` 分開。現階段支援相鄰 FY 營收／EPS 成長、同期期別淨利率、營業現金流減正規化資本支出的自由現金流、正 TTM EPS 本益比。不同幣別／單位、不可比期別、非正分母或缺值不計算；缺值不是零。TTM 成長、P/S、EV/EBITDA、負債指標、調整後歷史價格及同業比較未實作，不以替代數字冒充。
@@ -83,7 +85,7 @@ Hard Gate 包括未知 Evidence ID、錯誤標的、截止日後資料、未核�
 
 Phase 0 核心門檻為兩個不同來源紀錄及反轉條件，**尚未校準**。相同發布者另附單來源警告，不稱為獨立交叉驗證。成長趨勢與 AI 方向相反須具體解釋，否則降級；不直接平均為 Neutral。Hypothetical 關聯不發布方向性結論。
 
-Gate 能驗證結構、時點、數值、引用與輸入權限，不能證明自由文字推論與來源語意一致，也不能證明預測正確。真實輸入中的 verified／confirmed 標記須由人工來源查核支持；全自動真實研究尚未驗收。
+Gate 能驗證結構、時點、數值、引用與輸入權限，不能證明自由文字推論與來源語意一致，也不能證明預測正確。真實輸入中的 verified／confirmed 標記須由登錄檔記錄的來源查核（人工簽認或合格 AI 查核）支持；程式只檢查查核紀錄的結構與範圍，不能證明引用內容屬實；全自動真實研究尚未驗收。
 
 PDF 只接收 Gate 結果和已確認內部使用證據的投影，每頁正文頂端標示「僅供個人使用・不得散布 · Personal use only / Not for distribution」，首頁另有不得轉寄的說明，模板自動跳脫 HTML，禁止 Renderer 讀取本機／遠端 URL 資源。超過兩頁直接失敗，不縮成極小字體。頁尾採簡潔頁碼；使用限制與風險揭露放在正文，避免頁首頁尾渲染漏印必要揭露。長敘述用明示摘要，完整本機 JSON 保留。報告為 A4，股／事件兩版，分列 3–6、6–12 個月。目前 Quant 為 2、Prompt 為 2、Template 為 4，Context 的版本取自同一執行版本紀錄。
 
@@ -105,4 +107,4 @@ Python 或網路工具的授權。欄位契約、來源條款與測試結果都�
 
 Review Bundle 載入並驗證 `reports/codex-evaluation/llm-evaluation.json` 的歷史十例成品雜湊，保留基線 commit 與單批次限制；不冒充對目前程式版本重新呼叫模型。只有版本化摘要時會標示原始成品不在本機，無紀錄時才用 NOT_RUN。完整說明見 [Codex 互動驗證](codex-interactive-evaluation.md)。
 
-台股來源的 Date 僅作原始交易期別 `source_period_raw`；未宣告的公開日期 `source_published_raw` 保持 null，不把交易日放進公開日欄位。使用者本次選擇維持來源 unknown，未啟用來源數值保存或使用。
+台股來源的 Date 僅作原始交易期別 `source_period_raw`；未宣告的公開日期 `source_published_raw` 保持 null，不把交易日放進公開日欄位。來源是否啟用以登錄檔為準：2026-11-15 起可由使用者授權的 AI 來源查核啟用，證據不足的來源維持 unknown，不保存或使用來源數值。

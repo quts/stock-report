@@ -2034,6 +2034,7 @@
       "EVENT-announcement",
       "2330.TW-relationship-filing",
       "INTC-relationship"
-    ]
+    ],
+    "authorization": null
   }
 }

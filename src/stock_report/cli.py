@@ -96,7 +96,7 @@ def parser():
     news.add_argument('--source', choices=['gdelt-doc-v2', 'nvidia-press-rss'], default='gdelt-doc-v2')
     act = sub.add_parser('activation-check', help='Read-only check of a source activation package')
     act.add_argument('--package', required=True, type=Path)
-    act.add_argument('--candidate-registry', type=Path, help='Human-edited registry to compare; never applied')
+    act.add_argument('--candidate-registry', type=Path, help='Candidate registry (human-attested or assistant-reviewed) to compare; never applied')
     act.add_argument('--license-registry', type=Path, default=None)
     act.add_argument('--instruments', type=Path, default=Path('config/tw-instruments.json'))
     schema = sub.add_parser('schema')

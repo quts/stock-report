@@ -73,7 +73,7 @@ def probes(output, user_agent, retries=1, interval=1.0):
         started = time.monotonic()
         row = {'provider': name, 'endpoint': url, 'terms_url': terms,
                'tested_at': datetime.now(timezone.utc).isoformat(), 'license_status': 'unknown',
-               'shareable_in_pdf': False, 'terms_review': 'PENDING human review; access does not establish internal-use rights'}
+               'shareable_in_pdf': False, 'terms_review': 'PENDING source review; access does not establish internal-use rights'}
         try:
             if name.startswith('sec') and '@' not in user_agent:
                 raise ValueError('SEC probe blocked: configure a declared User-Agent with contact email; no personal login data is reused')

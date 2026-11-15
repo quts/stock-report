@@ -96,6 +96,13 @@ class Review(Model):
     statement: str = Field(min_length=1, max_length=400)
     # Evidence the reviewer actually checked for identity, timing and permission.
     evidence_ids: list[str] = Field(default_factory=list, max_length=400)
+    # Where the user's authorization for an assistant review is recorded. An assistant review
+    # without it does not qualify; it is never needed for, nor a substitute for, a human review.
+    authorization: str | None = Field(default=None, min_length=1, max_length=300)
+
+    def qualified(self):
+        """A human review, or an assistant review made under a recorded user authorization."""
+        return self.reviewed_by == 'human' or (self.reviewed_by == 'assistant' and bool(self.authorization))
 
 
 class EventDossier(Model):
@@ -183,11 +190,20 @@ def record_problem(evidence, dossier, registry, expected_entity=None, expected_k
     if evidence.license_status != 'confirmed' or not evidence.internal_use_allowed:
         return 'license_not_confirmed_for_internal_use'
     if dossier.dossier_kind == 'real':
-        if dossier.review.reviewed_by != 'human' or evidence.evidence_id not in dossier.review.evidence_ids:
-            return 'not_covered_by_human_review'
+        review = dossier.review
+        if not review.qualified() or evidence.evidence_id not in review.evidence_ids:
+            return 'not_covered_by_source_review'
+        known = {s.source_id: s for s in registry.sources} if registry is not None else {}
+        if review.reviewed_by == 'assistant':
+            # An assistant's word alone opens nothing: each record must trace to a registry entry
+            # whose own review (official evidence, free personal use) keeps the source open.
+            source = known.get(evidence.license_source_id)
+            if source is None:
+                return 'assistant_review_requires_registered_source'
+            if source.review_basis() is None:
+                return 'registry_keeps_source_closed'
         # A dossier cannot open a source that the versioned registry keeps closed.
         if registry is not None:
-            known = {s.source_id: s for s in registry.sources}
             source = known.get(evidence.license_source_id)
             if evidence.license_source_id and source is None:
                 return 'source_not_in_registry'
@@ -306,9 +322,15 @@ def rank_dossier(dossier, universe, registry=None):
     index = {e.evidence_id: e for e in dossier.evidence}
     supported = {e.entity_id: e for e in universe.entities}
     blockers, warnings, excluded, assessed = [], [], [], []
-    if dossier.dossier_kind == 'real' and dossier.review.reviewed_by != 'human':
-        blockers.append({'code': 'dossier_requires_human_review',
-                         'detail': '真實事件卷宗必須由人工查證身份、時點與權限；助理查核不能取代'})
+    if dossier.dossier_kind == 'real' and not dossier.review.qualified():
+        blockers.append({'code': 'dossier_requires_qualified_review',
+                         'detail': '真實事件卷宗必須有人工查核，或載明使用者授權依據的 AI 查核；'
+                                   '未載明授權的助理查核不合格'})
+    elif dossier.dossier_kind == 'real' and dossier.review.reviewed_by == 'assistant':
+        if registry is None:
+            blockers.append({'code': 'assistant_review_requires_registry',
+                             'detail': 'AI 查核的卷宗只能使用授權登錄檔內已查核開放的來源；未提供登錄檔'})
+        warnings.append('本卷宗為 AI 查核（非人工簽認）：僅採用登錄檔已查核開放來源的證據，其餘一律排除')
     verification, event_blockers = verify_event(dossier, index, registry)
     blockers.extend(event_blockers)
     if dossier.event.status == 'proposed':
@@ -359,13 +381,16 @@ def rank_dossier(dossier, universe, registry=None):
         warnings.append('部分候選公司超出支援範圍，未排序；這不代表它們與事件無關')
     report = {'artifact': 'event_candidate_ranking', 'schema_version': '1', 'ranking_version': VERSION,
               'status': 'blocked' if blockers else 'ready', 'dossier_kind': dossier.dossier_kind,
-              'data_label': 'DEMO / SYNTHETIC DATA' if dossier.dossier_kind == 'mock' else 'REAL (human-reviewed import)',
+              'data_label': 'DEMO / SYNTHETIC DATA' if dossier.dossier_kind == 'mock'
+                            else 'REAL (human-reviewed import)' if dossier.review.reviewed_by == 'human'
+                            else 'REAL (assistant-reviewed import)',
               'dossier_sha256': digest(dossier),
               'request': {'event_query': request.event_query, 'max_companies': request.max_companies,
                           'research_as_of': request.research_as_of.isoformat()},
               'event': {'event_id': dossier.event.event_id, 'status': dossier.event.status,
                         'event_time': dossier.event.event_time.isoformat(), 'verification': verification},
               'review': {'reviewed_by': dossier.review.reviewed_by, 'reviewer': dossier.review.reviewer,
+                         'qualified': dossier.review.qualified(), 'authorization': dossier.review.authorization,
                          'reviewed_at': dossier.review.reviewed_at.isoformat(),
                          'evidence_ids_reviewed': len(set(dossier.review.evidence_ids))},
               'universe': {'config_version': universe.config_version, 'supported': sorted(supported),

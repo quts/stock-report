@@ -21,6 +21,24 @@ pytestmark = pytest.mark.network
 OUTPUT = Path('reports/phase-0/source-smoke')
 
 
+def persist_by_review(collection):
+    """What may be written follows the live registry, whichever sources it currently enables.
+
+    Source values are only persisted for a confirmed source with a recorded review (human attestation
+    or sufficient assistant review); otherwise only an inspection record is written."""
+    licence = collection.license
+    opened = licence['status'] == 'confirmed' and licence['source_reviewed'] and licence['internal_use_allowed']
+    assert not licence['pdf_share_allowed']
+    if licence['review_basis'] == 'assistant_source_review':
+        assert not licence['human_attested'] and not licence['store_raw_response']
+    if not opened:
+        assert not licence['internal_use_allowed']
+        assert persistence_blockers(collection)[0]['code'] == 'source_values_not_cleared_for_local_persistence'
+    path, artifact = persist(collection, OUTPUT)
+    assert artifact == ('collection' if opened else 'inspection_record')
+    return path, artifact
+
+
 @pytest.mark.parametrize('source,ticker', [('twse-openapi-stock-day-all', '2330.TW'),
                                            ('tpex-openapi-mainboard-daily-close', '6488.TWO')])
 def test_taiwan_official_endpoint_contract(source, ticker):
@@ -35,13 +53,11 @@ def test_taiwan_official_endpoint_contract(source, ticker):
     close = next(o for o in collection.observations if o.role == 'close')
     assert close.value is not None and close.event_time <= collection.collected_at
     assert all(o.publication_basis == 'observed_availability' for o in collection.observations)
-    assert collection.license['status'] == 'unknown' and not collection.license['pdf_share_allowed']
-    # Terms are still unconfirmed, so only an inspection record may be written.
-    assert persistence_blockers(collection)[0]['code'] == 'source_values_not_cleared_for_local_persistence'
-    path, artifact = persist(collection, OUTPUT)
-    assert artifact == 'inspection_record'
-    text = path.read_text()
-    assert collection.entity.name not in text and str(close.value) not in text
+    assert not collection.license['pdf_share_allowed']
+    path, artifact = persist_by_review(collection)
+    if artifact == 'inspection_record':
+        text = path.read_text()
+        assert collection.entity.name not in text and str(close.value) not in text
 
 
 @pytest.mark.parametrize('source,ticker,market', [('twse-openapi-income-general', '2330.TW', 'twse'),
@@ -65,12 +81,11 @@ def test_taiwan_income_statement_endpoint_contract(source, ticker, market):
         assert observation.event_time < collection.collected_at
         assert observation.publication_basis == 'observed_availability'
     assert roles['revenue_current'].source_unit_raw is None and roles['eps_current'].source_unit_raw == '元'
-    assert collection.license['status'] == 'unknown' and not collection.license['internal_use_allowed']
-    path, artifact = persist(collection, OUTPUT)
-    assert artifact == 'inspection_record'
-    text = path.read_text()
-    assert collection.entity.name not in text
-    assert all(o.provider_record_id not in text for o in collection.observations)
+    path, artifact = persist_by_review(collection)
+    if artifact == 'inspection_record':
+        text = path.read_text()
+        assert collection.entity.name not in text
+        assert all(o.provider_record_id not in text for o in collection.observations)
     # The dataset does not declare its cumulative basis; re-check it against the monthly filing.
     sys.path.insert(0, 'scripts')
     try:
@@ -90,7 +105,5 @@ def test_sec_official_filing_contract(ticker):
     roles = {o.role for o in collection.observations}
     assert {'revenue_current', 'revenue_prior', 'net_income'} <= roles
     assert all(o.publication_basis == 'source_declared_date' for o in collection.observations)
-    assert collection.license['status'] == 'unknown' and not collection.license['internal_use_allowed']
-    path, artifact = persist(collection, OUTPUT)
-    assert artifact == 'inspection_record'
+    path, artifact = persist_by_review(collection)
     assert 'observations' in path.read_text()

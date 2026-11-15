@@ -23,7 +23,7 @@ SEC = 'sec-xbrl-companyconcept'
 
 @pytest.fixture
 def registry():
-    return load_registry('config/source-licenses.json')
+    return load_registry('tests/fixtures/licenses-closed.json')
 
 
 @pytest.fixture
@@ -251,7 +251,7 @@ def test_attested_sec_collection_builds_a_real_bundle_and_prepares(attested, tmp
     result = prepare(request, tmp_path, data.model_dump(mode='json'))
     assert result['coverage']['NVDA']['financial'] == 'available'
     assert result['coverage']['NVDA']['price'] == 'unavailable'
-    assert result['warnings'] == ['Real evidence import requires human source/license verification']
+    assert result['warnings'] == ['Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)']
     assert read_json(Path(result['research_input_path']))['dataset_kind'] == 'real'
 
 
@@ -383,11 +383,12 @@ def test_request_template_requires_a_cutoff_after_collection(attested):
         request_template('stock', '2330.TW', 'TWSE', [collection], NOW - timedelta(days=1))
 
 
-def test_default_registry_grants_nothing(registry):
+def test_closed_registry_snapshot_grants_nothing(registry):
     assert registry.registry_version == '0.4.1'
     for source in registry.sources:
         snapshot = registry.snapshot(source.source_id)
         assert snapshot['status'] == 'unknown' and not snapshot['human_attested']
+        assert not snapshot['source_reviewed'] and snapshot['review_basis'] is None
         assert not any(snapshot[name] for name in ('internal_use_allowed', 'pdf_share_allowed',
                                                    'store_response_hash', 'store_raw_response'))
         assert snapshot['open_questions']
@@ -402,6 +403,7 @@ def test_confirmed_terms_require_quoted_human_evidence_and_attestation(attested)
         LicenseRegistry.model_validate(payload)
     payload = attested.model_dump(mode='json')
     payload['sources'][0]['attested_by'] = None
+    payload['sources'][0]['attested_at'] = None
     with pytest.raises(ValidationError, match='named attestation'):
         LicenseRegistry.model_validate(payload)
     payload = attested.model_dump(mode='json')

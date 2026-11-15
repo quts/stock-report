@@ -149,5 +149,6 @@ def test_live_us_contract_without_retention(ticker):
     capture = collect(SOURCE, ticker, registry=load_registry(), allow_network=True)
     assert capture.entity.entity_id == ticker
     assert capture.source_class == 'secondary'
-    assert not capture.license['internal_use_allowed']
+    # Retention follows the live registry; it is never asserted to be open or closed here.
+    assert capture.license['internal_use_allowed'] == (capture.retention == 'research_input_allowed')
     assert all(o.price_adjustment == 'unknown' for o in capture.observations if o.kind == 'price')
