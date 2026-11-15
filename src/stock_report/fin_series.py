@@ -34,6 +34,7 @@ def usable_facts(data, entity_id):
     return [e for e in data.evidence
             if e.entity_id == entity_id and e.kind == 'financial' and e.statement_kind == 'fact'
             and e.financial_metric and e.value is not None and e.period_end is not None
+            and not e.financial_metric.startswith('peer_') and e.financial_metric != 'split_ratio'
             and e.unit != 'source_scale_undeclared' and reportable(e, data.request)]
 
 

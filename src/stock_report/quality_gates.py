@@ -13,8 +13,19 @@ SCALES = (1, 1e-3, 1e-6, 1e-8, 1e-9, 1e-12, 100)
 TOLERANCE = 0.006
 
 
+STATUS = {'critical': 'FAIL', 'warning': 'WARNING'}
+
+
 def check(name, passed, severity, detail):
-    return {'check': name, 'passed': bool(passed), 'severity': 'pass' if passed else severity, 'detail': detail}
+    status = 'PASS' if passed else STATUS[severity]
+    return state(name, status, detail)
+
+
+def state(name, status, detail):
+    """One gate result: PASS, WARNING, FAIL or NOT_APPLICABLE."""
+    return {'check': name, 'status': status, 'passed': status in ('PASS', 'NOT_APPLICABLE'),
+            'severity': {'PASS': 'pass', 'NOT_APPLICABLE': 'pass', 'WARNING': 'warning', 'FAIL': 'critical'}[status],
+            'detail': detail}
 
 
 DATE = re.compile(r'\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}/\d{1,2}|\d{4}年\d{1,2}月(?:\d{1,2}日)?|\d{1,2}月\d{1,2}日')
@@ -102,9 +113,10 @@ def run(data, proposal, engine, entity, decision=None):
     index = {e.evidence_id: e for e in data.evidence}
     results = []
     price = engine['valuation']['market']['price']
-    results.append(check('price_recency', price['status'] == 'available', 'critical',
-                         price.get('note') if price['status'] != 'available' else
-                         f'收盤日 {price["trade_date"]}，距截止 {price["trading_days_lag"]} 個交易日'))
+    if price['status'] != 'available':
+        results.append(state('price_recency', 'FAIL', price.get('note')))
+    else:
+        results.append(state('price_recency', 'PASS' if price.get('calendar_verified') else 'WARNING', price.get('note')))
     units = {}
     for name, points in engine['series']['quarters'].items():
         units.setdefault(name, set()).update((p['unit'], p['currency']) for p in points)
@@ -152,7 +164,7 @@ def run(data, proposal, engine, entity, decision=None):
     results.append(check('mandatory_fields', not gaps_mandatory, 'critical',
                          '必要欄位齊全' if not gaps_mandatory else '缺少必要欄位：' + '、'.join(gaps_mandatory)))
     scen = engine['scenarios']
-    disclosure_ok = scen['status'] == 'available' and all(s['assumptions'] and s['valuation']['multiple_basis']
+    disclosure_ok = scen['status'] == 'available' and all((s['drivers'] or s['assumptions']) and s['valuation']['multiple_basis']
                                                           for s in scen['scenarios'])
     results.append(check('valuation_assumption_disclosure', disclosure_ok, 'critical',
                          '每個情境都有明確假設、方法與倍數基礎' if disclosure_ok else
@@ -185,7 +197,128 @@ def run(data, proposal, engine, entity, decision=None):
         contradictions += [f'估值缺少歷史或同業參照卻判斷高低：{t}' for t in judged]
     results.append(check('section_contradictions', not contradictions, 'critical',
                          '各章節結論一致' if not contradictions else '；'.join(contradictions[:3])))
-    critical = [r for r in results if r['severity'] == 'critical']
+    results += model_checks(data, engine)
+    critical = [r for r in results if r['status'] == 'FAIL']
     return {'grade': 'limited' if critical else 'complete', 'checks': results,
             'critical_failures': [r['check'] for r in critical],
-            'warnings': [r['check'] for r in results if r['severity'] == 'warning']}
+            'warnings': [r['check'] for r in results if r['status'] == 'WARNING']}
+
+
+KEY_DRIVERS = ('revenue_growth', 'operating_margin')
+
+
+def model_checks(data, engine):
+    """Analytical-basis checks for the forecast, multiples and scenarios (deterministic rules)."""
+    scen, forecast = engine['scenarios'], engine.get('forecast')
+    rows = scen['scenarios']
+    if not rows:
+        na = '沒有提供情境'
+        return [state(n, 'NOT_APPLICABLE', na) for n in (
+            'assumption_evidence_quality', 'scenario_internal_consistency', 'valuation_method_suitability',
+            'valuation_reference_quality', 'scenario_uncertainty_disclosure', 'forecast_period_consistency')]
+    out = []
+    # 1. Assumption evidence quality: basis must match evidence; "historical" values must lie in history;
+    #    extreme history is not extrapolated; disclosure alone is not validation.
+    fails, warns = [], []
+    fails += [p for p in scen['problems'] if '證據' in p or '直接指定' in p or '類別不同' in p]
+    ranges = (forecast or {}).get('ranges', {})
+    anchors = (forecast or {}).get('drivers', {})
+    for r in rows:
+        d = r['drivers']
+        if not d:
+            fails.append(f'{r["name"]}：沒有營收、利潤率等預測驅動因子')
+            continue
+        g, m = d['revenue_growth'], d['operating_margin']
+        gr, mr = ranges.get('revenue_growth'), ranges.get('operating_margin')
+        for name, drv, rng, slack in (('營收成長', g, gr, 0.5), ('營業利益率', m, mr, 1.0)):
+            if drv['basis'] == 'historical_fact' and drv['value'] is not None and rng and \
+                    not rng[0] - slack <= drv['value'] <= rng[1] + slack:
+                fails.append(f'{r["name"]}：{name} {drv["value"]:.1f}% 標為歷史事實，但超出歷史區間 {rng[0]:.1f}–{rng[1]:.1f}%')
+        if g['value'] is not None and gr and g['basis'] not in ('management_guidance', 'consensus') and g['value'] > gr[1] + 10:
+            fails.append(f'{r["name"]}：營收成長 {g["value"]:.1f}% 高於歷史最高 {gr[1]:.1f}% 超過 10 個百分點，且沒有指引或共識支持')
+        if m['value'] is not None and mr and m['basis'] not in ('management_guidance', 'consensus') and m['value'] > mr[1] + 5:
+            fails.append(f'{r["name"]}：營業利益率 {m["value"]:.1f}% 高於歷史最高 {mr[1]:.1f}% 超過 5 個百分點，且沒有證據支持')
+        if g['source'] == 'historical_anchor' and anchors.get('revenue_growth', {}).get('status') == 'extreme':
+            fails.append(f'{r["name"]}：直接外推極端的歷史成長率，未提供指引、共識或明確假設')
+        tax = d['tax_rate']['value']
+        if tax is None:
+            fails.append(f'{r["name"]}：缺少稅率（歷史資料無法量測，也未提供假設）')
+        elif not 0 <= tax <= 45:
+            fails.append(f'{r["name"]}：稅率 {tax:.1f}% 不合理')
+        if d['share_change']['value'] is not None and abs(d['share_change']['value']) > 10:
+            warns.append(f'{r["name"]}：股數變動 {d["share_change"]["value"]:+.1f}% 幅度大')
+        if r['name'] == 'base' and any(d[k]['basis'] == 'model_assumption' for k in KEY_DRIVERS):
+            warns.append('基準情境的營收成長或利潤率是模型假設，沒有指引、共識或歷史資料直接支持')
+    out.append(state('assumption_evidence_quality', 'FAIL' if fails else ('WARNING' if warns else 'PASS'),
+                     '；'.join((fails + warns)[:4]) or '關鍵假設皆有歷史、指引或共識依據，且在合理範圍內'))
+    # 2. Internal consistency: the statements reconcile and the implied value follows from them.
+    broken = []
+    for r in rows:
+        s, d = r['statements'], r['drivers']
+        if s is None:
+            broken.append(f'{r["name"]}：無法建立財務預測')
+            continue
+        ident = [('稅後淨利', s['net_income'], None if d['tax_rate']['value'] is None else s['pretax_income'] * (1 - d['tax_rate']['value'] / 100)),
+                 ('EPS × 股數', None if s['eps'] is None else s['eps'] * s['diluted_shares'], s['net_income']),
+                 ('FCF', s['free_cash_flow'], None if s['operating_cash_flow'] is None or s['capital_expenditure'] is None
+                  else s['operating_cash_flow'] - s['capital_expenditure'])]
+        if r['implied_price'] is not None and r['valuation']['method'] in ('pe', 'p_fcf', 'p_b'):
+            ident.append(('隱含價值', r['implied_price'], r['valuation']['metric_value'] * r['valuation']['multiple']))
+        for label, a, b in ident:
+            if a is not None and b is not None and abs(a - b) > 1e-6 * max(1, abs(b)):
+                broken.append(f'{r["name"]}：{label}不一致')
+    eps = {r['name']: (r['statements'] or {}).get('eps') for r in rows}
+    order_warn = None not in eps.values() and len(eps) == 3 and not eps['bear'] <= eps['base'] <= eps['bull']
+    out.append(state('scenario_internal_consistency', 'FAIL' if broken else ('WARNING' if order_warn else 'PASS'),
+                     '；'.join(broken) or ('EPS 順序不是 bear ≤ base ≤ bull' if order_warn else
+                                           '各情境的損益、EPS、現金流與隱含價值互相勾稽')))
+    # 3. Method suitability for the sector and the earnings/cash profile.
+    from .fin_analysis import sector_profile
+    _, profile = sector_profile(engine['entity_id'])
+    allowed = {'pe': 'pe_trailing', 'p_fcf': 'p_fcf', 'ev_ebitda': 'ev_ebitda', 'p_b': 'p_b'}
+    unsuitable = []
+    for r in rows:
+        method = r['valuation']['method']
+        if allowed[method] not in profile['valuation_methods']:
+            unsuitable.append(f'{r["name"]}：{method} 不適用於 {engine["valuation"]["profile"]}')
+        if r['valuation']['metric_value'] is not None and r['valuation']['metric_value'] <= 0 and method in ('pe', 'p_fcf', 'ev_ebitda'):
+            unsuitable.append(f'{r["name"]}：{r["valuation"]["metric"]} 非正值，{method} 倍數無意義')
+    out.append(state('valuation_method_suitability', 'FAIL' if unsuitable else 'PASS',
+                     '；'.join(unsuitable) or '估值方法符合產業設定，且基礎指標為正'))
+    # 4. Reference quality: evidence-based multiples need sufficient history or peers.
+    bad_ref = [p for p in scen['problems'] if '參考資料不足' in p or '超出' in p]
+    bounds = profile.get('multiple_sanity_bounds', {})
+    outliers = [f'{r["name"]}：{r["valuation"]["multiple"]} 倍超出產業寬鬆範圍 {bounds[r["valuation"]["method"]]}'
+                for r in rows if r['valuation']['method'] in bounds
+                and not bounds[r['valuation']['method']][0] <= r['valuation']['multiple'] <= bounds[r['valuation']['method']][1]]
+    if bad_ref:
+        out.append(state('valuation_reference_quality', 'FAIL', '；'.join(bad_ref)))
+    elif scen['valuation_basis'] != 'evidence_based':
+        out.append(state('valuation_reference_quality', 'WARNING',
+                         '沒有足夠的歷史或同業估值參照，情境倍數屬模型假設：輸出為假設性估值敏感度，不是目標價'
+                         + ('；' + '；'.join(outliers) if outliers else '')))
+    else:
+        out.append(state('valuation_reference_quality', 'WARNING' if outliers else 'PASS',
+                         '；'.join(outliers) or '情境倍數皆落在足量的歷史或同業區間內'))
+    # 5. Uncertainty disclosure: hypothetical values must lose false precision and carry the label.
+    precise = [r['name'] for r in rows if not r['evidence_based_multiple'] and r['implied_price'] is not None
+               and r['implied_price_display'] == round(r['implied_price'], 4) and abs(r['implied_price']) >= 100]
+    history = next((m for m in engine['analysis']['metrics'] if m['name'] == 'history_quarters'), {'value': 0})
+    needs = scen['valuation_basis'] != 'evidence_based' or (history['value'] or 0) < 8 or \
+        any(r['model_assumption_count'] for r in rows)
+    out.append(state('scenario_uncertainty_disclosure', 'FAIL' if precise else 'PASS',
+                     f'假設性輸出仍顯示完整精度：{precise}' if precise else
+                     ('已以兩位有效數字呈現假設性價值並標示不確定性' if needs else '輸出有足量證據，無額外不確定性揭露需求')))
+    # 6. Forecast period and reference date alignment.
+    horizon = (forecast or {}).get('horizon')
+    if horizon is None:
+        out.append(state('forecast_period_consistency', 'FAIL', '沒有可推導的預測期間（缺 TTM 營收）'))
+    else:
+        wrong = [r['name'] for r in rows if r['target_period'] != horizon['label']]
+        price = engine['valuation']['market']['price']
+        latest_end = engine['analysis']['quarters'][-1]['end'] if engine['analysis']['quarters'] else None
+        stale_ref = price.get('trade_date') and latest_end and price['trade_date'] < latest_end.isoformat()
+        out.append(state('forecast_period_consistency', 'FAIL' if wrong else ('WARNING' if stale_ref else 'PASS'),
+                         f'情境期間 {wrong} 與模型預測期間 {horizon["label"]} 不一致' if wrong else
+                         ('參考價日期早於最新財報期末' if stale_ref else f'預測期間 {horizon["label"]}，參考價日期在最新財報之後')))
+    return out

@@ -181,13 +181,25 @@ def test_financial_sector_uses_book_value_methods(tmp_path, monkeypatch):
 
 # --- scenarios, labelling and narrative checks ---------------------------------------------------
 
-def scenario(name, eps, multiple, basis='model_assumption', ids=(), mbasis='model_assumption'):
-    return ScenarioProposal(entity_id='DELL', name=name, target_period='FY2028',
-                            assumptions=[Assumption(name='FY2028 EPS', value=eps, unit='USD/share', basis=basis,
-                                                    evidence_ids=list(ids), rationale='test')],
-                            financial_outcome=f'EPS {eps}', valuation_metric='eps', valuation_metric_value=eps,
-                            multiple_method='pe', multiple=multiple, multiple_basis=mbasis,
-                            invalidation_conditions=['test condition'])
+DELL_HORIZON = 'NTM 2026-08-01~2027-07-31'
+
+
+def driver(value, basis='model_assumption', ids=()):
+    return Assumption(name='test driver', value=value, unit='%', basis=basis, evidence_ids=list(ids), rationale='test')
+
+
+def scenario(name, growth, multiple, margin=7.5, basis='model_assumption', ids=(), mbasis='model_assumption',
+             margin_basis='historical_fact', method='pe', period=DELL_HORIZON, extra=None):
+    drivers = {'revenue_growth': driver(growth, basis, ids), 'operating_margin': driver(margin, margin_basis)}
+    drivers.update(extra or {})
+    return ScenarioProposal(entity_id='DELL', name=name, target_period=period, drivers=drivers,
+                            financial_outcome='test', valuation_metric='eps', multiple_method=method,
+                            multiple=multiple, multiple_basis=mbasis, invalidation_conditions=['test condition'])
+
+
+def default_scenarios():
+    return [scenario('bear', 0, 10, margin=7.0, margin_basis='model_assumption'), scenario('base', 15, 12),
+            scenario('bull', 25, 14, margin=8.0, margin_basis='model_assumption')]
 
 
 def proposal_for(data, scenarios=None, texts=('營收年增 57.7% 。',), outlook='insufficient', thesis_text='測試：無法判斷估值高低。'):
@@ -203,24 +215,40 @@ def proposal_for(data, scenarios=None, texts=('營收年增 57.7% 。',), outloo
                     outlooks=[HorizonProposal(entity_id=data.request.ticker, horizon=h, outlook=outlook,
                                               supporting_evidence_ids=ids, interpretation='測試。')
                               for h in ('3-6m', '6-12m')],
-                    scenarios=scenarios if scenarios is not None else
-                    [scenario('bear', 8, 12), scenario('base', 10, 15), scenario('bull', 12, 18)])
+                    scenarios=scenarios if scenarios is not None else default_scenarios())
 
 
-def test_scenarios_compute_implied_price_change_and_sensitivity_without_probabilities():
+def gate(result, name):
+    return next(c for c in result['gates']['checks'] if c['check'] == name)
+
+
+def test_scenarios_are_driver_based_and_reconcile():
     data = dell()
     result = engine.run(data, proposal_for(data))
     rows = {s['name']: s for s in result['scenarios']['scenarios']}
-    assert rows['base']['implied_price'] == 150 and rows['base']['change_vs_reference_percent'] == 0
-    assert rows['bull']['implied_price'] == pytest.approx(216)
-    assert result['scenarios']['sensitivity']['grid'][1][1] == 150
+    base = rows['base']
+    s = base['statements']
+    revenue_ttm = (27.0 + 33.0 + 37.0 + 46.97) * 1e9
+    assert s['revenue'] == pytest.approx(revenue_ttm * 1.15)
+    assert s['operating_income'] == pytest.approx(s['revenue'] * 0.075)
+    assert s['net_income'] == pytest.approx(s['pretax_income'] * (1 - base['drivers']['tax_rate']['value'] / 100))
+    assert base['drivers']['tax_rate']['basis'] == 'historical_fact' and base['drivers']['tax_rate']['value'] == pytest.approx(18.0)
+    assert s['eps'] == pytest.approx(s['net_income'] / 700e6)
+    assert s['free_cash_flow'] == pytest.approx(s['operating_cash_flow'] - s['capital_expenditure'])
+    assert base['implied_price'] == pytest.approx(s['eps'] * 12, rel=1e-6)
+    assert base['change_vs_reference_percent'] == pytest.approx((s['eps'] * 12 / 150 - 1) * 100, abs=0.01)
     assert result['scenarios']['probabilities'] == 'not_assigned'
+    assert result['scenarios']['valuation_basis'] == 'hypothetical_sensitivity'
+    assert base['implied_price_display'] == pytest.approx(round(base['implied_price'], -1), abs=10)
+    assert gate(result, 'scenario_internal_consistency')['status'] == 'PASS'
+    assert gate(result, 'valuation_reference_quality')['status'] == 'WARNING'
+    assert gate(result, 'assumption_evidence_quality')['status'] == 'WARNING'   # base growth is a model assumption
     assert result['gates']['grade'] == 'complete', result['gates']['critical_failures']
 
 
 def test_scenario_order_and_unsupported_multiple_basis_are_rejected():
     data = dell()
-    bad = [scenario('bear', 12, 18), scenario('base', 10, 15), scenario('bull', 8, 12, mbasis='peer_median')]
+    bad = [scenario('bear', 25, 14), scenario('base', 15, 12), scenario('bull', 0, 10, mbasis='peer_median')]
     result = engine.run(data, proposal_for(data, bad))
     assert result['scenarios']['status'] == 'invalid'
     assert any('順序' in p for p in result['scenarios']['problems'])
@@ -230,8 +258,8 @@ def test_scenario_order_and_unsupported_multiple_basis_are_rejected():
 
 def test_guidance_cannot_be_labelled_as_consensus():
     data = dell()
-    mislabelled = [scenario('bear', 8, 12), scenario('base', 10, 15, basis='consensus', ids=['dell-guidance-rev']),
-                   scenario('bull', 12, 18)]
+    mislabelled = [scenario('bear', 0, 10), scenario('base', 15, 12, basis='consensus', ids=['dell-guidance-rev']),
+                   scenario('bull', 25, 14)]
     result = engine.run(data, proposal_for(data, mislabelled))
     assert 'guidance_consensus_labeling' in result['gates']['critical_failures']
 
@@ -253,7 +281,7 @@ def test_valuation_judgement_without_reference_is_a_contradiction():
 
 def test_direction_contradicting_base_scenario_is_detected():
     data = dell()
-    proposal = proposal_for(data, [scenario('bear', 6, 12), scenario('base', 8, 15), scenario('bull', 12, 18)])
+    proposal = proposal_for(data, [scenario('bear', 0, 6), scenario('base', 5, 7), scenario('bull', 25, 14)])
     from stock_report.models import Decision
     decision = Decision(status='APPROVED', outlooks=[o.model_copy(update={'outlook': 'bullish'}) for o in proposal.outlooks],
                         findings=[], policy_version='test')

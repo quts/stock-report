@@ -33,7 +33,8 @@ def test_complete_investment_report_has_all_sections_and_no_limited_banner(tmp_p
     for heading in HEADINGS:
         assert heading in text
     assert '受限報告' not in text
-    assert 'Bull' in text and 'Base' in text and 'Bear' in text and '模型假設' in text
+    assert 'Bull' in text and 'Base' in text and 'Bear' in text
+    assert '假設性估值敏感度' in text and '稅率' in text and '自由現金流' in text and '存貨天數' in text
     assert '公司指引' in text and '不能代替市場共識' in text
 
 
@@ -57,3 +58,6 @@ def test_pipeline_writes_investment_inputs_and_audit_for_investment_profile(tmp_
     research = read_json(run / 'research.json')
     assert research['report_grade'] == result['report_grade'] == 'limited'   # synthetic proposal has no scenarios
     assert 'investment.json' in read_json(run / 'manifest.json')['hashes']
+    qa = read_json(run / 'qa.json')
+    assert {c['status'] for c in qa['quality_gates']} <= {'PASS', 'WARNING', 'FAIL', 'NOT_APPLICABLE'}
+    assert qa['market_data']['diagnostics']['providers']

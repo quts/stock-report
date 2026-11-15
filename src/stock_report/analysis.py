@@ -20,8 +20,11 @@ event_review.events 的已核實重大事件必須納入判斷；未解決線索
 股價估值不足不應刪掉有證據的公司基本面及營運分析；限制集中在末頁。company_research的事實分析獨立於outlook股價方向，但不得暗示被Gate拒絕的買賣建議。
 投資版型（report_profile=investment）另讀 investment_inputs.json：季度序列、財務指標、估值結果與資料缺口都已由 Python 計算，正文數字只能取自證據或該檔。
 thesis：market_pricing 說明目前股價隱含的預期（估值不可用時照實說明無法判斷），key_assumptions 列最影響報酬的假設，supporting／opposing 分列正反證據，invalidation 寫可驗證的推翻條件。
-scenarios：bull、base、bear 各一；每個假設標明 basis（historical_fact、management_guidance、consensus、model_assumption）並引用證據，指引不得標為 consensus。
-valuation_metric_value 由假設推得並在 financial_outcome 說明算法；倍數基礎沒有歷史或同業資料時必須標 model_assumption。不得給機率，不得捏造目標價或共識。
+scenarios：bull、base、bear 各一；target_period 必須等於 investment_inputs.json 的 forecast.horizon.label。
+不要直接指定 EPS：以 drivers（revenue_growth、operating_margin、non_operating_ratio、tax_rate、share_change、da_intensity、capex_intensity、working_capital_intensity，皆為百分比）描述營運假設，程式會推導營收、淨利、EPS、OCF、CapEx 與 FCF。
+沒填的 driver 會採用 forecast.drivers 的歷史錨點；歷史成長屬極端（status=extreme）時，必須以指引、共識或明確的 model_assumption 取代，不能直接外推。
+每個 driver 標明 basis（historical_fact 須落在歷史區間內；management_guidance／consensus 須引用對應證據，指引不得標為 consensus）。
+倍數：只有在 valuation.references 的歷史區間或同業資料為 sufficient 且倍數落在區間內時，才能標 historical_range／peer_median；否則標 model_assumption，結果是假設性敏感度，不得稱為目標價或合理價。EPS 與倍數不必同向。不得給機率，不得捏造共識。
 '''
 
 

@@ -483,15 +483,23 @@ class Assumption(Model):
     rationale: str = Field(min_length=1, max_length=300)
 
 
+ForecastDriver = Literal['revenue_growth', 'operating_margin', 'non_operating_ratio', 'tax_rate', 'share_change',
+                         'da_intensity', 'capex_intensity', 'working_capital_intensity']
+
+
 class ScenarioProposal(Model):
     entity_id: str
     name: Literal['bull', 'base', 'bear']
+    # Must equal the engine's forecast horizon label (see investment_inputs.json forecast.horizon).
     target_period: str = Field(min_length=1, max_length=40)
-    assumptions: list[Assumption] = Field(min_length=1, max_length=8)
+    # Driver-based forecast: each driver is a percentage with its origin. Omitted drivers fall back to
+    # the deterministic historical anchor and are labelled historical_fact.
+    drivers: dict[ForecastDriver, Assumption] = Field(default_factory=dict)
+    assumptions: list[Assumption] = Field(default_factory=list, max_length=8)
     financial_outcome: str = Field(min_length=1, max_length=400)
-    # The per-share (or EBITDA) figure the multiple is applied to, derived from the assumptions.
     valuation_metric: Literal['eps', 'fcf_per_share', 'book_value_per_share', 'ebitda']
-    valuation_metric_value: float
+    # Legacy direct input. With drivers the engine computes the metric; a supplied value must reconcile.
+    valuation_metric_value: float | None = None
     multiple_method: Literal['pe', 'p_fcf', 'p_b', 'ev_ebitda']
     multiple: float = Field(gt=0, le=200)
     multiple_basis: Literal['current_trailing', 'historical_range', 'peer_median', 'model_assumption']

@@ -1,0 +1,81 @@
+{
+  "schema_version": "1",
+  "config_version": "0.1.0",
+  "notes": "Market-data provider priority per exchange. A provider is used only when its source is open for internal use in config/source-licenses.json, or, for operator imports, when the import carries an operator rights attestation. Order is the fallback priority; providers are never chosen per company.",
+  "exchanges": {
+    "TWSE": {
+      "latest_close": [
+        "twse-openapi-stock-day-all",
+        "operator-import"
+      ],
+      "history": [
+        "operator-import"
+      ],
+      "calendar": "TWSE"
+    },
+    "TPEx": {
+      "latest_close": [
+        "tpex-openapi-mainboard-daily-close",
+        "operator-import"
+      ],
+      "history": [
+        "operator-import"
+      ],
+      "calendar": "TPEx"
+    },
+    "NYSE": {
+      "latest_close": [
+        "yahoo-chart-daily-close",
+        "operator-import"
+      ],
+      "history": [
+        "yahoo-chart-daily-close",
+        "operator-import"
+      ],
+      "calendar": "NYSE"
+    },
+    "NASDAQ": {
+      "latest_close": [
+        "yahoo-chart-daily-close",
+        "operator-import"
+      ],
+      "history": [
+        "yahoo-chart-daily-close",
+        "operator-import"
+      ],
+      "calendar": "NASDAQ"
+    }
+  },
+  "rejected": [
+    {
+      "provider": "www.twse.com.tw exchangeReport/STOCK_DAY（個股月成交）",
+      "reason": "TWSE 網站使用條款禁止以自動化程式下載本網站資料，僅已授權政府資料開放平臺的資料除外；此歷史端點不在開放資料集內",
+      "evidence": "https://www.twse.com.tw/zh/terms/use.html"
+    },
+    {
+      "provider": "Yahoo Finance chart API",
+      "reason": "條款頁無法取得（999）且端點調整契約未文件化；登錄檔維持 unknown",
+      "evidence": "docs/phase-0/us-price-source-notes.md"
+    },
+    {
+      "provider": "Nasdaq.com／NYSE.com 網站",
+      "reason": "網站條款限制程式化擷取",
+      "evidence": "https://www.nasdaq.com/legal"
+    },
+    {
+      "provider": "Alpha Vantage／Polygon／Tiingo／Nasdaq Data Link",
+      "reason": "需要 API Key；專案規則不新增金鑰",
+      "evidence": "AGENTS.md"
+    },
+    {
+      "provider": "Stooq CSV",
+      "reason": "未找到可核對的自動化使用條款；不能因端點公開可下載就推定允許",
+      "evidence": null
+    },
+    {
+      "provider": "IEX HIST",
+      "reason": "逐筆封包檔、每日數 GB，不適合個人日收盤用途；條款未審閱",
+      "evidence": null
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "1",
+  "config_version": "0.1.0",
+  "notes": "Exchange non-trading weekdays. NYSE holidays are computed from the exchange's published fixed rules (calendars.py); unscheduled closures are not modelled. TWSE lists come only from the official open-data holiday schedule (data.gov.tw dataset 11761, openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule, 政府資料開放授權條款第1版). That feed publishes only the latest year; years without a recorded list are reported as unverified, never assumed holiday-free.",
+  "exchanges": {
+    "TWSE": {
+      "source": "https://openapi.twse.com.tw/v1/holidaySchedule/holidaySchedule",
+      "license": "https://data.gov.tw/dataset/11761",
+      "years": {
+        "2027": {
+          "closed_weekdays": [
+            "2027-01-01",
+            "2027-02-02",
+            "2027-02-03",
+            "2027-02-04",
+            "2027-02-05",
+            "2027-02-08",
+            "2027-02-09",
+            "2027-02-10",
+            "2027-03-01",
+            "2027-04-05",
+            "2027-04-06",
+            "2027-04-30",
+            "2027-06-09",
+            "2027-09-15",
+            "2027-09-28",
+            "2027-10-11",
+            "2027-10-25",
+            "2027-12-24",
+            "2027-12-31"
+          ],
+          "retrieved_at": "2026-11-15",
+          "note": "民國116年；含「市場無交易，僅辦理結算交割」日"
+        }
+      }
+    },
+    "TPEx": {
+      "source": null,
+      "license": null,
+      "years": {},
+      "note": "No reviewed TPEx calendar; not assumed equal to TWSE."
+    },
+    "NYSE": {
+      "rules": "nyse_fixed_rules"
+    },
+    "NASDAQ": {
+      "rules": "nyse_fixed_rules"
+    }
+  }
+}

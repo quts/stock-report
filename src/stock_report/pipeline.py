@@ -150,6 +150,13 @@ def finalize(directory, proposal_path, mapping_path):
     investment = engine.run(data, proposal, decision)
     if investment is not None:
         write_json(directory / 'investment.json', engine.public(investment))
+        # Pipeline diagnostics live in a machine-readable QA artifact, not in the report body.
+        write_json(directory / 'qa.json', engine.public({
+            'report_grade': investment['gates']['grade'] if investment['gates'] else None,
+            'quality_gates': investment['gates']['checks'] if investment['gates'] else [],
+            'market_data': investment['market_data'], 'forecast_calibration': investment['forecast'].get('calibration'),
+            'forecast_notes': investment['forecast']['notes'], 'scenario_problems': investment['scenarios']['problems'],
+            'sector_drivers_unavailable': investment['sector_drivers']['unavailable']}))
     # File output is transactional: the personal PDF is written only after all checks pass.
     temp_pdf = directory / '.report.pending.pdf'
     try:
@@ -180,7 +187,7 @@ def finalize(directory, proposal_path, mapping_path):
     write_json(directory / 'ai_proposal.json', proposal)
     write_json(directory / 'rating_mapping.json', mapping)
     artifacts = ['research_input.json', 'ai_proposal.json', 'rating_mapping.json', 'evidence.json', 'evidence.sqlite', 'decision.json', 'research.json', 'report.pdf']
-    for optional in ('statement_metrics.json', 'investment.json', 'investment_inputs.json'):
+    for optional in ('statement_metrics.json', 'investment.json', 'investment_inputs.json', 'qa.json'):
         if (directory / optional).exists():
             artifacts.append(optional)
     manifest = {'run_id': prepared['run_id'], 'created_at': datetime.now(timezone.utc).isoformat(),
