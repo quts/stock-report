@@ -1,5 +1,7 @@
 # 美股日線可行性增量
 
+2026-11-15 後續官方文件查證：Yahoo Help 的 adjusted close 說明可由官方搜尋摘要核對為包含分割與股利調整；直接讀取 Help 回覆 429，條款頁回覆 999。一般 adjusted close 定義不能證明本端點 close 欄位的調整契約，因此現行 unknown／NA 仍正確，此端點不建議啟用。查核出處及範圍見 [人工核對前查證](pre-human-review.md)，不把這項未文件化契約交給使用者人工猜測。
+
 此增量仍屬 Phase 0，不代表正式 MVP GO。Claude Code（Fable）完成初稿後觸及用量上限，後續由 Codex 補齊設定、測試及驗收。
 
 `yahoo-chart-daily-close` 是次級資料供應者，不是交易所或公司申報。端點為 `https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2y&interval=1d&events=split`。這是未確認正式支援與授權的端點，不能因為可連線或僅供個人使用就認定允許保存或使用。登錄狀態維持 unknown；所有內部使用、原始快取及雜湊權限均不啟用。

@@ -118,7 +118,7 @@
       "license_findings": [
         "資料集 91998 頁面標示免費與政府資料開放授權條款－第1版（助理於 2026-11-15 查核）。",
         "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者只有實測交叉比對。",
-        "資料集指定資源是 mopsfin.twse.com.tw 的 CSV，與 openapi.twse.com.tw JSON 端點尚未逐欄比對。"
+        "2026-11-15 已完成目標名稱、年度、季別、營收、歸屬母公司淨利與 EPS 的 CSV／JSON 記憶體比對，結果一致；見 financial-source-binding.json。未比對全部欄位，不據此推定未宣告單位。"
       ],
       "proposed_scope": {
         "internal_use_allowed": false,
@@ -131,7 +131,7 @@
       "human_checklist": [],
       "open_questions": [
         "金額單位與累計基礎缺官方條文",
-        "CSV 資源與 JSON 端點未逐欄比對",
+        "已完成目標六欄比對，但非完整資料集逐欄驗證",
         "缺公司申報／公告時間",
         "會計年度結束月份未人工核對"
       ]

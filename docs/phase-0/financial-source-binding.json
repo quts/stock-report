@@ -1,0 +1,50 @@
+{
+  "results": [
+    {
+      "ticker": "2330",
+      "csv_url": "https://mopsfin.twse.com.tw/opendata/t187ap06_L_ci.csv",
+      "json_url": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
+      "dataset": "https://data.gov.tw/dataset/91998",
+      "checked_at": "2026-11-15T02:44:24.839931+00:00",
+      "retained_source_values": false,
+      "retained_response_hash": false,
+      "checked_by": "assistant",
+      "csv_target_matches": 1,
+      "json_target_matches": 1,
+      "field_matches": {
+        "公司名稱": true,
+        "年度": true,
+        "季別": true,
+        "營業收入": true,
+        "淨利（淨損）歸屬於母公司業主": true,
+        "基本每股盈餘（元）": true
+      },
+      "status": "matched_target_fields",
+      "csv_header_declares_monetary_scale": false
+    },
+    {
+      "ticker": "6488",
+      "csv_url": "https://mopsfin.twse.com.tw/opendata/t187ap06_O_ci.csv",
+      "json_url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci",
+      "dataset": "https://data.gov.tw/dataset/94853",
+      "checked_at": "2026-11-15T02:44:26.606693+00:00",
+      "retained_source_values": false,
+      "retained_response_hash": false,
+      "checked_by": "assistant",
+      "csv_target_matches": 1,
+      "json_target_matches": 1,
+      "field_matches": {
+        "公司名稱": true,
+        "年度": true,
+        "季別": true,
+        "營業收入": true,
+        "淨利（淨損）歸屬於母公司業主": true,
+        "基本每股盈餘（元）": true
+      },
+      "status": "matched_target_fields",
+      "csv_header_declares_monetary_scale": false
+    }
+  ],
+  "permissions_changed": false,
+  "limit": "Target fields at one capture only; no proof of units, publication or complete equivalence"
+}
