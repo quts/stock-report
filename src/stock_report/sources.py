@@ -745,6 +745,10 @@ class DailyPriceSeriesAdapter:
         return ParseResult(entity=entity, observations=observations, field_binding=binding, notes=notes)
 
 
+# Response fields that carry the issuer identity in every company-concept payload.
+SEC_IDENTITY_FIELDS = {'cik': 'cik', 'entity_name': 'entityName'}
+
+
 class SecConceptAdapter:
     """SEC EDGAR XBRL company-concept facts for an operator-configured issuer."""
 
@@ -826,8 +830,14 @@ class SecConceptAdapter:
                 found = self.annual_facts(candidate, spec, self.profile['endpoint'].format(
                     cik=config['cik'], concept=concept))
                 if found:
-                    facts, used_concept, payload = found, concept, candidate
-                    break
+                    # Revenue taxonomy can change between filings. Choose the newest
+                    # complete concept series, keeping configured priority for ties;
+                    # never splice current/prior values from different concepts.
+                    if not facts or found[0]['end_date'] > facts[0]['end_date']:
+                        facts, used_concept, payload = found, concept, candidate
+                    if role != 'revenue':
+                        break
+                    continue
                 notes.append(f'{role}:{concept} 無符合年度條件的事實')
             if not facts:
                 if spec.get('required'):
@@ -896,7 +906,7 @@ class SecConceptAdapter:
             retrieved_at=collected_at))
         notes.append(f'交易市場／幣別／股份類別來自設定檔版本 {self.config_version}，非 SEC 回應欄位')
         return ParseResult(entity=entity, observations=observations,
-                           field_binding={'cik': 'cik', 'entity_name': 'entityName'}, notes=notes)
+                           field_binding=dict(SEC_IDENTITY_FIELDS), notes=notes)
 
 
 ADAPTERS = {'exchange_quote': ExchangeQuoteAdapter, 'daily_price_series': DailyPriceSeriesAdapter, 'tw_income_statement': TaiwanIncomeStatementAdapter,

@@ -1,0 +1,162 @@
+{
+  "schema_version": "1",
+  "package_id": "sec-nvda-activation-fixture",
+  "prepared_at": "2026-11-15T00:00:00+00:00",
+  "prepared_by": "unit-test fixture (synthetic; not a real source review)",
+  "prepared_by_kind": "assistant",
+  "status": "awaiting_source_review",
+  "registry_baseline_version": "0.4.1",
+  "target": {
+    "ticker": "NVDA",
+    "cik": "0001045810",
+    "expected_entity_name_contains": "NVIDIA",
+    "exchange": "NASDAQ",
+    "currency": "USD",
+    "share_class": "common",
+    "entity_config": "config/sec-entities.json"
+  },
+  "items": [
+    {
+      "source_id": "sec-xbrl-companyconcept",
+      "recommendation": "ready_for_source_review",
+      "endpoint": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "dataset_page": "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data",
+      "dataset_resource": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "license_name": "UNIT TEST FIXTURE",
+      "license_url": "https://www.sec.gov/about/developer-resources",
+      "field_binding": {
+        "cik": [
+          "cik"
+        ],
+        "entity_name": [
+          "entityName"
+        ]
+      },
+      "sec_binding": {
+        "taxonomy": "us-gaap",
+        "annual_forms": [
+          "10-K"
+        ],
+        "min_period_days": 300,
+        "max_period_days": 400,
+        "roles": {
+          "revenue": {
+            "concepts": [
+              "RevenueFromContractWithCustomerExcludingAssessedTax",
+              "Revenues",
+              "SalesRevenueNet"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "revenue_current",
+              "revenue_prior"
+            ],
+            "required": true
+          },
+          "net_income": {
+            "concepts": [
+              "NetIncomeLoss"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "net_income"
+            ],
+            "required": true
+          },
+          "eps": {
+            "concepts": [
+              "EarningsPerShareDiluted",
+              "EarningsPerShareBasic"
+            ],
+            "units": [
+              "USD/shares"
+            ],
+            "unit": "per_share",
+            "metric_keys": [
+              "eps_current",
+              "eps_prior"
+            ],
+            "required": false
+          },
+          "operating_cash_flow": {
+            "concepts": [
+              "NetCashProvidedByUsedInOperatingActivities",
+              "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "operating_cash_flow"
+            ],
+            "required": false
+          },
+          "capital_expenditure": {
+            "concepts": [
+              "PaymentsToAcquirePropertyPlantAndEquipment"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "capital_expenditure"
+            ],
+            "required": false
+          }
+        },
+        "request_urls": [
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/Revenues.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/SalesRevenueNet.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetIncomeLoss.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/EarningsPerShareDiluted.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/EarningsPerShareBasic.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetCashProvidedByUsedInOperatingActivities.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetCashProvidedByUsedInOperatingActivitiesContinuingOperations.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/PaymentsToAcquirePropertyPlantAndEquipment.json"
+        ]
+      },
+      "evidence_produced": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "retained_normalized_fields": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "not_retained": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "identity_findings": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "time_findings": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "license_findings": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "proposed_scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "proposed_attribution": "UNIT TEST FIXTURE attribution - not a real attribution text.",
+      "report_effect": "UNIT TEST FIXTURE - not a finding about any real source.",
+      "review_checklist": [
+        "UNIT TEST FIXTURE - not a finding about any real source."
+      ],
+      "open_questions": []
+    }
+  ],
+  "notes": [
+    "Synthetic structure-only fixture for activation-check tests. It grants nothing and records no review."
+  ]
+}

@@ -27,6 +27,8 @@ scripts/runtime.sh cli activation-check --package docs/phase-0/2330-source-activ
 
 4. 啟用後重新 `collect --allow-network`；封閉期間的採集不沿用新權限。`bundle` 報告的每筆採集會標示 `source_reviewed` 與 `review_basis`。
 
+`activation-check` 支援兩種標的。臺灣標的（`code`＋`instrument_config`）預設以 `config/tw-instruments.json` 核對。SEC 標的（`cik`＋`expected_entity_name_contains`＋`entity_config`）只以查核包指定的 `config/sec-entities.json` 核對 CIK、名稱綁定、交易市場、幣別與股份類別；項目須附 `sec_binding`（taxonomy、annual_forms、期間天數、各 role 的 concepts／units／unit／metric_keys／required，以及依 CIK 展開的 `request_urls`），`field_binding` 為 `cik`／`entityName`，全部逐字比對來源契約。設定檔錯誤、CIK／市場／單位／concept／端點不符、或來源與標的種類不相容一律 `blocked`。`--target-config` 是 `--instruments` 的別名。啟用仍以來源（端點範本）為單位，不是單一 CIK。
+
 舊查核包的 `awaiting_human_attestation`／`ready_for_human_review`／`human_checklist` 仍可讀取，視同「等待來源查核」；新查核包可用 `awaiting_source_review`／`ready_for_source_review`／`review_checklist`。查核包基準版本與目前登錄檔不同時，`activation-check` 會回報漂移並封鎖，需更新查核包。不帶候選檔時，若登錄檔已對查核包建議的來源記錄查核依據，狀態為 `registry_already_reviewed` 並列出依據，否則為 `awaiting_source_review`。此檢查只驗證範圍與紀錄結構，不能證明引用內容與官方頁面相符。回應雜湊、原始回應留存仍需人工簽認。
 
 ## 新聞服務的明確選擇

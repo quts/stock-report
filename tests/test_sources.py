@@ -229,6 +229,35 @@ def test_sec_restated_period_keeps_the_latest_filing_and_its_record_id():
     assert prior.source_published_raw == '2025-02-26'
 
 
+def test_sec_revenue_uses_latest_concept_series_without_splicing():
+    import copy
+    data = payloads('sec_nvda_concepts.json')
+    old = data['revenue:RevenueFromContractWithCustomerExcludingAssessedTax']
+    newest = copy.deepcopy(old)
+    newest['tag'] = 'Revenues'
+    newest['units']['USD'].append(dict(start='2025-01-27', end='2026-01-25', val=2000000000,
+        accn='0001045810-26-000021', fy=2026, fp='FY', form='10-K', filed='2026-02-25'))
+    data['revenue:Revenues'] = newest
+    facts = {o.role: o for o in sec(data=data).observations}
+    assert facts['revenue_current'].period_end == date(2026, 1, 25)
+    assert facts['revenue_prior'].period_end == date(2025, 1, 26)
+    assert all(facts[k].request_key == 'revenue:Revenues' for k in ('revenue_current', 'revenue_prior'))
+    newest['units']['USD'] = newest['units']['USD'][-1:]
+    facts = {o.role: o for o in sec(data=data).observations}
+    assert 'revenue_prior' not in facts
+    newest['cik'] = 123
+    with pytest.raises(SourceContractError, match='does not match configured'):
+        sec(data=data)
+
+
+def test_sec_revenue_same_period_keeps_configured_concept_priority():
+    import copy
+    data = payloads('sec_nvda_concepts.json')
+    data['revenue:Revenues'] = copy.deepcopy(data['revenue:RevenueFromContractWithCustomerExcludingAssessedTax'])
+    facts = {o.role: o for o in sec(data=data).observations}
+    assert facts['revenue_current'].request_key == 'revenue:RevenueFromContractWithCustomerExcludingAssessedTax'
+
+
 def test_sec_filing_date_is_a_declared_date_upper_bound():
     current = next(o for o in sec().observations if o.role == 'revenue_current')
     assert current.publication_basis == 'source_declared_date'

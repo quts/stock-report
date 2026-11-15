@@ -98,7 +98,9 @@ def parser():
     act.add_argument('--package', required=True, type=Path)
     act.add_argument('--candidate-registry', type=Path, help='Candidate registry (human-attested or assistant-reviewed) to compare; never applied')
     act.add_argument('--license-registry', type=Path, default=None)
-    act.add_argument('--instruments', type=Path, default=Path('config/tw-instruments.json'))
+    act.add_argument('--instruments', '--target-config', dest='instruments', type=Path, default=None,
+                     help='Target configuration; defaults to config/tw-instruments.json for a Taiwan target '
+                          'and config/sec-entities.json for a SEC target')
     schema = sub.add_parser('schema')
     sub.add_parser('doctor', help='Read-only readiness and recorded validation status; no network')
     schema.add_argument('--output', required=True, type=Path)
@@ -223,7 +225,7 @@ def main(argv=None):
                               next_provider='import' if data.dataset_kind == 'real' else 'synthetic-event')
         elif args.command == 'activation-check':
             result = activation_check(args.package, load_registry(args.license_registry),
-                                      read_json(args.instruments), args.candidate_registry)
+                                      args.instruments, args.candidate_registry)
         elif args.command == 'doctor':
             result = doctor()
         elif args.command == 'probe':

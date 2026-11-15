@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
-  "registry_version": "0.5.0",
-  "updated_at": "2026-11-15T06:35:34+00:00",
+  "registry_version": "0.5.1",
+  "updated_at": "2026-11-15T07:17:19.963635+00:00",
   "policy": "Lawful, free access for personal non-distributed use only. Under the user's 2026-11-15 authorization, a sufficient AI review of official source, identity, time, terms and free access may confirm a specific source. Human attestations remain separately recorded. Unknown or restricted sources stay closed. Accessibility alone is not permission; no sharing, paid API, raw response or response hash retention is enabled by AI review.",
   "sources": [
     {
@@ -11,7 +11,12 @@
       "endpoint_scope": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
       "terms_url": "https://data.gov.tw/dataset/11549",
       "declared_status": "confirmed",
-      "scope": {"internal_use_allowed": true, "pdf_share_allowed": false, "store_response_hash": false, "store_raw_response": false},
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
       "terms_evidence": [
         {
           "terms_url": "https://data.gov.tw/dataset/11549",
@@ -29,23 +34,77 @@
           "excerpt": "重製、散布",
           "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
         },
-        {"terms_url":"https://data.gov.tw/dataset/11549","checked_at":"2026-11-15T06:33:06+00:00","checked_by":"assistant","checker":"Codex AI","excerpt":"政府資料開放授權條款-第1版","excerpt_covers":"本次重新查核資料集授權、免費計費與API文件連結；範圍限2330身份與最近收盤。"},
-        {"terms_url":"https://data.gov.tw/license","checked_at":"2026-11-15T06:33:06+00:00","checked_by":"assistant","checker":"Codex AI","excerpt":"免授權金進行利用","excerpt_covers":"第二節利用權與第三節及附件顯名要求；正規化資料本機保存及私人PDF，無分享功能。"}
+        {
+          "terms_url": "https://data.gov.tw/dataset/11549",
+          "checked_at": "2026-11-15T06:33:06+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "本次重新查核資料集授權、免費計費與API文件連結；範圍限2330身份與最近收盤。"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-15T06:33:06+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "免授權金進行利用",
+          "excerpt_covers": "第二節利用權與第三節及附件顯名要求；正規化資料本機保存及私人PDF，無分享功能。"
+        }
       ],
       "attested_by": null,
       "attested_at": null,
       "source_review": {
-        "reviewed_by": "assistant", "reviewer": "Codex AI", "reviewed_at": "2026-11-15T06:35:34+00:00",
+        "reviewed_by": "assistant",
+        "reviewer": "Codex AI",
+        "reviewed_at": "2026-11-15T06:35:34+00:00",
         "authorization": "使用者於2026-11-15明示由AI查核，證據充分才啟用；最低合法免費、僅自用不散布；見AGENTS.md",
         "reviewed_endpoint_scope": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
-        "use_basis": "personal_non_distributed", "verdict": "sufficient", "unresolved": [],
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
         "findings": [
-          {"aspect":"official_source","official_url":"https://data.gov.tw/dataset/11549","checked_at":"2026-11-15T06:33:06+00:00","excerpt":"OAS標準之API說明文件網址 https://openapi.twse.com.tw/v1/swagger.json","conclusion":"政府資料集直接連結官方API文件；本次指定CSV與JSON之2330名稱、日期、收盤及唯一性比對通過，Swagger列出端點。見docs/phase-0/ai-twse-binding.json。"},
-          {"aspect":"identity","official_url":"https://investor.tsmc.com/sites/ir/sec-filings/2025_20F%20Report.pdf","checked_at":"2026-11-15T06:33:06+00:00","excerpt":"The principal trading market for our common shares is the Taiwan Stock Exchange.","conclusion":"官方Form20-F PDF第63頁Item9另列普通股代號2330；與公司官方FAQ及交換資料的台積電名稱交叉核對。只啟用既有2330.TW身份與最近收盤。"},
-          {"aspect":"publication_time","official_url":"https://data.gov.tw/dataset/11549","checked_at":"2026-11-15T06:33:06+00:00","excerpt":"每1日","conclusion":"只確認每日更新及交易日期，未宣告精確發布時刻。採回應完成後observed_availability保守上界，研究截止時間不得早於採集，不當作即時或歷史可得資料。"},
-          {"aspect":"terms_of_use","official_url":"https://data.gov.tw/dataset/11549","checked_at":"2026-11-15T06:33:06+00:00","excerpt":"政府資料開放授權條款-第1版","conclusion":"資料集明列開放授權及指定CSV/API文件，限本次核實端點，不擴及其他交易所資料集。"},
-          {"aspect":"terms_of_use","official_url":"https://data.gov.tw/license","checked_at":"2026-11-15T06:33:06+00:00","excerpt":"免授權金進行利用","conclusion":"第二節允許重製、編輯等利用；第三節及附件要求顯名。本機正規化保存與私人PDF保留提供機關、資料集、年份與條款網址。禁止本產品對外散布。"},
-          {"aspect":"free_access","official_url":"https://data.gov.tw/dataset/11549","checked_at":"2026-11-15T06:33:06+00:00","excerpt":"免費","conclusion":"官方計費方式明列免費；本次CSV與JSON直接取得，無API Key、付費訂閱或繞過存取限制。"}
+          {
+            "aspect": "official_source",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "OAS標準之API說明文件網址 https://openapi.twse.com.tw/v1/swagger.json",
+            "conclusion": "政府資料集直接連結官方API文件；本次指定CSV與JSON之2330名稱、日期、收盤及唯一性比對通過，Swagger列出端點。見docs/phase-0/ai-twse-binding.json。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://investor.tsmc.com/sites/ir/sec-filings/2025_20F%20Report.pdf",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "The principal trading market for our common shares is the Taiwan Stock Exchange.",
+            "conclusion": "官方Form20-F PDF第63頁Item9另列普通股代號2330；與公司官方FAQ及交換資料的台積電名稱交叉核對。只啟用既有2330.TW身份與最近收盤。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "每1日",
+            "conclusion": "只確認每日更新及交易日期，未宣告精確發布時刻。採回應完成後observed_availability保守上界，研究截止時間不得早於採集，不當作即時或歷史可得資料。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "政府資料開放授權條款-第1版",
+            "conclusion": "資料集明列開放授權及指定CSV/API文件，限本次核實端點，不擴及其他交易所資料集。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/license",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "免授權金進行利用",
+            "conclusion": "第二節允許重製、編輯等利用；第三節及附件要求顯名。本機正規化保存與私人PDF保留提供機關、資料集、年份與條款網址。禁止本產品對外散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "免費",
+            "conclusion": "官方計費方式明列免費；本次CSV與JSON直接取得，無API Key、付費訂閱或繞過存取限制。"
+          }
         ]
       },
       "open_questions": [],
@@ -169,29 +228,124 @@
       "terms_evidence": [],
       "attested_by": null,
       "attested_at": null,
-      "open_questions": ["Endpoint support, identity, adjustment basis and storage/sharing rights require verification"],
+      "open_questions": [
+        "Endpoint support, identity, adjustment basis and storage/sharing rights require verification"
+      ],
       "notes": "No activation or retention rights. Official Help describes adjusted close generally, but chart close field adjustment remains undocumented here; Help access returned 429 and terms access 999. Excluded from recommended activation pending a supported contract. See docs/phase-0/pre-human-review.md."
     },
     {
       "source_id": "sec-xbrl-companyconcept",
       "publisher": "U.S. Securities and Exchange Commission",
-      "attribution": "Source: U.S. SEC EDGAR XBRL company concept API (terms not yet verified)",
+      "attribution": "Source: U.S. SEC EDGAR XBRL company concept API; normalized public filing facts, private use only.",
       "endpoint_scope": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
       "terms_url": "https://www.sec.gov/about/developer-resources",
-      "declared_status": "unknown",
-      "scope": {},
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
       "terms_evidence": [
-        {"terms_url":"https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data","checked_at":"2026-11-15T00:00:00+08:00","checked_by":"assistant","checker":"Codex；日期佔位，非精確查核時刻","excerpt":"Please declare your user agent in request headers","excerpt_covers":"自動存取應宣告 User-Agent；頁面並提供含聯絡資訊的範例。不構成所有第三方申報內容的權利保證。"},
-        {"terms_url":"https://www.sec.gov/about/developer-resources","checked_at":"2026-11-15T00:00:00+08:00","checked_by":"assistant","checker":"Codex；日期佔位，非精確查核時刻","excerpt":"10 requests per second","excerpt_covers":"每位使用者合計請求上限，跨機器計算；本專案更保守。"}
+        {
+          "terms_url": "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data",
+          "checked_at": "2026-11-15T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex；日期佔位，非精確查核時刻",
+          "excerpt": "Please declare your user agent in request headers",
+          "excerpt_covers": "自動存取應宣告 User-Agent；頁面並提供含聯絡資訊的範例。不構成所有第三方申報內容的權利保證。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/developer-resources",
+          "checked_at": "2026-11-15T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex；日期佔位，非精確查核時刻",
+          "excerpt": "10 requests per second",
+          "excerpt_covers": "每位使用者合計請求上限，跨機器計算；本專案更保守。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+          "checked_at": "2026-11-15T07:17:19.963635+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "data.sec.gov",
+          "excerpt_covers": "SEC 官方文件直接指定此主機及 companyconcept 端點；本次 NVDA 真實採集通過 CIK 與公司名稱比對。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/developer-resources",
+          "checked_at": "2026-11-15T07:17:19.963635+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "no more than 10 requests per second",
+          "excerpt_covers": "識別 User-Agent、限制請求速率並只抓必要欄位；使用者已另外提供聯絡資訊，僅經環境變數傳入。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T07:17:19.963635+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "EDGAR public filing content are free to access and reuse.",
+          "excerpt_covers": "官方 FAQ 明確允許 EDGAR 公開申報內容免費存取與再利用；本次僅保存正規化財報事實供本人私人PDF，不含圖片、商標、第三方外連或散布。"
+        }
       ],
       "attested_by": null,
       "attested_at": null,
-      "open_questions": [
-        "官方 API 與存取規範已有助手查核引用，未取得人工簽認",
-        "缺操作人明示的聯絡設定，真實 API 契約測試仍未執行；不得從登入資料取得或編造聯絡人",
-        "免費下載與公開可讀不代表所有第三方申報附件的權利相同；本輪不開啟保存或雜湊權限"
-      ],
-      "notes": "SEC 要求呼叫方自行宣告聯絡資訊；聯絡資訊必須由操作人以 --sec-contact 或 STOCK_REPORT_SEC_CONTACT 明示提供，不得取自登入資料，且不寫入任何產出檔案。"
+      "open_questions": [],
+      "notes": "AI來源查核涵蓋SEC公開申報結構化事實。本次NVDA身份及年度欄位經官方文件與真實採集驗證。市場及股份類別仍來自設定並經官方10-Q封面核對。年度財報不代表最新季度或投資結論；原始回應、雜湊與分享維持關閉。",
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex AI",
+        "reviewed_at": "2026-11-15T07:17:19.963635+00:00",
+        "authorization": "使用者2026-11-15授權AI查核官方來源、身份、時間與條款；最低合法免費、僅自用不散布；見AGENTS.md。",
+        "reviewed_endpoint_scope": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "data.sec.gov",
+            "conclusion": "SEC 官方文件直接指定此主機及 companyconcept 端點；本次 NVDA 真實採集通過 CIK 與公司名稱比對。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000075/nvda-20260726.htm",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "NVDA",
+            "conclusion": "官方 NVIDIA 10-Q 封面列普通股、NVDA 與 Nasdaq Global Select Market；官方檔案路徑 CIK 1045810 與 API 的0001045810及 NVIDIA 名稱一致。本次實際驗證標的為NVDA。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "as submissions are disseminated",
+            "conclusion": "API 隨申報公布更新；年度資料使用原申報 filed 日期，以UTC-05當日末作可得時間上界，不假設精確發布時刻。只涵蓋年度10-K，不涵蓋最新季度或新聞。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/developer-resources",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "no more than 10 requests per second",
+            "conclusion": "識別 User-Agent、限制請求速率並只抓必要欄位；使用者已另外提供聯絡資訊，僅經環境變數傳入。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "EDGAR public filing content are free to access and reuse.",
+            "conclusion": "官方 FAQ 明確允許 EDGAR 公開申報內容免費存取與再利用；本次僅保存正規化財報事實供本人私人PDF，不含圖片、商標、第三方外連或散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "do not require any authentication or API keys to access",
+            "conclusion": "官方API不需認證或API Key，本次直接採集成功；不使用付費服務。"
+          }
+        ]
+      }
     }
   ]
 }

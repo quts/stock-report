@@ -16,12 +16,21 @@ This module never writes the registry. It answers two questions:
 
 - does the package still describe the code, the instrument configuration and the registry?
 - does a candidate registry open exactly the packaged scope, on a valid basis, and nothing more?
+
+Two target kinds are understood. A Taiwan target (`code` + `instrument_config`) is bound to an
+exchange dataset profile and its field names. A SEC target (`cik` + `entity_config`) is bound to
+the operator-maintained SEC entity map and to the company-concept profile: CIK, entity-name
+check, market, currency, share class, roles, concepts, units and the exact request URLs. A
+package never mixes the two, and every mismatch blocks.
 """
+import os
+import re
+from pathlib import Path
 from typing import Literal
 from pydantic import AwareDatetime, Field, model_validator
 from .licensing import LicenseRegistry, PERMISSIONS, Scope
 from .models import Model
-from .sources import PROFILES
+from .sources import PROFILES, SEC_IDENTITY_FIELDS
 from .storage import read_json
 
 # Labels that identify an assistant or a test fixture. A candidate whose human attestation carries
@@ -33,6 +42,10 @@ NON_HUMAN_MARKERS = ('codex', 'claude', 'assistant', 'chatgpt', 'fixture', 'synt
 FROZEN_FIELDS = ('source_id', 'publisher', 'source_class', 'endpoint_scope', 'terms_url')
 # `ready_for_human_review` is the historical spelling of the same recommendation.
 READY = ('ready_for_source_review', 'ready_for_human_review')
+SEC_ADAPTER = 'sec_concept'
+CIK = re.compile(r'\d{10}')
+# Where each target kind is configured when the operator names no file.
+DEFAULT_CONFIG = {'tw_instrument': 'config/tw-instruments.json', 'sec_entity': 'config/sec-entities.json'}
 
 
 class Target(Model):
@@ -44,6 +57,36 @@ class Target(Model):
     instrument_config: str
 
 
+class SecTarget(Model):
+    """A US issuer identified by its SEC CIK, as configured in the SEC entity map."""
+    ticker: str = Field(pattern=r'^[A-Z0-9.\-]+$', max_length=24)
+    cik: str = Field(pattern=r'^\d{10}$')
+    expected_entity_name_contains: str = Field(min_length=1, max_length=80, pattern=r'\S')
+    exchange: Literal['NASDAQ', 'NYSE']
+    currency: Literal['USD']
+    share_class: str
+    entity_config: str
+
+
+class SecRole(Model):
+    concepts: list[str] = Field(min_length=1)
+    units: list[str] = Field(min_length=1)
+    unit: str
+    metric_keys: list[str] = Field(min_length=1)
+    required: bool
+
+
+class SecBinding(Model):
+    """The company-concept contract a SEC item claims: compared verbatim with the source profile."""
+    taxonomy: Literal['us-gaap']
+    annual_forms: list[str] = Field(min_length=1)
+    min_period_days: int
+    max_period_days: int
+    roles: dict[str, SecRole] = Field(min_length=1)
+    # Every URL the collector would request for this target, in request order.
+    request_urls: list[str] = Field(min_length=1)
+
+
 class ActivationItem(Model):
     source_id: str
     recommendation: Literal['ready_for_source_review', 'ready_for_human_review', 'not_recommended_yet']
@@ -53,6 +96,8 @@ class ActivationItem(Model):
     license_name: str
     license_url: str
     field_binding: dict[str, list[str]]
+    # Required for a SEC target, forbidden for a Taiwan target.
+    sec_binding: SecBinding | None = None
     evidence_produced: list[str]
     retained_normalized_fields: list[str]
     not_retained: list[str]
@@ -92,7 +137,7 @@ class ActivationPackage(Model):
     prepared_by_kind: Literal['assistant']
     status: Literal['awaiting_source_review', 'awaiting_human_attestation']
     registry_baseline_version: str
-    target: Target
+    target: Target | SecTarget
     items: list[ActivationItem] = Field(min_length=1, max_length=8)
     # The package itself never carries an attestation or a review; those are recorded in the registry.
     human_attestation: None = None
@@ -105,21 +150,107 @@ def looks_non_human(text):
     return any(marker in lowered for marker in NON_HUMAN_MARKERS)
 
 
+def target_kind(target):
+    return 'sec_entity' if isinstance(target, SecTarget) else 'tw_instrument'
+
+
+def tw_target_drift(target, instruments):
+    rows = instruments.get('instruments', []) if isinstance(instruments, dict) else []
+    entry = next((row for row in rows if isinstance(row, dict) and row.get('ticker') == target.ticker), None)
+    if entry is None:
+        return [f'{target.ticker} 不在 {target.instrument_config}；未設定的標的不得啟用']
+    return [f'標的設定 {key}={entry.get(key)!r} 與審查包 {getattr(target, key)!r} 不一致'
+            for key in ('code', 'exchange', 'share_class') if entry.get(key) != getattr(target, key)]
+
+
+def sec_target_drift(target, config):
+    """The package target against the SEC entity map: every identity field must agree exactly."""
+    rows = config.get('entities') if isinstance(config, dict) else None
+    if not isinstance(rows, list):
+        return [f'設定檔不是 SEC 實體設定（缺少 entities 清單）；SEC 標的只能以 {target.entity_config} 核對']
+    matches = [row for row in rows if isinstance(row, dict) and row.get('ticker') == target.ticker]
+    if not matches:
+        return [f'{target.ticker} 不在 {target.entity_config}；未設定的標的不得啟用']
+    if len(matches) > 1:
+        return [f'{target.ticker} 在 SEC 實體設定中出現 {len(matches)} 次；身份不明確，不得啟用']
+    entry, problems = matches[0], []
+    cik = entry.get('cik')
+    if not isinstance(cik, str) or not CIK.fullmatch(cik):
+        problems.append(f'SEC 實體設定的 CIK {cik!r} 不是十位數字字串')
+    name = entry.get('expected_entity_name_contains')
+    if not isinstance(name, str) or not name.strip():
+        problems.append('SEC 實體設定缺少 expected_entity_name_contains；沒有名稱綁定的標的不得啟用')
+    for key in ('cik', 'expected_entity_name_contains', 'exchange', 'currency', 'share_class'):
+        if entry.get(key) != getattr(target, key):
+            problems.append(f'標的設定 {key}={entry.get(key)!r} 與審查包 {getattr(target, key)!r} 不一致')
+    return problems
+
+
+def sec_item_drift(item, profile, target):
+    """A SEC item against the company-concept profile: roles, concepts, units, fields and URLs."""
+    sid = item.source_id
+    if profile.get('adapter') != SEC_ADAPTER or not isinstance(profile.get('roles'), dict):
+        return [f'{sid}：不是 SEC company-concept 來源，與 SEC 標的不相容']
+    problems, binding = [], item.sec_binding
+    if profile.get('entities_config') != target.entity_config:
+        problems.append(f'{sid}：審查包的 entity_config {target.entity_config!r} 不是來源契約使用的設定檔')
+    if '{cik}' not in profile['endpoint'] or '{concept}' not in profile['endpoint']:
+        problems.append(f'{sid}：來源契約端點缺少 CIK／concept 參數，無法綁定標的')
+    if item.field_binding != {key: [name] for key, name in SEC_IDENTITY_FIELDS.items()}:
+        problems.append(f'{sid}：欄位對應與來源契約不同')
+    if binding is None:
+        return problems + [f'{sid}：SEC 項目必須提供 sec_binding（roles／concepts／units／request_urls）']
+    if f'/{binding.taxonomy}/' not in profile['endpoint']:
+        problems.append(f'{sid}：taxonomy {binding.taxonomy} 與來源契約端點不符')
+    for key in ('annual_forms', 'min_period_days', 'max_period_days'):
+        if getattr(binding, key) != profile.get(key):
+            problems.append(f'{sid}：{key} 與來源契約不同')
+    roles = profile['roles']
+    if set(binding.roles) != set(roles):
+        problems.append(f'{sid}：roles {sorted(binding.roles)} 與來源契約 {sorted(roles)} 不同')
+    for role in sorted(set(binding.roles) & set(roles)):
+        claimed, spec = binding.roles[role], roles[role]
+        # Concept and unit order is the fallback priority, so it is compared as a list.
+        if claimed.concepts != list(spec['concepts']):
+            problems.append(f'{sid}：{role} 的 concept 與來源契約不同')
+        if claimed.units != list(spec['units']) or claimed.unit != spec['unit']:
+            problems.append(f'{sid}：{role} 的單位與來源契約不同')
+        if claimed.metric_keys != list(spec['metric_keys']) or claimed.required != bool(spec.get('required')):
+            problems.append(f'{sid}：{role} 的 metric_keys／required 與來源契約不同')
+    # The collector rejects a fact whose unit currency differs from the configured one.
+    for role, spec in roles.items():
+        if any(unit.split('/')[0] != target.currency for unit in spec['units']):
+            problems.append(f'{sid}：{role} 的來源單位與標的幣別 {target.currency} 不符')
+    expected = [profile['endpoint'].format(cik=target.cik, concept=concept)
+                for spec in roles.values() for concept in spec['concepts']]
+    if binding.request_urls != expected:
+        problems.append(f'{sid}：request_urls 與來源契約依 CIK {target.cik} 產生的請求網址不同')
+    return problems
+
+
+def tw_item_drift(item, profile, target):
+    sid, problems = item.source_id, []
+    if profile.get('exchange') != target.exchange or profile.get('currency') != target.currency:
+        problems.append(f'{sid}：來源市場／幣別與標的不符')
+    fields = profile.get('fields')
+    if item.sec_binding is not None or not isinstance(fields, dict):
+        problems.append(f'{sid}：不是臺灣交易所欄位來源，與臺灣標的不相容')
+    elif item.field_binding != {key: list(names) for key, names in fields.items()}:
+        problems.append(f'{sid}：欄位對應與來源契約不同')
+    return problems
+
+
 def package_drift(package, registry, instruments):
     """Facts in the package that no longer match code, instrument config or registry."""
-    problems = []
     target = package.target
-    entry = next((row for row in instruments.get('instruments', []) if row.get('ticker') == target.ticker), None)
-    if entry is None:
-        problems.append(f'{target.ticker} 不在 {target.instrument_config}；未設定的標的不得啟用')
-    else:
-        for key in ('code', 'exchange', 'share_class'):
-            if entry.get(key) != getattr(target, key):
-                problems.append(f'標的設定 {key}={entry.get(key)!r} 與審查包 {getattr(target, key)!r} 不一致')
+    sec = isinstance(target, SecTarget)
+    problems = sec_target_drift(target, instruments) if sec else tw_target_drift(target, instruments)
     if registry.registry_version != package.registry_baseline_version:
         problems.append(f'登錄檔版本為 {registry.registry_version}，審查包基準為 {package.registry_baseline_version}；'
                         f'需重新核對審查包')
     known = {s.source_id: s for s in registry.sources}
+    if len({item.source_id for item in package.items}) != len(package.items):
+        problems.append('審查包重複列出同一來源')
     for item in package.items:
         profile, source = PROFILES.get(item.source_id), known.get(item.source_id)
         if profile is None or source is None:
@@ -127,11 +258,22 @@ def package_drift(package, registry, instruments):
             continue
         if not (item.endpoint == profile['endpoint'] == source.endpoint_scope):
             problems.append(f'{item.source_id}：端點與來源契約或登錄範圍不一致')
-        if profile.get('exchange') != target.exchange or profile.get('currency') != target.currency:
-            problems.append(f'{item.source_id}：來源市場／幣別與標的不符')
-        if item.field_binding != {key: list(names) for key, names in profile['fields'].items()}:
-            problems.append(f'{item.source_id}：欄位對應與來源契約不同')
+        problems += (sec_item_drift if sec else tw_item_drift)(item, profile, target)
     return problems
+
+
+def load_target_config(target, instruments):
+    """Resolve the target configuration. Returns (config, problems); never reads a package path.
+
+    `instruments` is an already-loaded mapping, a path chosen by the operator, or None for the
+    default of the target kind. A SEC target is only checked against the file it names."""
+    sec = isinstance(target, SecTarget)
+    if isinstance(instruments, dict):
+        return instruments, []
+    path = Path(instruments) if instruments is not None else Path(DEFAULT_CONFIG[target_kind(target)])
+    if sec and os.path.normpath(path) != os.path.normpath(target.entity_config):
+        return {}, [f'設定檔 {path} 不是審查包指定的 {target.entity_config}；不得以其他設定檔核對 SEC 標的']
+    return read_json(path), []
 
 
 def candidate_violations(package, current, candidate):
@@ -200,15 +342,17 @@ def candidate_violations(package, current, candidate):
     return violations, changed, bases
 
 
-def check(package_path, registry, instruments, candidate_path=None):
+def check(package_path, registry, instruments=None, candidate_path=None):
     package = ActivationPackage.model_validate(read_json(package_path))
-    drift = package_drift(package, registry, instruments)
+    config, config_problems = load_target_config(package.target, instruments)
+    drift = config_problems + package_drift(package, registry, config)
     known = {s.source_id: s for s in registry.sources}
     items = [{'source_id': item.source_id, 'recommendation': item.recommendation,
               'registry_status': known[item.source_id].declared_status if item.source_id in known else 'absent',
               'endpoint': item.endpoint, 'proposed_scope': item.proposed_scope.model_dump(),
               'open_questions': len(item.open_questions)} for item in package.items]
     result = {'package_id': package.package_id, 'target': package.target.ticker,
+              'target_kind': target_kind(package.target),
               'package_status': package.status,
               'registry_version': registry.registry_version, 'items': items, 'package_drift': drift,
               'registry_modified': False}
