@@ -66,6 +66,7 @@ def economic_checks(data, engine):
     bt = (forecast or {}).get('backtest', {})
     out.append(state('forecast_backtest', 'WARNING',
                      f'可評分 FCF 樣本 {bt.get("fcf_test_count", 0)}；歷史留出樣本有限，算術一致不代表預測可靠'))
+    out += forecast_reliability_checks(engine)
     # Ordered scenario labels must also agree with operating economics, not just selected multiples.
     mapped = {r['name']: r for r in rows}
     contradictions = []
@@ -76,6 +77,63 @@ def economic_checks(data, engine):
                 contradictions.append(f'{key} 與 bear/base/bull 營運排序矛盾')
     out.append(check('operating_conclusion_consistency', not contradictions, 'critical',
                      '；'.join(contradictions) or '營運假設與情境順序一致；未以倍數遮掩營運反轉'))
+    return out
+
+
+def forecast_reliability_checks(engine):
+    """Arithmetic completeness and point-in-time integrity are prerequisites, not validation."""
+    from datetime import datetime
+    from .backtesting import METRICS, MIN_SAMPLES
+    from .forecast import ADDITIVE_METRICS
+    f = engine['forecast']
+    rec, bt = f['reconciliation'], f['backtest']
+    out = [check('cash_flow_statement_reconciliation', rec['status'] == 'reconciled', 'critical',
+                 '現金流量表非現金調整與營運資金現金變動同期間勾稽；預測仍為假設' if rec['status'] == 'reconciled' else
+                 '現金流量表項目不完整或有殘差：停止 OCF／FCF 預測；資產負債表變動不作現金流替代')]
+    violations = []
+    for r in bt.get('rows', []):
+        cutoff = datetime.fromisoformat(r['information_cutoff'])
+        for field in ('max_input_published_at', 'max_input_event_time'):
+            t = r.get(field)
+            t = datetime.fromisoformat(t) if isinstance(t, str) else t
+            if t and t >= cutoff:
+                violations.append(f'{r["origin"]} 使用截止後資料')
+        if r['vintage_status'] != 'strict_point_in_time':
+            violations.append('修訂歷史資料混入時點回測')
+    out.append(check('point_in_time_backtest_integrity', bt.get('method') == 'strict_point_in_time' and not violations,
+                     'critical', '；'.join(violations) or '僅使用截止前已公布資料；修訂資料測試獨立且不計入樣本'))
+    counts = {m: bt.get('metrics', {}).get(m, {}).get('sample_size', 0) for m in METRICS}
+    enough = all(n >= MIN_SAMPLES and bt['metrics'][m]['coverage'] >= 0.8 for m,n in counts.items())
+    out.append(check('forecast_sample_sufficiency', enough, 'critical',
+                     f'PIT 樣本（營收／營益／EPS／OCF／FCF）：{"／".join(str(n) for n in counts.values())}；'
+                     f'門檻各 {MIN_SAMPLES}、覆蓋80% 僅為最低條件，不代表統計驗證'))
+    broken, alignment = [], []
+    for s in engine['scenarios']['scenarios']:
+        quarters = s.get('quarterly_forecast', [])
+        annual = s.get('statements')
+        if s.get('forecast_method') == 'annual_sensitivity':
+            if s['name'] == 'base':
+                broken.append('Base 使用年化敏感度')
+            continue
+        if len(quarters) != 4 or annual is None:
+            broken.append(f'{s["name"]} 缺完整四季預測')
+            continue
+        for prev, nxt in zip(quarters, quarters[1:]):
+            if (nxt['start'] - prev['end']).days != 1:
+                broken.append('預測季度有重疊或缺口')
+        if quarters[0]['start'].isoformat() != f['horizon']['start'] or quarters[-1]['end'].isoformat() != f['horizon']['end']:
+            broken.append('季度合計與 NTM 期間不符')
+        for metric in ADDITIVE_METRICS:
+            values = [q['statements'][metric] for q in quarters]
+            total = sum(values) if all(v is not None for v in values) else None
+            if (total is None) != (annual[metric] is None) or (total is not None and abs(total - annual[metric]) > 1e-6 * max(abs(total), 1)):
+                broken.append(f'{metric} 年季合計不一致')
+        for q in quarters:
+            origin = q['revenue_origin']
+            if origin['method'] == 'management_guidance_midpoint' and origin['guidance_period_end'] != q['end'].isoformat():
+                alignment.append('公司指引套用至不同季度')
+    out.append(check('quarterly_forecast_consistency', not broken, 'critical', '；'.join(broken) or '四季連續且年季損益與現金流合計一致；缺值不補零'))
+    out.append(check('guidance_period_alignment', not alignment, 'critical', '；'.join(alignment) or '管理層指引僅適用其實際財務季度，不外推其他季度'))
     return out
 
 

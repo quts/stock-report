@@ -13,8 +13,15 @@ from datetime import timedelta
 from .policy import reportable
 from .research_contract import accounting_bucket
 
+# Signed cash-flow movements are separate metrics from period-end balance-sheet balances.
+CF_FLOW_METRICS = ('cf_other_noncash_adjustments', 'cf_working_capital_cash_movement',
+                  'cf_share_based_compensation', 'cf_deferred_tax', 'cf_other_noncash',
+                  'cf_receivables', 'cf_inventory', 'cf_payables', 'cf_financing_receivables',
+                  'cf_other_operating_assets_liabilities')
+
 FLOW_METRICS = ('revenue', 'gross_profit', 'operating_income', 'net_income', 'operating_cash_flow',
-                'capital_expenditure', 'depreciation_amortization', 'income_before_tax', 'income_tax', 'interest_expense')
+                'capital_expenditure', 'depreciation_amortization', 'income_before_tax', 'income_tax', 'interest_expense',
+                *CF_FLOW_METRICS)
 INSTANT_METRICS = ('cash_equivalents', 'accounts_receivable_net', 'accounts_receivable', 'inventory',
                    'accounts_payable', 'short_term_debt', 'long_term_debt', 'bonds_payable', 'total_debt',
                    'total_equity', 'total_assets', 'total_liabilities', 'shares_outstanding',

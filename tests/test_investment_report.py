@@ -25,14 +25,14 @@ def render_fixture(tmp_path, data, proposal):
     return pages, text, investment
 
 
-def test_complete_investment_report_has_all_sections_and_no_limited_banner(tmp_path):
+def test_investment_report_preserves_sections_but_downgrades_unvalidated_forecasts(tmp_path):
     data = dell()
     pages, text, investment = render_fixture(tmp_path, data, proposal_for(data))
-    assert investment['gates']['grade'] == 'complete'
+    assert investment['gates']['grade'] == 'limited'
     assert 4 <= pages <= 8
     for heading in HEADINGS:
         assert heading in text
-    assert '受限報告' not in text
+    assert '受限報告' in text
     assert 'Bull' in text and 'Base' in text and 'Bear' in text
     assert '假設性估值敏感度' in text and '稅率' in text and '自由現金流' in text and '存貨天數' in text
     assert '公司指引' in text and '不能代替市場共識' in text

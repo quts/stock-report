@@ -181,7 +181,7 @@ def test_financial_sector_uses_book_value_methods(tmp_path, monkeypatch):
 
 # --- scenarios, labelling and narrative checks ---------------------------------------------------
 
-DELL_HORIZON = 'NTM 2026-08-01~2027-07-31'
+DELL_HORIZON = 'NTM 2026-08-01~2027-07-30'
 
 
 def driver(value, basis='model_assumption', ids=()):
@@ -237,12 +237,13 @@ def test_scenarios_are_driver_based_and_reconcile():
     base = rows['base']
     s = base['statements']
     revenue_ttm = (27.0 + 33.0 + 37.0 + 46.97) * 1e9
-    assert s['revenue'] == pytest.approx(revenue_ttm * 1.15)
+    assert s['revenue'] == pytest.approx(sum(q['statements']['revenue'] for q in base['quarterly_forecast']))
+    assert base['quarterly_forecast'][0]['revenue_origin']['method'] == 'management_guidance_midpoint'
     assert s['operating_income'] == pytest.approx(s['revenue'] * 0.075)
     assert s['net_income'] == pytest.approx(s['pretax_income'] * (1 - base['drivers']['tax_rate']['value'] / 100))
     assert base['drivers']['tax_rate']['basis'] == 'historical_fact' and base['drivers']['tax_rate']['value'] == pytest.approx(18.0)
     assert s['eps'] == pytest.approx(s['net_income'] / 700e6)
-    assert s['free_cash_flow'] == pytest.approx(s['operating_cash_flow'] - s['capital_expenditure'])
+    assert s['free_cash_flow'] is None and s['operating_cash_flow'] is None  # No statement-component bridge.
     assert base['implied_price'] == pytest.approx(s['eps'] * 12, rel=1e-6)
     assert base['change_vs_reference_percent'] == pytest.approx((s['eps'] * 12 / 150 - 1) * 100, abs=0.01)
     assert result['scenarios']['probabilities'] == 'not_assigned'
@@ -251,7 +252,8 @@ def test_scenarios_are_driver_based_and_reconcile():
     assert gate(result, 'scenario_internal_consistency')['status'] == 'PASS'
     assert gate(result, 'valuation_reference_quality')['status'] == 'WARNING'
     assert gate(result, 'assumption_evidence_quality')['status'] == 'WARNING'   # base growth is a model assumption
-    assert result['gates']['grade'] == 'complete', result['gates']['critical_failures']
+    assert result['gates']['grade'] == 'limited'
+    assert {'cash_flow_statement_reconciliation', 'forecast_sample_sufficiency'} <= set(result['gates']['critical_failures'])
 
 
 def test_scenario_order_and_unsupported_multiple_basis_are_rejected():

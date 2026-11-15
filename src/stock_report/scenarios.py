@@ -6,7 +6,7 @@ when it sits inside a sufficient historical or peer reference; otherwise the res
 hypothetical valuation sensitivity, shown with reduced precision and never as a price target.
 Probabilities are not accepted.
 """
-from .forecast import DRIVERS, project
+from .forecast import DRIVERS, project, quarterly_project, guidance_records
 from .policy import reportable
 from .fin_series import ttm, build
 
@@ -96,7 +96,7 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                         issues.append(f'指引歸因：{name} 不是公司直接揭露的同期間同指標數字，應為 guidance_informed_model')
                 if any(e.accounting_basis in ('non_gaap', 'company_adjusted') for e in cited) and a.accounting_basis in ('reported', 'gaap', 'ifrs'):
                     issues.append(f'口徑錯配：{name} 以調整後指引支持報表口徑')
-        drivers, statements = {}, None
+        drivers, statements, quarter_rows = {}, None, []
         if forecast_anchor is not None:
             for name in DRIVERS:
                 if name in s.drivers:
@@ -107,13 +107,32 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                 drv = drivers[name]
                 drv['forecast_period'] = s.target_period
                 drv['forecast_role'] = 'direct_guidance' if drv['basis'] == 'management_guidance' else 'model_assumption'
+                if name in ('working_capital_intensity', 'ocf_residual_intensity'):
+                    drv['application'] = 'diagnostic_only_not_used_in_cash_forecast'
                 drv['evidence_role'] = 'context_only' if drv['basis'] == 'model_assumption' else 'derivation_input'
                 drv['source_evidence'] = [
                     {'id': e.evidence_id, 'url': e.source_url, 'period': e.target_period or e.period,
                      'start': e.period_start, 'end': e.target_period_end or e.period_end,
                      'accounting_basis': e.accounting_basis or 'unspecified', 'metric': e.financial_metric, 'value': e.value}
                     for e in (index[i] for i in drv['evidence_ids'] if i in index)]
-            statements = project(forecast_anchor['base'], drivers)
+            if s.forecast_method == 'quarterly':
+                guidance = guidance_records(data, entity.entity_id) if s.name == 'base' else []
+                fx_ids = [index[i] for i in s.guidance_fx_evidence_ids if i in index and reportable(index[i], data.request)]
+                fx_valid = s.guidance_fx_rate is not None and any(
+                    e.value == s.guidance_fx_rate or str(s.guidance_fx_rate) in e.claim for e in fx_ids)
+                if s.guidance_fx_rate and not fx_valid:
+                    issues.append('指引歸因：換算匯率缺少核實來源，不使用跨幣別指引')
+                statements, quarter_rows = quarterly_project(forecast_anchor, drivers, guidance,
+                                                             s.guidance_fx_rate if fx_valid else None)
+                if statements:
+                    for key in ('revenue_growth', 'operating_margin'):
+                        drivers[key]['input_value'] = drivers[key]['value']
+                        drivers[key]['value'] = statements[key]
+                        drivers[key]['aggregation'] = 'four_quarter_projection'
+            else:
+                statements = project(forecast_anchor['base'], drivers)
+                if s.name == 'base':
+                    issues.append('季度預測：Base 不得以單季年化敏感度代替四季預測')
             if statements is None:
                 issues.append('缺少 TTM 營收、營業利益率或營收成長假設，無法建立財務預測')
         metric_name = METRIC_FOR[s.multiple_method]
@@ -177,6 +196,8 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                        'interpretation': '固定股數、倍數之價格／倍數損益兩平敏感度；無風險折現或必要報酬，不證明倍數合理或構成目標價。'}
         problems.extend(f'{s.name}：{i}' for i in issues if f'{s.name}：{i}' not in problems)
         out.append({'name': s.name, 'target_period': s.target_period, 'financial_outcome': s.financial_outcome,
+                    'forecast_method': s.forecast_method, 'quarterly_forecast': quarter_rows,
+                    'forecast_reliability': 'hypothetical_sensitivity',
                     'assumptions': [a.model_dump() for a in s.assumptions], 'drivers': drivers, 'statements': statements,
                     'valuation': {'metric': metric_name, 'metric_value': metric_value, 'method': s.multiple_method,
                                   'multiple': s.multiple, 'multiple_basis': s.multiple_basis,

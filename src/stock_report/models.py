@@ -507,6 +507,9 @@ class ScenarioProposal(Model):
     # Driver-based forecast: each driver is a percentage with its origin. Omitted drivers fall back to
     # the deterministic historical anchor and are labelled historical_fact.
     drivers: dict[ForecastDriver, Assumption] = Field(default_factory=dict)
+    forecast_method: Literal['quarterly', 'annual_sensitivity'] = 'quarterly'
+    guidance_fx_rate: float | None = Field(default=None, gt=0)
+    guidance_fx_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
     assumptions: list[Assumption] = Field(default_factory=list, max_length=8)
     financial_outcome: str = Field(min_length=1, max_length=400)
     valuation_metric: Literal['eps', 'fcf_per_share', 'book_value_per_share', 'ebitda']
@@ -546,7 +549,7 @@ class HorizonProposal(Model):
 class Proposal(Model):
     input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     model: str
-    prompt_version: Literal['5'] = '5'
+    prompt_version: Literal['6'] = '6'
     usage: dict[str, int] | None = None
     outlooks: list[HorizonProposal] = Field(max_length=10)
     company_research: list[CompanyResearch] = Field(default_factory=list, max_length=5)

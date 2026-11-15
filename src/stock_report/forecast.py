@@ -1,7 +1,8 @@
 """Driver-based financial forecast for the next twelve months after the latest reported quarter.
 
 Revenue → operating margin → operating income → non-operating items → pre-tax income → tax →
-net income → diluted EPS, and net income + D&A − working-capital investment → OCF − capex → FCF.
+net income → diluted EPS. Cash forecasts require a reconciled statement bridge:
+net income + D&A + other noncash adjustments + signed working-capital cash movements − capex.
 Every driver carries its origin. Drivers the proposal leaves out fall back to the deterministic
 historical anchor; anchors that cannot be measured are reported, never invented.
 """
@@ -12,6 +13,9 @@ from .fin_series import ttm, year_ago
 DRIVERS = ('revenue_growth', 'operating_margin', 'non_operating_ratio', 'tax_rate', 'share_change',
            'da_intensity', 'capex_intensity', 'working_capital_intensity', 'ocf_residual_intensity')
 EXTREME_GROWTH = 30.0
+ADDITIVE_METRICS = ('revenue', 'operating_income', 'pretax_income', 'net_income', 'depreciation_amortization',
+                    'working_capital_investment', 'other_noncash_adjustments', 'operating_cash_flow',
+                    'capital_expenditure', 'free_cash_flow', 'ebitda')
 
 
 def _pct(a, b):
@@ -60,8 +64,9 @@ def anchors(series, analysis):
     put('capex_intensity', _pct(capex['value'], rev['value']) if capex and rev else None, 'TTM 資本支出／營收',
         (capex['evidence_ids'] + rev['evidence_ids']) if capex and rev else ())
     reconciliation = reconcile(series, analysis)
-    wc = ({'value': reconciliation['wc_proxy'], 'evidence_ids': reconciliation['evidence_ids']}
-          if reconciliation.get('wc_proxy') is not None else None)
+    proxy = balance_proxy(series, analysis)
+    wc = ({'value': proxy['wc_proxy'], 'evidence_ids': proxy['evidence_ids']}
+          if proxy.get('wc_proxy') is not None else None)
     prior_rev = None
     if rev:
         quarters_rev = series['quarters'].get('revenue', [])
@@ -70,16 +75,21 @@ def anchors(series, analysis):
             prior_rev = sum(p['value'] for p in prior)
     if wc and rev and prior_rev and rev['value'] != prior_rev:
         put('working_capital_intensity', wc['value'] / (rev['value'] - prior_rev) * 100,
-            '一年營運資金增加／同期 TTM 營收增加', wc['evidence_ids'] + rev['evidence_ids'])
+            '資產負債表營運資金餘額增加／營收增加：僅診斷，不用於現金流預測', wc['evidence_ids'] + rev['evidence_ids'])
     else:
         put('working_capital_intensity', None, '缺少可比的營運資金或前一年 TTM 營收')
     ranges = {'revenue_growth': (min(growth), max(growth)) if growth else None,
               'operating_margin': (min(margins), max(margins)) if margins else None}
     base = {'revenue_ttm': rev, 'operating_income_ttm': op, 'net_income_ttm': ni, 'pretax_ttm': pretax,
             'ocf_ttm': aligned(ttm(series, 'operating_cash_flow')), 'shares': shares}
-    residual = reconciliation.get('residual')
-    put('ocf_residual_intensity', _pct(residual, rev['value']) if rev and residual is not None else None,
-        'TTM 未解釋 OCF 殘差／營收；含未取得非現金、稅款、融資應收及其他營運資金，不是已核實的單一科目',
+    base['cashflow_reconciled'] = bool(rev and reconciliation['status'] == 'reconciled' and
+                                      (reconciliation['start'], reconciliation['end'], reconciliation['currency']) ==
+                                      (rev['start'], rev['end'], rev['currency']))
+    base['cashflow_ratios'] = ({'other_noncash': reconciliation['noncash_adjustments'] / rev['value'],
+                               'working_capital_cash_movement': reconciliation['working_capital_cash_movement'] / rev['value']}
+                              if base['cashflow_reconciled'] and rev else None)
+    put('ocf_residual_intensity', None,
+        '未解釋殘差禁止外推；現金流量表無法完整勾稽時不產生 OCF／FCF 預測',
         reconciliation.get('evidence_ids', []))
     out['ocf_residual_intensity']['basis'] = 'model_assumption'
     out['share_change']['basis'] = 'model_assumption'
@@ -91,10 +101,138 @@ def anchors(series, analysis):
             driver['source_period'] = f'{shares["start"]}~{shares["end"]}'
     horizon = None
     if rev:
-        start, end = rev['end'] + timedelta(days=1), rev['end'] + timedelta(days=365)
+        windows = quarter_windows(series)
+        start, end = (windows[0]['start'], windows[-1]['end']) if windows else (rev['end'] + timedelta(days=1), rev['end'] + timedelta(days=365))
         horizon = {'start': start.isoformat(), 'end': end.isoformat(), 'label': f'NTM {start.isoformat()}~{end.isoformat()}'}
     return {'drivers': out, 'ranges': ranges, 'base': base, 'notes': notes, 'horizon': horizon,
-            'reconciliation': reconciliation}
+            'reconciliation': reconciliation, 'balance_sheet_proxy': proxy, 'series': series,
+            'reliability': 'hypothetical_sensitivity'}
+
+
+def quarter_windows(series):
+    """Calendar quarters or an explicitly assumed 52-week fiscal calendar, never a 365-day stub."""
+    from .fin_series import contiguous_tail
+    past = contiguous_tail(series['quarters'].get('revenue', []), 4)
+    if not past:
+        return []
+    weekly = all(((p['end'] - p['start']).days + 1) % 7 == 0 for p in past)
+    def next_year(d):
+        if weekly:
+            return d + timedelta(weeks=52)
+        try:
+            return d.replace(year=d.year + 1)
+        except ValueError:
+            return d.replace(year=d.year + 1, day=28)
+    first = past[-1]['end'] + timedelta(days=1)
+    return [{'start': first + timedelta(days=91*i) if weekly else next_year(p['start']),
+             'end': first + timedelta(days=91*(i+1)-1) if weekly else next_year(p['end']), 'prior': p,
+             'calendar_basis': '52_week_model_assumption' if weekly else 'calendar_year'} for i,p in enumerate(past)]
+
+
+def trend_drivers(anchor):
+    """Shared live/backtest Base policy. Two comparable quarters are required, never invented."""
+    series = anchor['series']
+    drivers = {k: dict(v) for k,v in anchor['drivers'].items()}
+    revs = series['quarters'].get('revenue', [])
+    recent = revs[-2:]
+    prior = [year_ago(revs, p) for p in recent]
+    growth = median((r['value'] / p['value'] - 1) * 100 for r,p in zip(recent, prior)) if len(recent) == 2 and all(p and p['value'] for p in prior) else None
+    ops = [next((p for p in series['quarters'].get('operating_income', [])
+                 if (p['start'], p['end']) == (r['start'], r['end'])), None) for r in recent]
+    margin = sum(p['value'] for p in ops) / sum(r['value'] for r in recent) * 100 if len(recent) == 2 and all(ops) else None
+    for key,value in (('revenue_growth', growth), ('operating_margin', margin)):
+        drivers[key].update(value=value, basis='model_assumption',
+                            derivation='最近兩季可比成長中位數／營業利益率加權平均；同一政策用於即時模型與歷史回測')
+    return drivers
+
+
+def quarterly_project(anchor, drivers, guidance=(), fx_rate=None):
+    """Same-quarter prior-year seasonality, explicit YoY trend and period-specific guidance."""
+    series, base = anchor['series'], anchor['base']
+    windows = quarter_windows(series)
+    if len(windows) != 4:
+        return None, []
+    rows, used, rejected = [], [], []
+    prior_rev = base['revenue_ttm']
+    if not prior_rev or drivers['operating_margin']['value'] is None or drivers['revenue_growth']['value'] is None:
+        return None, []
+    historical_margin = (base['operating_income_ttm']['value'] / prior_rev['value'] * 100
+                         if base['operating_income_ttm'] else None)
+    for w in windows:
+        prior = w['prior']
+        d = {k: dict(v) for k,v in drivers.items()}
+        origin = {'method': 'same_quarter_yoy_trend', 'evidence_ids': prior['evidence_ids'],
+                  'growth_assumption': d['revenue_growth']['value']}
+        # Keep historical seasonal margins while shifting the annual margin by the scenario delta.
+        op = next((p for p in series['quarters'].get('operating_income', [])
+                   if (p['start'], p['end']) == (prior['start'], prior['end'])), None)
+        if op and historical_margin is not None and prior['value']:
+            d['operating_margin']['value'] += op['value'] / prior['value'] * 100 - historical_margin
+        applicable = []
+        for g in guidance:
+            if g['metric'] != 'revenue' or g['target_period_end'] != w['end'].isoformat():
+                continue
+            # The registered label must identify a quarter, not an annual number ending on the same day.
+            if (not g.get('quarterly_period_verified') or g['bucket'] != 'reported' or
+                    (g.get('declared_start') and g['declared_start'] != w['start'].isoformat())):
+                rejected.append({'evidence_ids': g['evidence_ids'], 'reason': 'guidance_period_or_basis_unverified'})
+                continue
+            conversion = 1 if g['currency'] == prior['currency'] else fx_rate
+            if not conversion or conversion <= 0:
+                rejected.append({'evidence_ids': g['evidence_ids'], 'reason': 'missing_explicit_fx'})
+                continue
+            applicable.append((g, conversion))
+        if applicable:
+            latest_date = max(g['published'] for g,_ in applicable)
+            latest = [(g,f) for g,f in applicable if g['published'] == latest_date]
+            values = [(g['low'] + g['high']) / 2 * f for g,f in latest]
+            if max(values) - min(values) > max(values) * 0.005:
+                rejected.append({'reason': 'conflicting_guidance', 'evidence_ids': [i for g,_ in latest for i in g['evidence_ids']]})
+            else:
+                g,f = latest[0]
+                d['revenue_growth']['value'] = (values[0] / prior['value'] - 1) * 100
+                origin = {'method': 'management_guidance_midpoint', 'evidence_ids': g['evidence_ids'],
+                          'guidance_period_end': g['target_period_end'], 'fx_rate': f,
+                          'target_period_start': w['start'].isoformat()}
+                used.append(origin)
+        quarter_base = {**base, 'revenue_ttm': prior}
+        s = project(quarter_base, d)
+        if s is None:
+            return None, rows
+        rows.append({'start': w['start'], 'end': w['end'], 'calendar_basis': w['calendar_basis'],
+                     'revenue_origin': origin, 'statements': s})
+    annual = {key: sum(r['statements'][key] for r in rows) if all(r['statements'][key] is not None for r in rows) else None
+              for key in ADDITIVE_METRICS}
+    shares = [r['statements']['diluted_shares'] for r in rows]
+    annual['diluted_shares'] = (sum(s * ((r['end'] - r['start']).days + 1) for s,r in zip(shares, rows)) /
+                                sum((r['end'] - r['start']).days + 1 for r in rows)) if all(shares) else None
+    annual['eps'] = annual['net_income'] / annual['diluted_shares'] if annual['net_income'] is not None and annual['diluted_shares'] else None
+    annual['fcf_per_share'] = annual['free_cash_flow'] / annual['diluted_shares'] if annual['free_cash_flow'] is not None and annual['diluted_shares'] else None
+    annual['revenue_growth'] = (annual['revenue'] / prior_rev['value'] - 1) * 100
+    annual['operating_margin'] = annual['operating_income'] / annual['revenue'] * 100 if annual['revenue'] else None
+    annual['ocf_residual'] = None
+    annual['guidance_used'], annual['guidance_rejected'] = used, rejected
+    return annual, rows
+
+
+def guidance_records(data, entity_id):
+    from .expectations import forward_records, ranges
+    evidence = forward_records(data, entity_id, ('management_guidance',))
+    records = ranges(evidence)
+    index = {e.evidence_id: e for e in evidence}
+    import re
+    for g in records:
+        # A declared source start wins; otherwise accept an explicit quarterly source label only.
+        g['quarterly_period_verified'] = all(e.period_basis in (None, 'single_quarter') and
+            ((e.period_start and e.period_end and e.period_basis == 'single_quarter') or
+             bool(re.search(r'Q[1-4]|第[一二三四1234]季', e.target_period or '')))
+            for e in (index[i] for i in g['evidence_ids']))
+        starts = {index[i].period_start.isoformat() for i in g['evidence_ids'] if index[i].period_start}
+        g['declared_start'] = next(iter(starts)) if len(starts) == 1 else None
+        if len(starts) > 1:
+            g['quarterly_period_verified'] = False
+        g['target_period_end'] = g['target_period_end'].isoformat()
+    return records
 
 
 def project(base, drivers):
@@ -111,20 +249,27 @@ def project(base, drivers):
     share_count = shares['value'] * (1 + d['share_change'] / 100) if shares and d.get('share_change') is not None else None
     eps = ni / share_count if ni is not None and share_count else None
     da = revenue * d['da_intensity'] / 100 if d.get('da_intensity') is not None else None
-    wc = (revenue - rev0['value']) * d['working_capital_intensity'] / 100 if d.get('working_capital_intensity') is not None else None
-    residual = revenue * d['ocf_residual_intensity'] / 100 if d.get('ocf_residual_intensity') is not None else None
-    ocf = ni + da - wc + residual if all(v is not None for v in (ni, da, wc, residual)) else None
+    ratios = base.get('cashflow_ratios') if base.get('cashflow_reconciled') else None
+    wc = -revenue * ratios['working_capital_cash_movement'] if ratios else None
+    noncash = revenue * ratios['other_noncash'] if ratios else None
+    residual = None  # An unexplained historical residual is never a forecast driver.
+    ocf = ni + da - wc + noncash if all(v is not None for v in (ni, da, wc, noncash)) else None
     capex = revenue * d['capex_intensity'] / 100 if d.get('capex_intensity') is not None else None
     fcf = ocf - capex if ocf is not None and capex is not None else None
     return {'revenue': revenue, 'revenue_growth': d['revenue_growth'], 'operating_margin': d['operating_margin'],
             'operating_income': op, 'pretax_income': pretax, 'net_income': ni, 'diluted_shares': share_count,
             'eps': eps, 'depreciation_amortization': da, 'working_capital_investment': wc, 'operating_cash_flow': ocf,
-            'capital_expenditure': capex, 'free_cash_flow': fcf, 'ocf_residual': residual,
+            'capital_expenditure': capex, 'free_cash_flow': fcf, 'ocf_residual': residual, 'other_noncash_adjustments': noncash,
             'fcf_per_share': fcf / share_count if fcf is not None and share_count else None,
             'ebitda': op + da if da is not None else None}
 
 
-def reconcile(series, analysis):
+def reconcile(series, analysis=None):
+    from .cashflow import reconcile as statement_bridge
+    return statement_bridge(series)
+
+
+def balance_proxy(series, analysis=None):
     """Balance-sheet WC is a proxy, never a cash-flow-statement reconciliation item."""
     points = {m: ttm(series, m) for m in ('revenue', 'net_income', 'depreciation_amortization', 'operating_cash_flow')}
     ref = points['revenue']
@@ -152,64 +297,15 @@ def reconcile(series, analysis):
 
 
 def backtest(data, entity_id):
-    """Expanding historical vintages, publication-time filtered; never fit to target-period OCF."""
-    from . import fin_series, fin_analysis
-    full = fin_series.build(data, entity_id)
-    revs = full['quarters'].get('revenue', [])
-    rows = []
-    for origin in revs[3:-4]:
-        relevant = [e for e in data.evidence if e.entity_id == entity_id and e.financial_metric == 'revenue'
-                    and e.period_end == origin['end'] and e.statement_kind == 'fact']
-        if not relevant:
-            continue
-        # Comparative facts reappear in later filings. Use the earliest available publication,
-        # never the latest repeat (which could reveal the entire forecast target).
-        vintage = min(e.published_at for e in relevant)
-        timely = vintage.date() <= origin['end'] + timedelta(days=120)
-        observed = data.model_copy(update={'evidence': [e for e in data.evidence if (not timely or e.published_at <= vintage)
-                                                       and (e.period_end is None or e.period_end <= origin['end'])]})
-        train = fin_series.build(observed, entity_id)
-        a = anchors(train, fin_analysis.analyse(observed, train, entity_id))
-        if not a['base']['revenue_ttm'] or a['base']['revenue_ttm']['end'] != origin['end']:
-            continue
-        pred = project(a['base'], a['drivers'])
-        target = [r for r in revs if r['start'] > origin['end']][:4]
-        if len(target) != 4 or pred is None:
-            continue
-        end = target[-1]['end']
-        future = {key: {m: [p for p in pts if p['end'] <= end] for m, pts in full[key].items()}
-                  for key in ('quarters', 'instants', 'cumulative')}
-        actual = {m: ttm(future, m) for m in ('revenue', 'net_income', 'operating_cash_flow', 'capital_expenditure')}
-        errors = {}
-        for name in ('revenue', 'net_income', 'operating_cash_flow', 'free_cash_flow'):
-            if name == 'free_cash_flow':
-                ocf, capex = actual['operating_cash_flow'], actual['capital_expenditure']
-                value = ocf['value'] - capex['value'] if ocf and capex and ocf['start'] == capex['start'] else None
-            else:
-                p = actual[name]
-                value = p['value'] if p and p['start'] == target[0]['start'] else None
-            estimate = pred.get(name)
-            errors[name] = {'predicted': estimate, 'actual': value,
-                            'error_percent': (estimate - value) / abs(value) * 100 if estimate is not None and value else None}
-        if timely and vintage.date() >= end:
-            continue
-        rows.append({'origin': origin['end'], 'information_cutoff': vintage.isoformat() if timely else None,
-                     'vintage_status': 'publication_filtered' if timely else 'current_vintage_period_holdout',
-                     'dataset_cutoff': data.request.research_as_of.isoformat(), 'target_end': end,
-                     'errors': errors})
-    n = sum(r['errors']['free_cash_flow']['error_percent'] is not None for r in rows)
-    return {'status': 'limited' if n else 'insufficient', 'fcf_test_count': n, 'rows': rows,
-            'limitation': '四季留出、訓練財務期間不含預測期；無原始公布版本時僅做目前版本的回溯測試，可能含重編，不是即時交易回測。樣本少且可能重疊，不能證明 FCF 預測可靠。'}
+    from .backtesting import rolling_origin
+    return rolling_origin(data, entity_id)
 
 
 def calibration(anchor):
-    """How well NI + D&A − ΔWC reproduces actual TTM operating cash flow (model fit, disclosed)."""
-    base = anchor['base']
-    d = anchor['drivers']
-    if not (base['ocf_ttm'] and base['net_income_ttm'] and base['revenue_ttm'] and d['da_intensity']['value'] is not None):
+    """Legacy diagnostic field; not a fitted residual and never a reliability claim."""
+    r = anchor['reconciliation']
+    if r.get('residual') is None:
         return None
-    rev = base['revenue_ttm']['value']
-    modelled = base['net_income_ttm']['value'] + rev * d['da_intensity']['value'] / 100
-    actual = base['ocf_ttm']['value']
-    return {'modelled_ocf_excluding_wc': modelled, 'actual_ocf': actual,
-            'gap_percent': (actual / modelled - 1) * 100 if modelled else None}
+    return {'basis': 'cash_flow_statement_components', 'reconstructed_ocf': r['modelled_ocf'],
+            'actual_ocf': r['actual_ocf'], 'unexplained_residual': r['residual'],
+            'gap_percent': r['residual_percent_ocf'], 'not_forecast_validation': True}

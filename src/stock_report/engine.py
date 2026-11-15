@@ -9,7 +9,7 @@ from . import (charts, completeness, expectations, fin_analysis, fin_series, for
                quality_gates, scenarios, sector_drivers, valuation)
 from .research_contract import canonical_period, fiscal_year_end_month
 
-VERSION = '3'
+VERSION = '4'
 
 
 def jsonable(value):

@@ -26,7 +26,7 @@ def test_residual_reconciles_actual_ocf_but_is_not_validation():
     result = engine.run(dell(), proposal_for(dell()))
     r = result['forecast']['reconciliation']
     assert r['modelled_ocf'] + r['residual'] == pytest.approx(r['actual_ocf'])
-    assert r['net_income'] + r['da'] - sum(r['wc_components'].values()) == pytest.approx(r['modelled_ocf'])
+    assert r['net_income'] + r['da'] + sum(r['wc_components'].values()) == pytest.approx(r['modelled_ocf'])
     assert gate(result, 'ocf_reconciliation')['status'] == 'WARNING'
     assert result['forecast']['drivers']['ocf_residual_intensity']['basis'] == 'model_assumption'
     drivers = result['scenarios']['scenarios'][1]['drivers']
@@ -39,7 +39,7 @@ def test_missing_ap_or_stale_cashflow_cannot_be_silently_reconciled():
     data = dell()
     data.evidence = [e for e in data.evidence if e.financial_metric != 'accounts_payable']
     result = engine.run(data, proposal_for(data))
-    assert result['forecast']['reconciliation']['status'] == 'unavailable'
+    assert result['forecast']['reconciliation']['status'] == 'partial'
     assert all(r['statements']['free_cash_flow'] is None for r in result['scenarios']['scenarios'])
 
 
@@ -51,7 +51,8 @@ def test_weak_or_already_breached_invalidation_fails():
     s[1].operating_invalidations[0].threshold = 100
     assert gate(engine.run(data, proposal_for(data, s)), 'scenario_invalidation_logic')['status'] == 'FAIL'
     s = default_scenarios()
-    s[1].operating_invalidations[0].threshold = s[1].drivers['revenue_growth'].value - 0.0001
+    actual_growth = engine.run(data, proposal_for(data, s))['scenarios']['scenarios'][1]['drivers']['revenue_growth']['value']
+    s[1].operating_invalidations[0].threshold = actual_growth - 0.0001
     assert gate(engine.run(data, proposal_for(data, s)), 'scenario_invalidation_logic')['status'] == 'FAIL'
 
 
