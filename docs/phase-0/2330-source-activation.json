@@ -87,7 +87,7 @@
       "recommendation": "not_recommended_yet",
       "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
       "dataset_page": "https://data.gov.tw/dataset/91998",
-      "dataset_resource": "mopsfin.twse.com.tw 的 CSV（資料集頁面指定資源；尚未與 JSON 端點逐欄比對）",
+      "dataset_resource": "https://mopsfin.twse.com.tw/opendata/t187ap06_L_ci.csv（已比對目標六欄，非全資料集驗證）",
       "license_name": "政府資料開放授權條款－第1版",
       "license_url": "https://data.gov.tw/license",
       "field_binding": {

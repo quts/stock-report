@@ -1,5 +1,15 @@
 # Codex 互動提案驗證紀錄
 
+## 2026-11-15 新版重驗
+
+舊批次仍保留於下文，未覆寫。另以目前 Quant 2、Policy phase0-2、Prompt 2、Template 4 匯出十例，Codex 在本次互動工作階段讀取各例研究輸入、Context、Schema 與分析指示後，逐例撰寫二十個期限提案。未呼叫 synthetic_proposal；輸入本身仍是明示合成資料。
+
+這次抓到 Context=Prompt 2、Proposal Schema 卻仍限定 Prompt 1 的缺陷，已將 Schema 修正為 2，並新增正常交換與舊版拒絕的回歸測試。修正後十例皆符合 Schema 與安全預期，十份 PDF 皆兩頁；矛盾、缺財務、未核實事件、刻意錯引用、未來資料、內部權限未知皆保留不足結論；正常、缺估值、缺評等及指令注入案例僅短期保留條件式營運偏多，長期資料不足。
+
+新紀錄為 `docs/phase-0/codex-interactive-v2.json`，成品在 `reports/codex-evaluation-v2/`，原始碼雜湊與四項成品雜湊可核對。Bundle 另列 `llm-evaluation-current.json`，不覆蓋舊 `llm-evaluation.json`。模型精確 ID 與用量無法取得，仍為 null。
+
+這是同一互動工作階段的一批十例，不是十次獨立模型抽樣，不是自然幻覺率或真實投資效能測試。不存在引用為刻意故障注入。來源指令未執行，兩個檢查位置均無 canary。`scripts/interactive_validation.py` 保存的是本次已撰寫的提案；重跑序列化或 finalize 只屬重播，不能宣稱重新呼叫模型。`verify` 僅核對這份已記錄批次，不重跑模型。
+
 ## 執行方式與範圍
 
 本次 Codex 互動工作階段實際讀取十個受控輸入，逐例撰寫二十個期限提案，再由 Apple Container 內的程式驗證 Schema、輸入雜湊、Policy Gate、研究 JSON 及兩頁 PDF。提案沒有呼叫 `synthetic_proposal`；序列化腳本只保存本次助手已撰寫的內容。

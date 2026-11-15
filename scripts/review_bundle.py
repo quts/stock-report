@@ -97,6 +97,10 @@ write_json(output/'data-coverage.json',{'mock_coverage':coverage,
 write_json(output/'llm-evaluation.json',load_evaluation(
     Path('reports/codex-evaluation/llm-evaluation.json'),
     Path('docs/phase-0/codex-interactive-evaluation.json'),Path('reports')))
+if Path('docs/phase-0/codex-interactive-v2.json').exists():
+    write_json(output/'llm-evaluation-current.json',load_evaluation(
+        Path('reports/codex-evaluation-v2/llm-evaluation.json'),
+        Path('docs/phase-0/codex-interactive-v2.json'),Path('reports/codex-evaluation-v2')))
 for name in ('provider-feasibility.md','phase-0-review.md','codex-interactive-evaluation.md',
              'codex-interactive-evaluation.json','taiwan-license-review-evidence.md','taiwan-source-binding.json'):
     source=Path('docs/phase-0')/name

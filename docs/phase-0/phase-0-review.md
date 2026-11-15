@@ -21,7 +21,7 @@
 | 台灣財報（綜合損益表，一般業）2330／6488 | 離線與網路契約已驗證；真實報告仍 NO-GO | 僅最新一期年初至今累計的營收、歸屬母公司淨利、基本 EPS；保留年度／季別原值、推得的期間起訖與 `cumulative_ytd` 基礎。來源未宣告金額級距、累計基礎與申報時間，故只可得同期淨利率；年增率、PE、自由現金流明示省略。權限 unknown，只保存檢視用中繼資料。見 [財報來源查核紀錄](taiwan-financial-source-notes.md) |
 | SEC NVDA／AMD | 離線契約已驗證；網路未驗證 | CIK、名稱、年度申報與原始單位已測試；操作人尚未提供 SEC 聯絡資訊，網路測試明確跳過 |
 | 來源授權 | 已有助理查核證據，尚無人工簽認 | 官方資料集 11549／11371 的授權標示已核對；CSV／JSON 目標欄位已實測一致；人工查證仍須完成，未自行解鎖權限 |
-| Codex 互動十例 | 已完成一批受控案例 | 同一工作階段撰寫二十個期限提案，十例 Schema／Gate／PDF 符合預期；不是十次獨立模型呼叫。實作基線與雜湊見專門紀錄 |
+| Codex 互動十例 | 舊版與目前版本分開驗證 | 本次讀取現行交換輸入後撰寫二十個期限提案，抓到並修正 Prompt 2 Context／Prompt 1 Schema 不一致；新版十例 Schema／Gate／PDF 符合預期，非十次獨立模型呼叫。舊紀錄保留，詳見 codex-interactive-v2.json |
 | 投顧評等、全市場真實事件探索 | 尚缺已驗證 Provider | 有界新聞搜尋不代表完整探索或來源驗收；不以三大法人或合成資料替代，不承諾全市場覆蓋 |
 | 美股次級行情 | 日線契約與兩項網路測試通過 | 來源維持 unknown；調整口徑未知，不計算真實跨期漲跌幅，並非完整歷史資料驗收 |
 | 台灣資產負債表、現金流量表、歷史期別、非一般業格式 | 未實作 | 台灣財報目前只有上列損益表最新一期；沒有前期數與現金流，無法支援成長率或自由現金流 |
@@ -41,7 +41,7 @@
 
 ## 實際測試與交付紀錄
 
-- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸為 432 passed、10 deselected（2026-11-15 官方 RSS、Quant 2 與操作驗收工具增量）。`scripts/runtime.sh verify` 全套完成：測試、四份合成報告及 Replay、PDF 預覽與 Review Bundle。`reports/phase-0/acceptance.json` 記錄 offline_acceptance_passed、來源全關閉及正式 MVP GO=false。
+- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸為 433 passed、10 deselected，包含 Prompt 版本交換的回歸測試。`scripts/runtime.sh verify` 全套完成：測試、四份合成報告及 Replay、PDF 預覽與 Review Bundle。新版實際互動批次另驗十例，不併作獨立模型呼叫數。`reports/phase-0/acceptance.json` 記錄 offline_acceptance_passed、來源全關閉及正式 MVP GO=false。
 - `reports/phase-0/rss-network-junit.xml`：官方 NVIDIA 新聞稿 RSS 的真實網路契約 1 passed。另以受控 NVDA Request 實際執行 CLI，20 項 Feed 中有 18 項符合窗口的候選統計；只保存數量與狀態，沒有保存標題、文章連結、原始回應或雜湊，紀錄為 `reports/news/nvda-feed-inspection.json`。這不是已啟用的研究證據。
 - `reports/phase-0/discovery-network-junit.xml`：新聞索引實際網路契約 1 failed（HTTP 429），沒有宣稱真實搜尋驗收通過。Review Bundle 的 research-manifest.json 明列 FAILED，合成搜尋紀錄另列，沒有混成真實證據。
 - `reports/phase-0/us-price-network-junit.xml`：NVDA／AMD 次級行情來源的實際契約測試 2 passed；沒有保存價格、原始回應或雜湊，亦未啟用權限。
