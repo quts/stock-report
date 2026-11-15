@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "registry_version": "0.4.0",
+  "registry_version": "0.4.1",
   "updated_at": "2026-11-15T00:00:00+00:00",
   "policy": "Reports are for personal use only and are never distributed; that is not a permission. Unknown terms are not cleared for the personal report or for local persistence. A source becomes 'confirmed' only after a human records the quoted excerpt, the exact terms URL, the check date and a named attestation in this file. Endpoint accessibility is never evidence of any right; pdf_share_allowed is a legacy field that gates nothing.",
   "sources": [
@@ -34,7 +34,7 @@
       "attested_at": null,
       "open_questions": [
         "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
-        "資料發布時間與更新頻率是否有官方宣告未確認"
+        "資料集明列每日更新；精確發布時間未宣告，僅採觀測可得性上界"
       ],
       "notes": "官方資料集授權標示已由 Codex 查核；2026-11-15 在記憶體內比對本次目標的 CSV／JSON 名稱與收盤欄位一致。證據見 docs/phase-0/taiwan-source-binding.json。這是有限範圍的助手查核，缺人工來源核對與簽認，故維持 unknown，不保存來源數值或分享。"
     },
@@ -104,7 +104,7 @@
         "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
         "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者目前只有實測交叉比對，沒有官方條文",
         "出表日期不是公司申報日；官方是否提供申報／公告時間未確認",
-        "資料集指定資源為 mopsfin.twse.com.tw 的 CSV；與 openapi.twse.com.tw JSON 端點的內容一致性尚未逐欄比對"
+        "目標六欄 CSV／JSON 本次比對一致（financial-source-binding.json），不推及完整資料集；金額級距與累計定義仍缺官方契約"
       ],
       "notes": "2026-11-15 由 Claude Code 查核資料集頁面並在記憶體內檢視端點回應形狀（欄位名稱、列數、目標列唯一）；未保存任何來源數值。使用者已選擇維持 unknown、暫不啟用，故無內部保存、分享、雜湊或原始回應權限。證據見 docs/phase-0/taiwan-financial-source-notes.md。"
     },
@@ -140,7 +140,7 @@
         "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
         "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者目前只有實測交叉比對，沒有官方條文",
         "出表日期不是公司申報日；官方是否提供申報／公告時間未確認",
-        "資料集頁面列出的資源是 mopsfin.twse.com.tw 的 CSV，API 文件指向 openapi.twse.com.tw；本專案呼叫的 www.tpex.org.tw/openapi 端點是否屬於同一授權資料集尚未確認"
+        "指定 CSV 與本專案 TPEx JSON 目標六欄本次比對一致（financial-source-binding.json）；非完整資料集或授權等價證明"
       ],
       "notes": "2026-11-15 由 Claude Code 查核資料集頁面並在記憶體內檢視端點回應形狀（欄位名稱、列數、目標列唯一）；未保存任何來源數值。使用者已選擇維持 unknown、暫不啟用，故無內部保存、分享、雜湊或原始回應權限。證據見 docs/phase-0/taiwan-financial-source-notes.md。"
     },
@@ -157,7 +157,7 @@
       "attested_by": null,
       "attested_at": null,
       "open_questions": ["Endpoint support, identity, adjustment basis and storage/sharing rights require verification"],
-      "notes": "Feasibility adapter only; user chose unknown and no activation. No human attestation or retention rights."
+      "notes": "No activation or retention rights. Official Help describes adjusted close generally, but chart close field adjustment remains undocumented here; Help access returned 429 and terms access 999. Excluded from recommended activation pending a supported contract. See docs/phase-0/pre-human-review.md."
     },
     {
       "source_id": "sec-xbrl-companyconcept",
@@ -167,14 +167,16 @@
       "terms_url": "https://www.sec.gov/about/developer-resources",
       "declared_status": "unknown",
       "scope": {},
-      "terms_evidence": [],
+      "terms_evidence": [
+        {"terms_url":"https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data","checked_at":"2026-11-15T00:00:00+08:00","checked_by":"assistant","checker":"Codex；日期佔位，非精確查核時刻","excerpt":"Please declare your user agent in request headers","excerpt_covers":"自動存取應宣告 User-Agent；頁面並提供含聯絡資訊的範例。不構成所有第三方申報內容的權利保證。"},
+        {"terms_url":"https://www.sec.gov/about/developer-resources","checked_at":"2026-11-15T00:00:00+08:00","checked_by":"assistant","checker":"Codex；日期佔位，非精確查核時刻","excerpt":"10 requests per second","excerpt_covers":"每位使用者合計請求上限，跨機器計算；本專案更保守。"}
+      ],
       "attested_by": null,
       "attested_at": null,
       "open_questions": [
-        "SEC 開發者資源頁與網站使用條款尚未逐字核對並留存引用",
-        "重製／再散布範圍與是否需標示來源未確認",
-        "宣告式 User-Agent 與存取頻率的正式要求條文未逐字核對",
-        "原始回應留存與雜湊留存是否允許未確認"
+        "官方 API 與存取規範已有助手查核引用，未取得人工簽認",
+        "缺操作人明示的聯絡設定，真實 API 契約測試仍未執行；不得從登入資料取得或編造聯絡人",
+        "免費下載與公開可讀不代表所有第三方申報附件的權利相同；本輪不開啟保存或雜湊權限"
       ],
       "notes": "SEC 要求呼叫方自行宣告聯絡資訊；聯絡資訊必須由操作人以 --sec-contact 或 STOCK_REPORT_SEC_CONTACT 明示提供，不得取自登入資料，且不寫入任何產出檔案。"
     }

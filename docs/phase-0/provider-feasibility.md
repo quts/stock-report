@@ -22,7 +22,7 @@
 - [11371：上櫃股票收盤行情](https://data.gov.tw/dataset/11371) 同樣列明該授權，指定 TPEx CSV 並連到 OpenAPI 文件。
 - [政府資料開放授權條款](https://data.gov.tw/license) 包含利用權利與顯名義務；不能省略來源標示或宣稱政府認可研究方向。
 
-`config/source-licenses.json`（版本 0.4.0）六個來源皆為 unknown：沒有內部使用、原始回應或回應雜湊的已確認權限。報告僅供個人使用、不分享，故再散布權不是條件（`pdf_share_allowed` 為舊欄位）；但個人使用不等於已取得權限，unknown 仍封鎖。confirmed 需要依現行 AGENTS 的人工查證契約，保留具體條款、日期、具名 attestation 及 scope。候選來源不因網站屬於同一交易所而共用權限。
+`config/source-licenses.json`（版本 0.4.1）六個來源皆為 unknown：沒有內部使用、原始回應或回應雜湊的已確認權限。報告僅供個人使用、不分享，故再散布權不是條件（`pdf_share_allowed` 為舊欄位）；但個人使用不等於已取得權限，unknown 仍封鎖。confirmed 需要依現行 AGENTS 的人工查證契約，保留具體條款、日期、具名 attestation 及 scope。候選來源不因網站屬於同一交易所而共用權限。0.4.1 僅同步前置查證及 SEC 官方規範引用，沒有任何權限變更。
 
 採集時與使用時的權限取交集。實際請求端點、載入的採集端點及逐筆來源 URL 都須位於登錄的範圍，授權改動或撤回會阻擋原本不再適用的內容。
 

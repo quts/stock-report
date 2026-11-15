@@ -384,7 +384,7 @@ def test_request_template_requires_a_cutoff_after_collection(attested):
 
 
 def test_default_registry_grants_nothing(registry):
-    assert registry.registry_version == '0.4.0'
+    assert registry.registry_version == '0.4.1'
     for source in registry.sources:
         snapshot = registry.snapshot(source.source_id)
         assert snapshot['status'] == 'unknown' and not snapshot['human_attested']

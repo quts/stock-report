@@ -103,7 +103,7 @@ def mutate_raw(p): twse(p)['scope']['store_raw_response'] = True
 def mutate_share(p): twse(p)['scope']['pdf_share_allowed'] = True
 def mutate_endpoint(p): twse(p)['endpoint_scope'] = 'https://openapi.twse.com.tw/v1/exchangeReport/{dataset}'
 def mutate_attribution(p): twse(p)['attribution'] = '官方資料'
-def mutate_version(p): p['registry_version'] = '0.4.0'
+def mutate_version(p): p['registry_version'] = '0.4.1'
 def mutate_assistant_attestor(p): twse(p)['attested_by'] = 'Codex 互動助手'
 def mutate_assistant_checker(p):
     for t in twse(p)['terms_evidence']:
@@ -161,7 +161,7 @@ def test_candidate_without_human_evidence_is_not_a_valid_registry(tmp_path, caps
 
 def test_package_drift_blocks_the_check(tmp_path):
     registry = read_json(REGISTRY)
-    registry['registry_version'] = '0.4.1'
+    registry['registry_version'] = '0.4.2'
     drifted = LicenseRegistry.model_validate(registry)
     assert check(PACKAGE, drifted, instruments())['status'] == 'blocked'
     config = copy.deepcopy(instruments())
