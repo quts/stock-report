@@ -1,7 +1,11 @@
-"""Render only policy-approved, license-filtered projections."""
+"""Render only policy-approved projections of evidence confirmed for internal use.
+
+The PDF is a personal-use document that is never distributed, so redistribution rights are not
+a rendering condition. Unknown, restricted or internally unlicensed records never reach it.
+"""
 from importlib.resources import files
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from .policy import publishable
+from .policy import reportable
 from .quant import consensus, calculate
 
 LABELS = {'bullish': '偏多', 'neutral': '中性', 'bearish': '偏空', 'insufficient': '資料不足'}
@@ -13,13 +17,13 @@ def projection(data, decision, mapping):
     entity_ids = {e.entity_id for e in data.entities}
     if data.request.mode == 'event':
         entity_ids.add('EVENT')
-    allowed = {e.evidence_id: e for e in data.evidence if e.entity_id in entity_ids and publishable(e, data.request)}
+    allowed = {e.evidence_id: e for e in data.evidence if e.entity_id in entity_ids and reportable(e, data.request)}
     computed = calculate(data.evidence, data.request.research_as_of)
     companies = []
     for entity in data.entities:
         identity_ok = any(e.entity_id == entity.entity_id and e.kind == 'identity' for e in allowed.values())
         if not identity_ok:
-            raise ValueError('Cannot publish a report without a verified, licensed company identity')
+            raise ValueError('Cannot render a report without a verified, internally licensed company identity')
         metrics = [m for m in computed if m.entity_id == entity.entity_id and m.value is not None
                    and all(eid in allowed for eid in m.evidence_ids)]
         company_evidence = [e for e in allowed.values() if e.entity_id == entity.entity_id]

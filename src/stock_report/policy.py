@@ -1,13 +1,25 @@
-"""Fail-closed publication decisions scoped to each company and horizon."""
+"""Fail-closed report decisions scoped to each company and horizon.
+
+Reports are for the operator's personal use only and are never distributed, so the gate asks
+whether a record is confirmed for internal use. The legacy redistribution flag
+(`shareable_in_pdf`) is recorded for audit compatibility and is never consulted here.
+Personal use is not a permission in itself: unknown or restricted sources stay blocked.
+"""
 from .models import Decision, Finding, HorizonProposal
 from .quant import calculate, usable
 
-VERSION = 'phase0-1'
+VERSION = 'phase0-2'
 
 
-def publishable(e, request):
+def internally_licensed(e):
+    """Confirmed terms that allow internal use. Redistribution rights are not required."""
+    return e.license_status == 'confirmed' and e.internal_use_allowed
+
+
+def reportable(e, request):
+    """May this record appear in, or support, the personal-use report?"""
     return (usable(e, request.research_as_of) and e.research_as_of == request.research_as_of
-            and e.license_status == 'confirmed' and e.shareable_in_pdf)
+            and internally_licensed(e))
 
 
 def evaluate(data, proposal):
@@ -33,7 +45,7 @@ def evaluate(data, proposal):
         refs = list(dict.fromkeys(p.supporting_evidence_ids + p.counter_evidence_ids))
         if p.entity_id in bad_quant:
             add('QUANT_MISMATCH', '量化結果與原始證據重算不符')
-        identity = [e for e in data.evidence if e.entity_id == p.entity_id and e.kind == 'identity' and publishable(e, data.request)]
+        identity = [e for e in data.evidence if e.entity_id == p.entity_id and e.kind == 'identity' and reportable(e, data.request)]
         if not identity or (data.request.exchange and entities[p.entity_id].exchange != data.request.exchange):
             add('IDENTITY', '標的身份或交易市場無法確認')
         for eid in refs:
@@ -47,10 +59,10 @@ def evaluate(data, proposal):
                 add('FUTURE_DATA', '資料不屬於研究截止時點', [eid])
             if e.verification_status != 'verified':
                 add('UNVERIFIED', '未核實或矛盾資料不得作為已確認事實', [eid])
-            if not e.internal_use_allowed or e.license_status != 'confirmed' or not e.shareable_in_pdf:
-                add('LICENSE', '內容未取得報告使用權限', [eid])
+            if not internally_licensed(e):
+                add('LICENSE', '來源未確認內部使用權限，不得進入個人報告', [eid])
         core = [index[eid] for eid in set(p.supporting_evidence_ids) if eid in index
-                and publishable(index[eid], data.request) and index[eid].kind in ('financial', 'price', 'event')
+                and reportable(index[eid], data.request) and index[eid].kind in ('financial', 'price', 'event')
                 and index[eid].entity_id == p.entity_id]
         # Phase 0 threshold is deliberately conservative and remains uncalibrated.
         independent = {(e.publisher, e.source_record_id) for e in core}
@@ -58,7 +70,7 @@ def evaluate(data, proposal):
             add('CORE_INSUFFICIENT', '核心證據不足或缺少反轉條件；門檻尚待 Phase 0 校準')
         if data.request.mode == 'event':
             event_refs = [index.get(eid) for eid in data.event_evidence_ids]
-            if not event_refs or not all(e and e.kind == 'event' and e.entity_id == 'EVENT' and publishable(e, data.request) for e in event_refs):
+            if not event_refs or not all(e and e.kind == 'event' and e.entity_id == 'EVENT' and reportable(e, data.request) for e in event_refs):
                 add('EVENT_UNVERIFIED', '事件狀態無法以合法且已核實資料確認')
             rels = [r for r in data.relationships if r.entity_id == p.entity_id]
             if len(rels) != 1:
@@ -66,7 +78,7 @@ def evaluate(data, proposal):
             else:
                 rel = rels[0]
                 valid = rel.evidence_ids and all(eid in index and index[eid].entity_id == p.entity_id
-                    and index[eid].kind == 'relationship' and publishable(index[eid], data.request) for eid in rel.evidence_ids)
+                    and index[eid].kind == 'relationship' and reportable(index[eid], data.request) for eid in rel.evidence_ids)
                 if rel.relationship == 'hypothetical' or not valid:
                     add('HYPOTHETICAL', '假設或無依據關聯不得發布方向性結論', rel.evidence_ids)
         growth = [m.value for m in computed if m.entity_id == p.entity_id and m.name in ('revenue_growth', 'eps_growth') and m.value is not None]
@@ -80,7 +92,7 @@ def evaluate(data, proposal):
             add('SINGLE_SOURCE', '核心證據只有單一發布者，並非獨立來源交叉驗證', severity='soft')
         if p.unresolved_conflicts:
             add('UNRESOLVED_CONFLICT', '重大分歧尚未解決，保留分歧並降級')
-        if not any(e.kind == 'rating' and e.entity_id == p.entity_id and publishable(e, data.request)
+        if not any(e.kind == 'rating' and e.entity_id == p.entity_id and reportable(e, data.request)
                    and e.valid_until and e.valid_until >= data.request.research_as_of for e in data.evidence):
             add('RATINGS_MISSING', '投顧共識資料不足', severity='soft')
         if any(m.value is None for m in data.metrics if m.entity_id == p.entity_id):
@@ -88,7 +100,7 @@ def evaluate(data, proposal):
         add('PHASE0_THRESHOLD', 'Phase 0 規則未經實際投資效能驗證', severity='soft')
         if problems:
             approved.append(HorizonProposal(entity_id=p.entity_id, horizon=p.horizon, outlook='insufficient',
-                supporting_evidence_ids=[], counter_evidence_ids=[], interpretation='證據或發布條件不足；請查閱決策紀錄。',
+                supporting_evidence_ids=[], counter_evidence_ids=[], interpretation='證據或報告條件不足；請查閱決策紀錄。',
                 assumptions=[], unresolved_conflicts=['；'.join(problems)], invalidation_conditions=[]))
         elif p.outlook == 'insufficient':
             approved.append(HorizonProposal(entity_id=p.entity_id, horizon=p.horizon, outlook='insufficient',

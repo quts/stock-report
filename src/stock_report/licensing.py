@@ -1,11 +1,19 @@
 """Versioned source-license registry.
 
-Accessibility of an endpoint never establishes any right to reuse or redistribute
-its contents. Every source starts at `unknown`, and `unknown` is non-shareable and
-not even cleared for local persistence. `confirmed` is only representable when the
-registry carries a quoted terms excerpt that was checked by a human, the exact
-terms URL and check date, and a named attestation. Nothing here reads credentials
-or derives contact details from login data.
+Accessibility of an endpoint never establishes any right to reuse its contents, and
+neither does the fact that reports are for personal use only. Every source starts at
+`unknown`, which is not cleared for the personal report or for local persistence.
+`confirmed` is only representable when the registry carries a quoted terms excerpt that
+was checked by a human, the exact terms URL and check date, and a named attestation.
+
+Permissions are separate and none implies another:
+- `internal_use_allowed`: values may be persisted in the local run and used in the
+  personal-use PDF, metrics and proposals.
+- `store_response_hash` / `store_raw_response`: local raw audit retention.
+- `pdf_share_allowed`: legacy redistribution flag. Nothing is distributed, so it gates
+  nothing and no redistribution attestation is needed for a personal report.
+
+Nothing here reads credentials or derives contact details from login data.
 """
 import os
 from pathlib import Path

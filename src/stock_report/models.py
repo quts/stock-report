@@ -64,7 +64,9 @@ class Request(Model):
     max_companies: int = Field(default=5, ge=1, le=5)
     language: Literal['zh-TW'] = 'zh-TW'
     max_pdf_pages: Literal[2] = 2
-    sharing_profile: Literal['private', 'friends'] = 'friends'
+    # Outputs are exclusively for the operator's personal use. No sharing profile exists, and a
+    # request asking for one is rejected instead of being quietly downgraded.
+    sharing_profile: Literal['private'] = 'private'
 
     @model_validator(mode='after')
     def validate_mode(self):
@@ -107,6 +109,8 @@ class Evidence(Model):
     verification_status: Literal['verified', 'unverified', 'conflicting', 'unavailable']
     license_status: Literal['confirmed', 'unknown', 'restricted'] = 'unknown'
     attribution: str
+    # Legacy redistribution flag, kept for stored-record compatibility. It gates nothing: the
+    # personal report depends on `internal_use_allowed` with confirmed terms.
     shareable_in_pdf: bool = False
     internal_use_allowed: bool = False
     terms_url: str

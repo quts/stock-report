@@ -9,7 +9,7 @@ ENTITIES = {
     '2330.TW': ('台積電（合成測資）', 'TWSE', 'TWD'),
     '6488.TWO': ('環球晶（合成測資）', 'TPEx', 'TWD'),
 }
-VERSIONS = {'quant': '1', 'policy': 'phase0-1', 'prompt': '1', 'template': '1', 'dataset': 'synthetic-1'}
+VERSIONS = {'quant': '1', 'policy': 'phase0-2', 'prompt': '1', 'template': '2', 'dataset': 'synthetic-1'}
 
 
 def fixture(request):
@@ -25,7 +25,7 @@ def fixture(request):
             published_at=cutoff-timedelta(days=2), publication_basis='synthetic',
             retrieved_at=cutoff, research_as_of=cutoff,
             verification_status='verified', license_status='confirmed', attribution='專案自行生成合成測資',
-            shareable_in_pdf=True, internal_use_allowed=True, terms_url='https://example.invalid/synthetic-terms',
+            internal_use_allowed=True, terms_url='https://example.invalid/synthetic-terms',
             license_checked_at=cutoff, **kwargs)
         evidence.append(e)
         return e.evidence_id

@@ -13,7 +13,7 @@
       "declared_status": "confirmed",
       "scope": {
         "internal_use_allowed": true,
-        "pdf_share_allowed": true,
+        "pdf_share_allowed": false,
         "store_response_hash": true,
         "store_raw_response": false
       },
@@ -24,7 +24,7 @@
           "checked_by": "human",
           "checker": "test-fixture (not a real attestation)",
           "excerpt": "FIXTURE TEXT - not a quotation of any real terms page.",
-          "excerpt_covers": "internal use and report redistribution, fixture only"
+          "excerpt_covers": "internal use for a personal report only, fixture only"
         }
       ],
       "attested_by": "test-fixture (not a real attestation)",
@@ -41,7 +41,7 @@
       "declared_status": "confirmed",
       "scope": {
         "internal_use_allowed": true,
-        "pdf_share_allowed": true,
+        "pdf_share_allowed": false,
         "store_response_hash": false,
         "store_raw_response": false
       },
@@ -52,7 +52,7 @@
           "checked_by": "human",
           "checker": "test-fixture (not a real attestation)",
           "excerpt": "FIXTURE TEXT - not a quotation of any real terms page.",
-          "excerpt_covers": "internal use and report redistribution, fixture only"
+          "excerpt_covers": "internal use for a personal report only, fixture only"
         }
       ],
       "attested_by": "test-fixture (not a real attestation)",
@@ -74,7 +74,7 @@
       "open_questions": [
         "left unknown on purpose so tests cover the blocked path"
       ],
-      "notes": "Fixture entry kept unknown to exercise the non-shareable path."
+      "notes": "Fixture entry kept unknown to exercise the blocked path."
     },
     {
       "source_id": "twse-openapi-income-general",
@@ -85,7 +85,7 @@
       "declared_status": "confirmed",
       "scope": {
         "internal_use_allowed": true,
-        "pdf_share_allowed": true,
+        "pdf_share_allowed": false,
         "store_response_hash": true,
         "store_raw_response": false
       },
@@ -96,7 +96,7 @@
           "checked_by": "human",
           "checker": "test-fixture (not a real attestation)",
           "excerpt": "FIXTURE TEXT - not a quotation of any real terms page.",
-          "excerpt_covers": "internal use and report redistribution, fixture only"
+          "excerpt_covers": "internal use for a personal report only, fixture only"
         }
       ],
       "attested_by": "test-fixture (not a real attestation)",
@@ -113,7 +113,7 @@
       "declared_status": "confirmed",
       "scope": {
         "internal_use_allowed": true,
-        "pdf_share_allowed": true,
+        "pdf_share_allowed": false,
         "store_response_hash": true,
         "store_raw_response": false
       },
@@ -124,7 +124,7 @@
           "checked_by": "human",
           "checker": "test-fixture (not a real attestation)",
           "excerpt": "FIXTURE TEXT - not a quotation of any real terms page.",
-          "excerpt_covers": "internal use and report redistribution, fixture only"
+          "excerpt_covers": "internal use for a personal report only, fixture only"
         }
       ],
       "attested_by": "test-fixture (not a real attestation)",

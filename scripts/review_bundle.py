@@ -24,6 +24,9 @@ for scenario,expected in golden['expected'].items():
     elif scenario=='future_data':target.published_at=request.research_as_of.replace(year=2027)
     elif scenario=='unverified_event':next(e for e in data.evidence if e.source_record_id=='risk').verification_status='unverified'
     elif scenario=='license_unknown':target.license_status='unknown'
+    elif scenario=='internal_use_denied':target.internal_use_allowed=False
+    elif scenario=='personal_use_not_shareable':
+        for e in data.evidence:e.shareable_in_pdf=False
     elif scenario=='quant_mismatch':data.metrics[0].value=999
     elif scenario=='partial_financials':
         data.evidence=[e for e in data.evidence if e.source_record_id!='eps_current']
@@ -47,7 +50,7 @@ for name,label in [('stock-nvda','stock'),('event','event')]:
     row=next(r for r in index if r.get('example')==name)
     copyfile(row['report_path'],output/f'sample-{label}.pdf')
 write_json(output/'research-manifest.json',{'generated_at':datetime.now(timezone.utc).isoformat(),
-    'samples':'DEMO / SYNTHETIC DATA only', 'runs':[read_json(Path(r['report_path']).parent/'manifest.json') for r in index],
+    'samples':'DEMO / SYNTHETIC DATA only', 'distribution':'personal_use_only', 'runs':[read_json(Path(r['report_path']).parent/'manifest.json') for r in index],
     'replay_verified':any('replay_of' in r for r in index), 'test_results':'provider-increment-junit.xml', 'network_test_results':'network-junit.xml',
     'real_data_probe':'provider-probes.json' if (output/'provider-probes.json').exists() else 'legacy probe archived privately',
     'source_binding':'taiwan-source-binding.json', 'interactive_evaluation':'llm-evaluation.json',
@@ -69,7 +72,8 @@ write_json(output/'data-coverage.json',{'mock_coverage':coverage,
       'license_status':r.get('license_status','unknown')} for r in smoke['results']],
     'license_registry':{'version':registry['registry_version'],
       'statuses':{s['source_id']:s['declared_status'] for s in registry['sources']},
-      'shareable_sources':[s['source_id'] for s in registry['sources'] if s['scope'].get('pdf_share_allowed')]},
+      'internal_use_sources':[s['source_id'] for s in registry['sources'] if s['scope'].get('internal_use_allowed')],
+      'distribution':'personal_use_only; no source is cleared for redistribution'},
     'denominator':'No fabricated aggregate coverage percentage; each named field/provider is reported separately'})
 write_json(output/'llm-evaluation.json',load_evaluation(
     Path('reports/codex-evaluation/llm-evaluation.json'),

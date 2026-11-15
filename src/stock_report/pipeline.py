@@ -8,10 +8,13 @@ from . import __version__
 from .analysis import exchange
 from .models import Request, ResearchInput, Proposal
 from .mock import fixture, VERSIONS
-from .policy import evaluate, publishable
+from .policy import evaluate, reportable
 from .quant import calculate, consensus
 from .render import render
 from .storage import digest, read_json, write_json, save_evidence
+
+# Every output is for the operator's personal use; there is no sharing profile or feature.
+DISTRIBUTION = 'personal_use_only'
 
 
 def byte_hash(path):
@@ -32,7 +35,7 @@ def coverage(data):
         fields = {}
         for kind in ('identity', 'financial', 'price', 'event', 'rating', 'relationship'):
             rows = [e for e in data.evidence if e.entity_id == entity.entity_id and e.kind == kind]
-            fields[kind] = 'unavailable' if not rows else 'available' if all(publishable(e, data.request) for e in rows) else 'partial' if any(publishable(e, data.request) for e in rows) else 'license_unknown' if any(e.license_status == 'unknown' for e in rows) else 'unavailable'
+            fields[kind] = 'unavailable' if not rows else 'available' if all(reportable(e, data.request) for e in rows) else 'partial' if any(reportable(e, data.request) for e in rows) else 'license_unknown' if any(e.license_status == 'unknown' for e in rows) else 'unavailable'
         result[entity.entity_id] = fields
     return result
 
@@ -43,8 +46,11 @@ def prepare(request, root, source=None):
         raise ValueError('Imported request does not match the validated request')
     if source is not None and data.dataset_kind != 'real':
         raise ValueError('Import is reserved for explicitly reviewed real evidence bundles')
+    # Personal use is not a permission: local persistence still needs confirmed internal-use terms.
     if any(not e.internal_use_allowed for e in data.evidence):
         raise ValueError('Do not persist source contents without confirmed internal-use permission')
+    if any(e.license_status != 'confirmed' for e in data.evidence):
+        raise ValueError('Internal-use permission cannot be claimed for a source whose terms are unknown or restricted')
     # Recompute imported quantities; never trust provider-supplied calculations.
     data.metrics = calculate(data.evidence, request.research_as_of)
     # Pin the executing code versions, but never relabel a real import as synthetic data.
@@ -85,7 +91,7 @@ def finalize(directory, proposal_path, mapping_path):
     if data.dataset_kind == 'real' and proposal.model.startswith('synthetic'):
         raise ValueError('Synthetic proposal cannot be applied to real data')
     decision = evaluate(data, proposal)
-    # File output is transactional: a PDF is published only after all checks pass.
+    # File output is transactional: the personal PDF is written only after all checks pass.
     temp_pdf = directory / '.report.pending.pdf'
     try:
         pages = render(data, decision, mapping, temp_pdf)
@@ -99,7 +105,8 @@ def finalize(directory, proposal_path, mapping_path):
               'metrics': [m.model_dump(mode='json') for m in calculate(data.evidence, data.request.research_as_of)],
               'approved_outlooks': [p.model_dump(mode='json') for p in decision.outlooks],
               'consensus': {e.entity_id: consensus(data.evidence, e.entity_id, data.request.research_as_of, mapping) for e in data.entities},
-              'privacy': 'Local audit JSON; not automatically cleared for redistribution'}
+              'distribution': DISTRIBUTION,
+              'privacy': 'Personal use only. Local audit JSON; never distributed'}
     write_json(directory / 'research.json', report)
     write_json(directory / 'decision.json', decision)
     write_json(directory / 'ai_proposal.json', proposal)
@@ -109,14 +116,16 @@ def finalize(directory, proposal_path, mapping_path):
                 'research_as_of': data.request.research_as_of.isoformat(), 'dataset_kind': data.dataset_kind,
                 'versions': runtime_versions(mapping, data), 'proposal_model': proposal.model, 'usage': proposal.usage,
                 'input_sha256': digest(data), 'decision_sha256': digest(decision), 'pdf_pages': pages,
-                'shareable_files': ['report.pdf'], 'audit_files_private': True,
+                # Nothing is cleared for redistribution. `shareable_files` is a legacy key kept empty.
+                'distribution': DISTRIBUTION, 'personal_report_files': ['report.pdf'],
+                'shareable_files': [], 'audit_files_private': True,
                 'hashes': {name: byte_hash(directory / name) for name in artifacts}}
     write_json(directory / 'manifest.json', manifest)
     warnings = sorted({f.message for f in decision.findings})
     if data.dataset_kind == 'mock':
         warnings.insert(0, 'DEMO / SYNTHETIC DATA')
     return {'run_id': prepared['run_id'], 'status': 'partial' if warnings else 'success',
-            'gate_status': decision.status, 'report_path': str(report_path), 'json_path': str(directory / 'research.json'),
+            'gate_status': decision.status, 'distribution': DISTRIBUTION, 'report_path': str(report_path), 'json_path': str(directory / 'research.json'),
             'research_as_of': data.request.research_as_of.isoformat(), 'coverage': coverage(data), 'warnings': warnings}
 
 

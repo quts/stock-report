@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "registry_version": "0.3.0",
-  "updated_at": "2026-11-14T16:57:23+00:00",
-  "policy": "Unknown terms are non-shareable AND not cleared for local persistence. A source becomes 'confirmed' only after a human records the quoted excerpt, the exact terms URL, the check date and a named attestation in this file. Endpoint accessibility is never evidence of a redistribution right.",
+  "registry_version": "0.4.0",
+  "updated_at": "2026-11-15T00:00:00+00:00",
+  "policy": "Reports are for personal use only and are never distributed; that is not a permission. Unknown terms are not cleared for the personal report or for local persistence. A source becomes 'confirmed' only after a human records the quoted excerpt, the exact terms URL, the check date and a named attestation in this file. Endpoint accessibility is never evidence of any right; pdf_share_allowed is a legacy field that gates nothing.",
   "sources": [
     {
       "source_id": "twse-openapi-stock-day-all",

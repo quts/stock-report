@@ -128,7 +128,7 @@ def main(argv=None):
                       'retention': collection.retention,
                       'research_as_of': 'not applied; supply the cutoff with request-template or bundle',
                       'persistence_blockers': persistence_blockers(collection),
-                      'warnings': ['採集本身不建立任何分享或留存權限'] + collection.notes}
+                      'warnings': ['採集本身不建立任何內部使用或留存權限'] + collection.notes}
         elif args.command == 'bundle':
             request = Request.model_validate(read_json(args.request))
             collections = [load_collection(path) for path in args.collection]

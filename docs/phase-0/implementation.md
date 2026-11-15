@@ -42,7 +42,7 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke 
 
 `analyze --run DIRECTORY` 只輸出受控交換檔；Codex 在互動環境依證據產生提案。此命令不使用付費 API、不假裝已呼叫模型。`--synthetic` 僅允許 Mock，產生清楚標示為合成的測試提案。此版本沒有任意自然語言 shell 執行功能。
 
-`finalize --run DIRECTORY --proposal JSON [--rating-map config/ratings.json]` 檢查輸入 Hash、提案 Schema、每家公司每期限唯一提案、Policy、分享過濾及 PDF 頁數。輸出 PDF 前先寫暫存檔；失敗不宣稱完成。已完成的研究目錄不可直接覆寫。
+`finalize --run DIRECTORY --proposal JSON [--rating-map config/ratings.json]` 檢查輸入 Hash、提案 Schema、每家公司每期限唯一提案、Policy、內部使用權限過濾及 PDF 頁數。輸出 PDF 前先寫暫存檔；失敗不宣稱完成。已完成的研究目錄不可直接覆寫。
 
 `replay --run DIRECTORY --output reports` 驗證來源檔案 Hash 與程式／模板／Policy／映射版本，在新 UUID 目錄重播，要求決策結果雜湊一致。此版本不支援從較舊程式自動重建舊環境；版本不符便拒絕。Fresh Run 必須重新 prepare。
 
@@ -61,7 +61,7 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke 
 
 普通股身份另依 `config/tw-instruments.json` 明示的 POC 標的設定，不以代號形狀推定。
 
-來源授權由版本化登錄檔 `config/source-licenses.json` 決定：`unknown` 不可分享也不可本機留存，
+來源授權由版本化登錄檔 `config/source-licenses.json` 決定：`unknown`／`restricted` 不可用於個人報告也不可本機留存，
 `confirmed` 需要人工逐字條款引用與具名 attestation 才能通過驗證。Evidence 另存
 `license_source_id` 與 `license_registry_version` 以供追溯。
 
@@ -69,27 +69,29 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke 
 
 評等映射經版本管理，保留原詞彙與機構、分析師、訊息數的不同分母。同機構取截止日前最新有效紀錄；有效期限未知不當成仍有效，未定義詞彙列 Unclassified。樣本不足時仍輸出 PDF，顯示「投顧共識資料不足」。
 
-## Gate 與發布邊界
+## Gate 與個人報告邊界
+
+2026-11-15 起（Policy `phase0-2`、模板 `2`）所有輸出僅供使用者本人使用，不分享。Gate 與 Renderer 只檢查已確認的內部使用權限（`license_status=confirmed` 且 `internal_use_allowed`）；`shareable_in_pdf`／`pdf_share_allowed` 為相容用舊欄位，不參與任何判斷，Mock 與測試登錄檔一律為 false。`prepare` 另拒絕無內部使用權限或授權狀態非 confirmed 的匯入證據。Request 的 `sharing_profile` 只接受 `private`。
 
 預設零次自動修正：不循環呼叫模型；相關期限違規直接降級 insufficient 並保留規則。一次修正是規格初始建議而非必須開啟的能力。`REVISE` 保留在狀態 Schema，目前沒有自動修正流程。
 
-Hard Gate 包括未知 Evidence ID、錯誤標的、截止日後資料、未核實／矛盾主張、禁止分享／權限未知、Quant 重算不符、核心證據不足、未解決分歧及無法核實的事件關聯。錯誤主要限於公司／期限；身份或 PDF 核心流程不成立才不產報告。所有期限方向被拒仍可生成清楚標記的資料不足摘要。
+Hard Gate 包括未知 Evidence ID、錯誤標的、截止日後資料、未核實／矛盾主張、內部使用權限未確認（unknown／restricted）、Quant 重算不符、核心證據不足、未解決分歧及無法核實的事件關聯。錯誤主要限於公司／期限；身份或 PDF 核心流程不成立才不產報告。所有期限方向被拒仍可生成清楚標記的資料不足摘要。
 
 Phase 0 核心門檻為兩個不同來源紀錄及反轉條件，**尚未校準**。相同發布者另附單來源警告，不稱為獨立交叉驗證。成長趨勢與 AI 方向相反須具體解釋，否則降級；不直接平均為 Neutral。Hypothetical 關聯不發布方向性結論。
 
 Gate 能驗證結構、時點、數值、引用與輸入權限，不能證明自由文字推論與來源語意一致，也不能證明預測正確。真實輸入中的 verified／confirmed 標記須由人工來源查核支持；全自動真實研究尚未驗收。
 
-PDF 只接收 Gate 結果和可分享證據的投影，模板自動跳脫 HTML，禁止 Renderer 讀取本機／遠端 URL 資源。超過兩頁直接失敗，不縮成極小字體。頁尾採簡潔頁碼；使用限制與風險揭露放在正文，避免頁尾渲染影響必要揭露。長敘述用明示摘要，完整本機 JSON 保留。報告為 A4，股／事件兩版，分列 3–6、6–12 個月。
+PDF 只接收 Gate 結果和已確認內部使用證據的投影，每頁頁首標示「僅供個人使用・不得散布 · Personal use only / Not for distribution」，首頁另有不得轉寄的說明，模板自動跳脫 HTML，禁止 Renderer 讀取本機／遠端 URL 資源。超過兩頁直接失敗，不縮成極小字體。頁尾採簡潔頁碼；使用限制與風險揭露放在正文，避免頁尾渲染影響必要揭露。長敘述用明示摘要，完整本機 JSON 保留。報告為 A4，股／事件兩版，分列 3–6、6–12 個月。
 
 ## 儲存、授權與安全
 
-`reports/<run_id>/` 包含 report.pdf、research.json、evidence.json、evidence.sqlite、decision.json、ai_proposal.json、rating_mapping.json、research_input.json、manifest.json。只有 PDF 被列為通過發布過濾的檔案；原始／稽核 JSON 與 SQLite 是本機研究資料，不能視為自動具分享權。預設不保存網頁全文或第三方研究報告。
+`reports/<run_id>/` 包含 report.pdf、research.json、evidence.json、evidence.sqlite、decision.json、ai_proposal.json、rating_mapping.json、research_input.json、manifest.json。Manifest 記錄 `distribution=personal_use_only`、`personal_report_files=[report.pdf]`，舊鍵 `shareable_files` 固定為空。PDF 與原始／稽核 JSON、SQLite 都是個人本機資料，均不得對外提供。個人 PDF 的權限（`internal_use_allowed`）與本機原始稽核留存（`store_response_hash`／`store_raw_response`）分開判斷：前者不代表可保留回應雜湊或原始回應。預設不保存網頁全文或第三方研究報告。
 
 HTTPClient 提供有限 Retry、速率限制與可選 TTL Cache；原始回應 Cache 預設停用，僅在來源內部保存授權確認後由 Adapter 顯式啟用。探查只保存目標欄位及回應 Hash，不保存全文。CLI 不執行來源文字、不組 shell、不讀取登入憑證。User-Agent 聯絡資訊由操作人自行配置，不能從登入資料取得。
 
 ## 尚未驗收的必要項目
 
-真實台美財報／行情正規化與分享條款、逐機構評等來源、跨市場真實事件探索排序、Codex 十例互動提案驗證、真實股／事件兩頁報告、校準 Gate 門檻。這些狀態必須留在 Review，不能用 Mock 測試通過取代。
+真實台美財報／行情正規化與內部使用條款、逐機構評等來源、跨市場真實事件探索排序、Codex 十例互動提案驗證、真實股／事件兩頁報告、校準 Gate 門檻。這些狀態必須留在 Review，不能用 Mock 測試通過取代。
 
 真實採集管線（`collect`／`bundle`／`request-template`、授權登錄檔、公開時間模型）已實作並附離線契約測試，
 但**尚未以實際網路回應驗證**，且**本次新增的測試尚未在容器內執行**：本工作階段未取得執行容器、
@@ -99,4 +101,4 @@ Python 或網路工具的授權。欄位契約、來源條款與測試結果都�
 
 Review Bundle 載入並驗證 `reports/codex-evaluation/llm-evaluation.json` 的歷史十例成品雜湊，保留基線 commit 與單批次限制；不冒充對目前程式版本重新呼叫模型。只有版本化摘要時會標示原始成品不在本機，無紀錄時才用 NOT_RUN。完整說明見 [Codex 互動驗證](codex-interactive-evaluation.md)。
 
-台股來源的 Date 僅作原始交易期別 `source_period_raw`；未宣告的公開日期 `source_published_raw` 保持 null，不把交易日放進公開日欄位。使用者本次選擇維持來源 unknown，未啟用來源數值保存或分享。
+台股來源的 Date 僅作原始交易期別 `source_period_raw`；未宣告的公開日期 `source_published_raw` 保持 null，不把交易日放進公開日欄位。使用者本次選擇維持來源 unknown，未啟用來源數值保存或使用。

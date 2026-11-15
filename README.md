@@ -4,6 +4,8 @@
 
 已實作 Schema 驗證、Prepare → 提案交換 → Finalize、SQLite 證據庫、Python 確定性計算、機構評等統計、逐公司／逐期限 Policy Gate、兩頁繁體中文 PDF、稽核 JSON／Manifest 與隔離 Replay。合成資料明確標示 `DEMO / SYNTHETIC DATA`，真實資料失敗不會自動退回 Mock。
 
+**所有輸出僅供使用者本人使用，不分享、不散布**（2026-11-15 範圍變更）。PDF 每頁標示「僅供個人使用・不得散布 / Personal use only / Not for distribution」；沒有任何分享功能。
+
 ## 快速執行
 
 需要 macOS Apple Container（服務已啟動）或 Docker，以及 Git。所有 Python、字型及 PDF 系統依賴只裝在映像內，不需要在主機安裝第三方函式庫。
@@ -56,7 +58,7 @@ CONTAINER_ENGINE=docker ./scripts/runtime.sh demo
   --user-agent 'StockReportPhase0/0.1' --output reports/phase-0
 ```
 
-SEC 探查需要自行在 User-Agent 設定符合來源要求的聯絡資訊；沒有聯絡資訊便記錄阻礙，不會取用 Claude／Codex 的登入資料。條款未核對前所有真實探查資料均標為不可在分享 PDF 使用。無付費 API、無自動重新登入。
+SEC 探查需要自行在 User-Agent 設定符合來源要求的聯絡資訊；沒有聯絡資訊便記錄阻礙，不會取用 Claude／Codex 的登入資料。條款未核對前所有真實探查資料均不得用於個人 PDF、指標或提案。無付費 API、無自動重新登入。
 
 ### 官方來源採集（collect → bundle → prepare）
 
@@ -87,13 +89,25 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
   --provider import --evidence-bundle reports/collections/bundle.json
 ```
 
-授權狀態來自版本化登錄檔 `config/source-licenses.json`：`unknown` 不可分享也不可本機留存，
-`confirmed` 必須附人工逐字條款引用與具名 attestation。**目前五個來源都是 `unknown`**，
+授權狀態來自版本化登錄檔 `config/source-licenses.json`：`unknown`／`restricted` 不可用於個人報告也不可本機留存，
+`confirmed` 必須附人工逐字條款引用與具名 attestation。**目前六個來源都是 `unknown`**，
 因此 collect 目前只保存檢視用中繼資料，不能把該檔傳入 request-template／bundle 當成研究輸入。
 內部權限確認後需重新採集，才會產生 collection.json；核心證據不足時可輸出不足摘要。公開時間依來源分為
 來源宣告日期與「擷取當下可得性上界」；後者只適用最新時點研究，既有歷史時點不會被改寫。
 欄位契約與限制見 [來源可行性](docs/phase-0/provider-feasibility.md)。
 
 已人工查證身份、發布時間與權限的標準化真實證據也可直接經 `prepare --provider import --evidence-bundle FILE --request REQUEST` 載入。Bundle 使用 `ResearchInput` Schema，必須 `dataset_kind=real`；不得含 Synthetic 證據，且須確認內部保存權限。這是受信任的人工整理介面，**不是自動證實來源真實性或授權的機制**。`schema --output reports/schemas` 可輸出契約。
+
+### 個人 PDF 與本機原始稽核資料的權限
+
+個人使用**不等於**已取得權限，各權限分開判斷：
+
+| 權限 | 作用 |
+| --- | --- |
+| `internal_use_allowed`（需 `confirmed`） | 來源數值可寫入本機研究目錄，並用於個人 PDF、指標與提案 |
+| `store_response_hash`／`store_raw_response` | 本機原始稽核留存（回應雜湊／原始回應）；不因 PDF 可用而自動允許 |
+| `pdf_share_allowed`／`shareable_in_pdf` | 舊版再散布欄位，僅為相容保留；不是報告條件，系統不會自行設為 true |
+
+內部使用已確認但再散布欄位為 false 的證據可進入個人 PDF；個人報告不需要再散布簽認。`sharing_profile` 只接受 `private`。PDF 與本機 JSON／SQLite 稽核檔都不得對外提供。
 
 操作細節、已實作範圍與限制見 [實作說明](docs/phase-0/implementation.md)、[來源可行性](docs/phase-0/provider-feasibility.md) 及 [Phase 0 Review](docs/phase-0/phase-0-review.md)。

@@ -17,7 +17,7 @@ def test_independent_horizons_and_missing_ratings(data,proposal):
 
 @pytest.mark.parametrize('fault,rule',[
     ('unknown','UNKNOWN_EVIDENCE'),('future','FUTURE_DATA'),('unverified','UNVERIFIED'),
-    ('conflicting','UNVERIFIED'),('license','LICENSE'),('restricted','LICENSE'),
+    ('conflicting','UNVERIFIED'),('license','LICENSE'),('restricted','LICENSE'),('no_internal_use','LICENSE'),
     ('wrong_entity','WRONG_ENTITY'),('quant','QUANT_MISMATCH'),
     ('core','CORE_INSUFFICIENT'),('conflict','UNRESOLVED_CONFLICT')])
 def test_fault_injection_does_not_release_direction(data,proposal,fault,rule):
@@ -27,7 +27,8 @@ def test_fault_injection_does_not_release_direction(data,proposal,fault,rule):
     elif fault=='future':target.published_at=data.request.research_as_of+timedelta(seconds=1)
     elif fault in ('unverified','conflicting'):target.verification_status='unverified' if fault=='unverified' else 'conflicting'
     elif fault=='license':target.license_status='unknown'
-    elif fault=='restricted':target.shareable_in_pdf=False
+    elif fault=='restricted':target.license_status='restricted'
+    elif fault=='no_internal_use':target.internal_use_allowed=False
     elif fault=='wrong_entity':target.entity_id='AMD'
     elif fault=='quant':data.metrics[0].value=999
     elif fault=='core':first.supporting_evidence_ids=[]

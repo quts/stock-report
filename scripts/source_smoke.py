@@ -72,7 +72,7 @@ for source_id, ticker in TARGETS:
 
 report = {'generated_at': datetime.now(timezone.utc).isoformat(), 'capture': 'network',
           'registry_version': registry.registry_version, 'results': results,
-          'license_conclusion': 'NONE. Reaching an endpoint establishes no internal-use or redistribution right.',
+          'license_conclusion': 'NONE. Reaching an endpoint establishes no internal-use or retention right; personal use is not a permission.',
           'research_e2e': 'NOT_ESTABLISHED. A smoke collection is not a research run.'}
 args.output.mkdir(parents=True, exist_ok=True)
 write_json(args.output / 'source-smoke.json', report)

@@ -37,7 +37,13 @@ def test_mock_e2e_pdf_and_audit(tmp_path,name):
     assert read_json(run/'manifest.json')['pdf_pages']==2
     with sqlite3.connect(run/'evidence.sqlite') as db:
         assert db.execute('SELECT count(*) FROM evidence').fetchone()[0]>0
-    assert set(read_json(run/'manifest.json')['shareable_files'])=={'report.pdf'}
+    manifest=read_json(run/'manifest.json')
+    assert manifest['distribution']=='personal_use_only' and manifest['personal_report_files']==['report.pdf']
+    assert manifest['shareable_files']==[] and manifest['audit_files_private'] is True
+    assert result['distribution']=='personal_use_only'
+    for page in pdf.pages:
+        page_text=unicodedata.normalize('NFKC',page.extract_text())
+        assert '僅供個人使用' in page_text and 'Not for distribution' in page_text
 
 
 def test_replay_values_gate_and_integrity(tmp_path,request_model):
@@ -79,7 +85,7 @@ def test_restricted_contents_absent_from_pdf(tmp_path,request_model):
     _,data,_=load_prepared(run)
     restricted=next(e for e in data.evidence if e.source_record_id=='risk')
     restricted.claim='SECRET_RESTRICTED_CONTENT'
-    restricted.shareable_in_pdf=False
+    restricted.license_status='restricted'
     # Create a new trusted snapshot before signing the corresponding proposal.
     from stock_report.storage import digest
     write_json(run/'research_input.json',data)
@@ -126,7 +132,7 @@ def test_renderer_recomputes_bad_quant_and_hides_unverified_relationship(data,pr
     assert all(m.value!=999 for m in view['companies'][0]['metrics'])
     request=request_model.model_copy(update={'mode':'event','ticker':None,'exchange':None,'event_query':'合成事件'})
     event=fixture(request)
-    next(e for e in event.evidence if e.evidence_id=='NVDA-relationship').shareable_in_pdf=False
+    next(e for e in event.evidence if e.evidence_id=='NVDA-relationship').license_status='unknown'
     view=projection(event,evaluate(event,synthetic_proposal(event)),mapping)
     company=next(c for c in view['companies'] if c['entity'].entity_id=='NVDA')
     assert company['relationship'] is None
@@ -168,7 +174,7 @@ def test_licensed_close_is_visible_and_restricted_close_is_hidden(tmp_path,reque
     assert '最近可得收盤' in unicodedata.normalize('NFKC',text)
     assert '100.00 USD' in text
     close=next(e for e in data.evidence if e.metric_key=='close')
-    close.shareable_in_pdf=False
+    close.license_status='restricted'
     view=projection(data,evaluate(data,proposal),mapping)
     assert view['companies'][0]['latest_quote'] is None
     render(data,evaluate(data,proposal),mapping,tmp_path/'restricted-close.pdf')
