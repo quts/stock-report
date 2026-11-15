@@ -74,8 +74,18 @@ def parser():
     bun.add_argument('--allow-fixture-capture', action='store_true', help='Offline tests only')
     bun.add_argument('--earnings-preview', type=Path, default=None,
                      help='EarningsPreviewReview JSON recording the next-earnings search; cited IDs must be in the bundle')
+    bun.add_argument('--operator-import', type=Path, action='append', default=None,
+                     help='Normalized import file written by import-market-data (operator-attested data)')
     bun.add_argument('--data-gaps', type=Path, default=None,
                      help='JSON list of DataGap records: required fields searched for but not usable, with status and sources tried')
+    imp = sub.add_parser('import-market-data', help='Validate operator-supplied prices/splits/consensus/peers CSV with a rights attestation')
+    imp.add_argument('--kind', required=True, choices=['prices', 'splits', 'consensus', 'peers'])
+    imp.add_argument('--csv', required=True, type=Path)
+    imp.add_argument('--ticker', required=True)
+    imp.add_argument('--exchange', required=True, choices=['TWSE', 'TPEx', 'NYSE', 'NASDAQ'])
+    imp.add_argument('--attestation', required=True, type=Path,
+                     help='JSON written by the operator: attested_by, attested_at, rights_statement, source_name, source_url')
+    imp.add_argument('--output', required=True, type=Path)
     tpl = sub.add_parser('request-template', help='Write a request whose cutoff follows the collection time')
     tpl.add_argument('--mode', choices=['stock'], default='stock')
     tpl.add_argument('--ticker', required=True)
@@ -174,7 +184,8 @@ def main(argv=None):
             data, report = build_bundle(request, collections, registry=load_registry(args.license_registry),
                                         allow_fixture_capture=args.allow_fixture_capture,
                                         earnings_preview=read_json(args.earnings_preview) if args.earnings_preview else None,
-                                        data_gaps=read_json(args.data_gaps) if args.data_gaps else None)
+                                        data_gaps=read_json(args.data_gaps) if args.data_gaps else None,
+                                        operator_imports=[read_json(p) for p in args.operator_import or []])
             args.output.parent.mkdir(parents=True, exist_ok=True)
             report_path = args.output.with_name(args.output.stem + '-report.json')
             write_json(report_path, report)
@@ -188,6 +199,12 @@ def main(argv=None):
             if data is not None:
                 write_json(args.output, data)
                 result['bundle_path'] = str(args.output)
+        elif args.command == 'import-market-data':
+            from .operator_import import read_csv
+            imported = read_csv(args.kind, args.csv, args.ticker, args.exchange, read_json(args.attestation))
+            write_json(args.output, imported)
+            result = {'status': 'imported', 'kind': args.kind, 'records': len(imported.rows), 'output': str(args.output),
+                      'attested_by': imported.attestation.attested_by}
         elif args.command == 'request-template':
             if args.output.exists():
                 raise ValueError('Refusing to overwrite an existing request; a supplied cutoff is never rewritten')

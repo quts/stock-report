@@ -478,26 +478,51 @@ class Assumption(Model):
     name: str = Field(min_length=1, max_length=80)
     value: float
     unit: str = Field(min_length=1, max_length=40)
-    basis: Literal['historical_fact', 'management_guidance', 'consensus', 'model_assumption']
-    evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+    basis: Literal['historical_fact', 'management_guidance', 'guidance_informed_model', 'consensus', 'model_assumption']
+    evidence_ids: list[str] = Field(default_factory=list, max_length=64)
+    rationale: str = Field(min_length=1, max_length=300)
+    source_period: str | None = None
+    forecast_period: str | None = None
+    accounting_basis: str | None = None
+    derivation: str | None = None
+
+
+ForecastDriver = Literal['revenue_growth', 'operating_margin', 'non_operating_ratio', 'tax_rate', 'share_change',
+                         'da_intensity', 'capex_intensity', 'working_capital_intensity', 'ocf_residual_intensity']
+
+
+class OperatingInvalidation(Model):
+    driver: ForecastDriver
+    operator: Literal['lt', 'gt']
+    threshold: float
+    period: str
     rationale: str = Field(min_length=1, max_length=300)
 
 
 class ScenarioProposal(Model):
     entity_id: str
     name: Literal['bull', 'base', 'bear']
+    # Must equal the engine's forecast horizon label (see investment_inputs.json forecast.horizon).
     target_period: str = Field(min_length=1, max_length=40)
-    assumptions: list[Assumption] = Field(min_length=1, max_length=8)
+    # Driver-based forecast: each driver is a percentage with its origin. Omitted drivers fall back to
+    # the deterministic historical anchor and are labelled historical_fact.
+    drivers: dict[ForecastDriver, Assumption] = Field(default_factory=dict)
+    forecast_method: Literal['quarterly', 'annual_sensitivity'] = 'quarterly'
+    guidance_fx_rate: float | None = Field(default=None, gt=0)
+    guidance_fx_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+    assumptions: list[Assumption] = Field(default_factory=list, max_length=8)
     financial_outcome: str = Field(min_length=1, max_length=400)
-    # The per-share (or EBITDA) figure the multiple is applied to, derived from the assumptions.
     valuation_metric: Literal['eps', 'fcf_per_share', 'book_value_per_share', 'ebitda']
-    valuation_metric_value: float
+    # Legacy direct input. With drivers the engine computes the metric; a supplied value must reconcile.
+    valuation_metric_value: float | None = None
     multiple_method: Literal['pe', 'p_fcf', 'p_b', 'ev_ebitda']
     multiple: float = Field(gt=0, le=200)
     multiple_basis: Literal['current_trailing', 'historical_range', 'peer_median', 'model_assumption']
     multiple_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
     catalysts: list[str] = Field(default_factory=list, max_length=5)
     invalidation_conditions: list[str] = Field(min_length=1, max_length=5)
+    operating_invalidations: list[OperatingInvalidation] = Field(default_factory=list, max_length=8)
+    leading_indicators: list[str] = Field(default_factory=list, max_length=5)
 
 
 class InvestmentThesis(Model):
@@ -524,7 +549,7 @@ class HorizonProposal(Model):
 class Proposal(Model):
     input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     model: str
-    prompt_version: Literal['5'] = '5'
+    prompt_version: Literal['6'] = '6'
     usage: dict[str, int] | None = None
     outlooks: list[HorizonProposal] = Field(max_length=10)
     company_research: list[CompanyResearch] = Field(default_factory=list, max_length=5)

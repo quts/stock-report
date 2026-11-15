@@ -12,7 +12,8 @@ TAIPEI = timezone(timedelta(hours=8))
 NEW_YORK = timezone(timedelta(hours=-5))
 
 # DELL fiscal quarters (FY ends late January): windows end on these dates.
-DELL_QUARTERS = [(date(2024, 5, 4), date(2024, 8, 2)), (date(2024, 8, 3), date(2024, 11, 1)),
+DELL_QUARTERS = [(date(2023, 8, 5), date(2023, 11, 3)), (date(2023, 11, 4), date(2024, 2, 2)),
+                 (date(2024, 2, 3), date(2024, 5, 3)), (date(2024, 5, 4), date(2024, 8, 2)), (date(2024, 8, 3), date(2024, 11, 1)),
                  (date(2024, 11, 2), date(2025, 1, 31)), (date(2025, 2, 1), date(2025, 5, 2)),
                  (date(2025, 5, 3), date(2025, 8, 1)), (date(2025, 8, 2), date(2025, 10, 31)),
                  (date(2025, 11, 1), date(2026, 1, 30)), (date(2026, 1, 31), date(2026, 5, 1)),
@@ -46,14 +47,15 @@ def fin(ticker, cutoff, metric, value, start, end, basis, unit, currency, **kw):
 def dell(cutoff=datetime(2026, 11, 15, 9, 0, tzinfo=UTC), price=150.0, price_day=date(2026, 11, 13),
          revenue_scale=1.0, net_income=None, extra=(), drop=()):
     t, items = 'DELL', []
-    revenues = [24.4, 24.4, 23.9, 23.4, 29.8, 27.0, 33.0, 37.0, 46.97]
-    incomes = net_income or [0.84, 1.13, 1.53, 0.97, 1.16, 1.5, 1.7, 2.6, 4.13]
+    revenues = [22.3, 22.3, 22.2, 24.4, 24.4, 23.9, 23.4, 29.8, 27.0, 33.0, 37.0, 46.97]
+    incomes = net_income or [1.0, 1.16, 0.96, 0.84, 1.13, 1.53, 0.97, 1.16, 1.5, 1.7, 2.6, 4.13]
     eps = [round(i / 0.70, 2) for i in incomes]
     for (start, end), r, n, e in zip(DELL_QUARTERS, revenues, incomes, eps):
         items += [fin(t, cutoff, 'revenue', r * 1e9 * revenue_scale, start, end, 'single_quarter', 'USD', 'USD', accounting_basis='gaap'),
                   fin(t, cutoff, 'operating_income', r * 1e9 * 0.075, start, end, 'single_quarter', 'USD', 'USD'),
                   fin(t, cutoff, 'gross_profit', r * 1e9 * 0.21, start, end, 'single_quarter', 'USD', 'USD'),
                   fin(t, cutoff, 'net_income', n * 1e9, start, end, 'single_quarter', 'USD', 'USD'),
+                  fin(t, cutoff, 'income_before_tax', n * 1e9 / 0.82, start, end, 'single_quarter', 'USD', 'USD'),
                   fin(t, cutoff, 'diluted_eps', e, start, end, 'single_quarter', 'per_share', 'USD'),
                   fin(t, cutoff, 'depreciation_amortization', 0.8e9, start, end, 'single_quarter', 'USD', 'USD'),
                   fin(t, cutoff, 'diluted_shares', 700e6, start, end, 'single_quarter', 'shares', None)]
@@ -73,6 +75,9 @@ def dell(cutoff=datetime(2026, 11, 15, 9, 0, tzinfo=UTC), price=150.0, price_day
                   fin(t, cutoff, 'inventory', inv * 1e9, None, end, 'instant', 'USD', 'USD'),
                   fin(t, cutoff, 'accounts_payable', ap * 1e9, None, end, 'instant', 'USD', 'USD'),
                   fin(t, cutoff, 'total_equity', eq * 1e9, None, end, 'instant', 'USD', 'USD')]
+    items.append(ev('dell-guidance-eps-gaap', t, cutoff, kind='event', statement_kind='management_guidance',
+                    financial_metric='diluted_eps', value=6.10, unit='per_share', currency='USD', accounting_basis='gaap',
+                    target_period='FY2027 Q3', target_period_end=date(2026, 10, 30), published_at=datetime(2026, 9, 1, 22, tzinfo=UTC)))
     items.append(ev('dell-guidance-rev', t, cutoff, kind='event', statement_kind='management_guidance',
                     financial_metric='revenue', value=49e9, unit='USD', currency='USD', target_period='FY2027 Q3',
                     target_period_end=date(2026, 10, 30), published_at=datetime(2026, 9, 1, 22, tzinfo=UTC)))
@@ -97,6 +102,7 @@ def tsmc(cutoff=datetime(2026, 11, 15, 21, 20, tzinfo=TAIPEI), price=2350.0, pri
     for (start, end), r, n in zip(TSMC_QUARTERS, revenues, incomes):
         items += [fin(t, cutoff, 'revenue', r * 1e9, start, end, 'single_quarter', 'TWD', 'TWD', accounting_basis='ifrs'),
                   fin(t, cutoff, 'net_income', n * 1e9, start, end, 'single_quarter', 'TWD', 'TWD', accounting_basis='ifrs'),
+                  fin(t, cutoff, 'income_before_tax', n * 1e9 / 0.84, start, end, 'single_quarter', 'TWD', 'TWD', accounting_basis='ifrs'),
                   fin(t, cutoff, 'gross_profit', r * 1e9 * 0.62, start, end, 'single_quarter', 'TWD', 'TWD'),
                   fin(t, cutoff, 'operating_income', r * 1e9 * 0.52, start, end, 'single_quarter', 'TWD', 'TWD'),
                   fin(t, cutoff, 'diluted_eps', round(n / 25.93, 2), start, end, 'single_quarter', 'per_share', 'TWD'),

@@ -28,6 +28,7 @@ case "$command" in
   smoke) run_container python scripts/source_smoke.py "$@" ;;
   contract) run_container python scripts/contract_probe.py "$@" ;;
   verify) run_container python scripts/verify.py "$@" ;;
+  model-review) run_container python scripts/model_review.py "$@" ;;
   review-sources) run_container python scripts/review_sources.py "$@" ;;
   *) echo 'Usage: scripts/runtime.sh build|test|cli|demo|qa|bundle|smoke|contract|review-sources|verify [arguments]' >&2; exit 2 ;;
 esac

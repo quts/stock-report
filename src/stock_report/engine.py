@@ -5,10 +5,11 @@ The model's proposal only contributes assumptions and interpretation; every numb
 shows is computed here from evidence.
 """
 from datetime import date
-from . import charts, completeness, expectations, fin_analysis, fin_series, materiality, quality_gates, scenarios, valuation
+from . import (charts, completeness, expectations, fin_analysis, fin_series, forecast, market_data, materiality, multiples,
+               quality_gates, scenarios, sector_drivers, valuation)
 from .research_contract import canonical_period, fiscal_year_end_month
 
-VERSION = '1'
+VERSION = '4'
 
 
 def jsonable(value):
@@ -30,12 +31,21 @@ def run(data, proposal=None, decision=None):
     analysis = fin_analysis.analyse(data, series, entity.entity_id)
     for row in analysis['quarters']:
         row['label'] = canonical_period(row['start'], row['end'], 'single_quarter', fy_end)
-    values = valuation.value(data, series, entity, analysis)
+    price_series = market_data.prices(data, entity)
+    refs = multiples.references(data, series, price_series, entity.entity_id)
+    values = valuation.value(data, series, entity, analysis, refs)
+    anchor = forecast.anchors(series, analysis)
+    anchor['calibration'] = forecast.calibration(anchor)
+    anchor['backtest'] = forecast.backtest(data, entity.entity_id)
     expect = expectations.compare(data, series, entity.entity_id)
     complete = completeness.assess(data, series, analysis, values, expect, entity.entity_id)
-    scen = scenarios.evaluate(data, proposal, values, entity)
+    scen = scenarios.evaluate(data, proposal, values, entity, anchor, refs)
+    _, profile = fin_analysis.sector_profile(entity.entity_id)
     engine = {'version': VERSION, 'entity_id': entity.entity_id, 'currency': entity.currency,
               'fiscal_year_end_month': fy_end, 'series': series, 'analysis': analysis, 'valuation': values,
+              'forecast': anchor, 'sector_drivers': sector_drivers.compute(series, analysis, profile),
+              'market_data': {'status': price_series['status'], 'history_points': len(price_series['points']),
+                              'diagnostics': price_series['diagnostics']},
               'expectations': expect, 'completeness': complete, 'scenarios': scen, 'events': materiality.rank(data)}
     engine['thesis'] = [t.model_dump(mode='json') for t in proposal.thesis if t.entity_id == entity.entity_id] if proposal else []
     engine['gates'] = quality_gates.run(data, proposal, engine, entity, decision) if proposal else None
@@ -55,7 +65,9 @@ def charts_for(engine):
                                             ('淨利率', [r['net_margin'] for r in rows])])}
     scen = engine['scenarios']
     if scen['scenarios']:
-        out['scenarios'] = charts.scenario_bars(scen['scenarios'], engine['valuation']['market']['price'].get('value'))
+        rows = [{**r, 'implied_price': r['implied_price_display']} for r in scen['scenarios']]
+        price = engine['valuation']['market']['price']
+        out['scenarios'] = charts.scenario_bars(rows, price.get('value') if price.get('status') == 'available' else None)
     return out
 
 

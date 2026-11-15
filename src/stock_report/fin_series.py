@@ -13,8 +13,15 @@ from datetime import timedelta
 from .policy import reportable
 from .research_contract import accounting_bucket
 
+# Signed cash-flow movements are separate metrics from period-end balance-sheet balances.
+CF_FLOW_METRICS = ('cf_other_noncash_adjustments', 'cf_working_capital_cash_movement',
+                  'cf_share_based_compensation', 'cf_deferred_tax', 'cf_other_noncash',
+                  'cf_receivables', 'cf_inventory', 'cf_payables', 'cf_financing_receivables',
+                  'cf_other_operating_assets_liabilities')
+
 FLOW_METRICS = ('revenue', 'gross_profit', 'operating_income', 'net_income', 'operating_cash_flow',
-                'capital_expenditure', 'depreciation_amortization', 'income_before_tax', 'income_tax')
+                'capital_expenditure', 'depreciation_amortization', 'income_before_tax', 'income_tax', 'interest_expense',
+                *CF_FLOW_METRICS)
 INSTANT_METRICS = ('cash_equivalents', 'accounts_receivable_net', 'accounts_receivable', 'inventory',
                    'accounts_payable', 'short_term_debt', 'long_term_debt', 'bonds_payable', 'total_debt',
                    'total_equity', 'total_assets', 'total_liabilities', 'shares_outstanding',
@@ -34,6 +41,7 @@ def usable_facts(data, entity_id):
     return [e for e in data.evidence
             if e.entity_id == entity_id and e.kind == 'financial' and e.statement_kind == 'fact'
             and e.financial_metric and e.value is not None and e.period_end is not None
+            and not e.financial_metric.startswith('peer_') and e.financial_metric != 'split_ratio'
             and e.unit != 'source_scale_undeclared' and reportable(e, data.request)]
 
 

@@ -129,3 +129,7 @@ NVDA 個股修正已加入受查核 SEC 8-K 文件採集與重大事件優先呈
 ### 投資研究版型（2026-11-15）
 
 `report_profile=investment`（`max_pdf_pages` 4–8）在既有管線上加入確定性的投資研究層，台股與美股共用：季度序列與 TTM、財務分析、依產業選擇的估值方法、Bull／Base／Bear 情境、指引 vs 共識比較、事件影響排序、資料完整性，以及發布前品質檢查。任一關鍵檢查失敗時，報告會在首頁標示為受限報告。`prepare` 會輸出 `investment_inputs.json` 給提案引用，`finalize` 另寫 `investment.json`。美股季度資料可用 `collect --source sec-xbrl-companyconcept --source-profile '{"series":"quarterly"}'` 取得。設計與限制見 [差距分析](docs/phase-0/investment-engine-gap-analysis.md)，新舊報告比較見 [報告比較](docs/phase-0/investment-engine-report-comparison.md)。
+
+### 估值可靠度（2026-11-15）
+
+情境改由驅動因子推導財務預測：營收成長、利潤率、稅率、業外、股數、折舊攤銷、資本支出、營運資金，每一項都標明出處。倍數只有落在足量的歷史或同業區間內才算有證據，否則標示為假設性估值敏感度。市場資料層依交易所設定的優先順序選擇來源，並使用交易日曆判斷過期。沒有合法免費來源的價格、共識與同業資料，可由使用者以 `import-market-data` 匯入，但必須附上本人的權利聲明。詳見 [估值可靠度](docs/phase-0/valuation-reliability.md)。

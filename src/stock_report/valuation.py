@@ -10,41 +10,9 @@ from .fin_series import latest_instant
 from .fin_analysis import debt_at, sector_profile
 from .policy import reportable
 
-MAX_PRICE_LAG_TRADING_DAYS = 3
-EXCHANGE_TZ_HOURS = {'TWSE': 8, 'TPEx': 8, 'NYSE': -5, 'NASDAQ': -5}
 METHOD_LABELS = {'pe_trailing': '本益比（TTM）', 'pe_forward': '預估本益比（共識）', 'ev_ebitda': 'EV/EBITDA',
                  'p_fcf': '股價／自由現金流', 'fcf_yield': '自由現金流殖利率', 'p_b': '股價淨值比',
                  'historical_range': '歷史估值區間', 'peer_relative': '同業相對估值', 'scenario': '情境估值'}
-
-
-def weekdays_between(earlier, later):
-    """Weekdays strictly after `earlier` up to and including `later`; exchange holidays are not modelled."""
-    days, day = 0, earlier
-    while day < later:
-        day += timedelta(days=1)
-        days += day.weekday() < 5
-    return days
-
-
-def latest_price(data, entity):
-    quotes = [e for e in data.evidence if e.entity_id == entity.entity_id and e.kind == 'price'
-              and e.metric_key == 'close' and e.value and e.value > 0 and reportable(e, data.request)]
-    if not quotes:
-        return None, {'status': 'not_found', 'note': '沒有已查核且可內部使用的收盤價來源'}
-    quote = max(quotes, key=lambda e: (e.event_time, e.evidence_id))
-    if quote.currency != entity.currency:
-        return None, {'status': 'conflicting', 'note': f'收盤價幣別 {quote.currency} 與報表幣別 {entity.currency} 不同'}
-    from datetime import timezone
-    tz = timezone(timedelta(hours=EXCHANGE_TZ_HOURS.get(entity.exchange, 0)))
-    trade_day = quote.event_time.astimezone(tz).date()
-    lag = weekdays_between(trade_day, data.request.research_as_of.astimezone(tz).date())
-    info = {'status': 'available', 'value': quote.value, 'currency': quote.currency, 'trade_date': trade_day.isoformat(),
-            'evidence_ids': [quote.evidence_id], 'trading_days_lag': lag,
-            'note': '交易日以週一至週五估算，未納入交易所假日'}
-    if lag > MAX_PRICE_LAG_TRADING_DAYS:
-        info['status'] = 'stale'
-        info['note'] = f'收盤價距截止時點 {lag} 個交易日，超過 {MAX_PRICE_LAG_TRADING_DAYS} 日'
-    return quote, info
 
 
 def result(method, status, value=None, unit=None, inputs=(), formula=None, limitations=(), as_of=None):
@@ -69,11 +37,30 @@ def shares(series):
     return None
 
 
-def value(data, series, entity, analysis):
+def market_price(data, entity):
+    """Latest usable close from the market-data layer, in the shape the valuation uses."""
+    from types import SimpleNamespace
+    from .market_data import prices
+    series = prices(data, entity)
+    latest = series['latest']
+    info = {'status': series['status'], 'note': series['note'], 'diagnostics': series['diagnostics'],
+            'history_points': len(series['points'])}
+    if latest is None or series['status'] != 'available':
+        if latest is not None:
+            info.update(value=latest['close'], trade_date=latest['date'].isoformat(), evidence_ids=[latest['evidence_id']])
+        return None, info, series
+    info.update(value=latest['close'], currency=entity.currency, trade_date=latest['date'].isoformat(),
+                evidence_ids=[latest['evidence_id']], trading_days_lag=series['trading_days_lag'],
+                calendar_verified=series['calendar_verified'], provider=latest['provider'])
+    return SimpleNamespace(value=latest['close'], currency=entity.currency, evidence_id=latest['evidence_id']), info, series
+
+
+def value(data, series, entity, analysis, references=None):
     profile_name, profile = sector_profile(entity.entity_id)
     methods = profile['valuation_methods']
     as_of = data.request.research_as_of.isoformat()
-    quote, price = latest_price(data, entity)
+    quote, price, _ = market_price(data, entity)
+    references = references or {'historical_pe': {'status': 'insufficient', 'note': '未計算'}, 'peers': {}}
     results, market = [], {'price': price}
     share = shares(series)
     if share:
@@ -87,7 +74,7 @@ def value(data, series, entity, analysis):
         market['enterprise_value'] = market['market_cap'] + market['net_debt']
         market['net_debt_ids'] = debt[2] + cash['evidence_ids']
     price_ok = price['status'] == 'available'
-    no_price = '缺少可用的最新收盤價' if price['status'] == 'not_found' else price['note']
+    no_price = {'stale': '收盤價過期', 'conflicting': '來源收盤價互相衝突'}.get(price['status'], '缺少可合法取得的最新收盤價')
     eps_metric = next((m for m in analysis['metrics'] if m['name'] == 'eps_ttm' and m['status'] == 'available'), None)
     eps = None if eps_metric is None else {'value': eps_metric['value'], 'evidence_ids': eps_metric['evidence_ids'],
                                            'window': eps_metric['window'], 'formula': eps_metric['formula']}
@@ -164,13 +151,35 @@ def value(data, series, entity, analysis):
                                                   equity['evidence_ids'] + market['shares']['evidence_ids'])],
                                       formula='price / (equity / shares)'))
         elif method == 'historical_range':
-            results.append(result(method, 'source_unavailable', as_of=as_of, limitations=[
-                '沒有已查核的歷史股價序列，無法建立歷史本益比區間']))
+            ref = references['historical_pe']
+            if ref['status'] in ('sufficient', 'limited'):
+                st = ref['stats']
+                current = next((r for r in results if r['method'] == 'pe_trailing' and r['status'] == 'available'), None)
+                results.append(result(method, 'available', st['median'], 'x', as_of=as_of,
+                                      inputs=[inp('historical_pe_points', st['count'], 'count',
+                                                  [i for p in ref['points'] for i in p['evidence_ids']][:40],
+                                                  f'{ref["points"][0]["date"]}~{ref["points"][-1]["date"]}')],
+                                      formula=f'季末本益比中位數（區間 {st["min"]:.1f}–{st["max"]:.1f}，四分位 {st["p25"]:.1f}–{st["p75"]:.1f}）',
+                                      limitations=[n for n in [ref.get('note'), None if current is None else
+                                                   f'目前 {current["value"]:.1f} 倍']+['以季末收盤價對當時 TTM EPS'] if n]))
+            else:
+                results.append(result(method, 'source_unavailable' if price['history_points'] < 2 else 'not_found', as_of=as_of,
+                                      limitations=[f'歷史收盤價只有 {price["history_points"]} 筆；沒有已查核的歷史股價序列，'
+                                                   '無法建立歷史本益比區間（可用 import-market-data 匯入有權使用的歷史收盤價）']))
         elif method == 'peer_relative':
-            results.append(result(method, 'not_found', as_of=as_of, limitations=[
-                '沒有已查核的同業估值資料；不以未查核網站的倍數比較']))
+            ref = references['peers'].get('pe_trailing')
+            if ref and ref['status'] == 'sufficient':
+                st = ref['stats']
+                results.append(result(method, 'available', st['median'], 'x', as_of=as_of,
+                                      inputs=[inp('peer_pe_median', st['median'], 'x', ref['evidence_ids'], '、'.join(ref['peers']))],
+                                      formula=f'同業本益比中位數（{st["count"]} 家，{st["min"]:.1f}–{st["max"]:.1f}）'))
+            else:
+                results.append(result(method, 'not_found', as_of=as_of, limitations=[
+                    '同業估值資料不足（少於 3 家）；不以未查核網站的倍數比較' if ref else
+                    '沒有已查核或使用者匯入的同業估值資料']))
     available = [r for r in results if r['status'] == 'available']
-    reference = [r for r in available if r['method'] in ('historical_range', 'peer_relative')]
+    reference = [r for r in available if r['method'] in ('historical_range', 'peer_relative')
+                 and not any('只有' in n for n in r['limitations'])]
     if not price_ok:
         assessment = 'unavailable'
     elif not available:
@@ -180,4 +189,4 @@ def value(data, series, entity, analysis):
     else:
         assessment = 'evaluated'
     return {'profile': profile_name, 'methods_considered': methods, 'results': results, 'market': market,
-            'assessment': assessment}
+            'assessment': assessment, 'references': references}

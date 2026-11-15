@@ -319,7 +319,8 @@ def exclusion_reason(evidence, request):
     return None
 
 
-def build_bundle(request, collections, *, registry, allow_fixture_capture=False, earnings_preview=None, data_gaps=None):
+def build_bundle(request, collections, *, registry, allow_fixture_capture=False, earnings_preview=None, data_gaps=None,
+                 operator_imports=None):
     """Return (research_input_or_None, report). Blockers are reported, never worked around."""
     cutoff = request.research_as_of
     blockers, exclusions, notes, evidence, summary = [], [], [], [], []
@@ -442,6 +443,20 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False,
         latest_financials = LatestFinancialReview(discovery=discovery,
             evidence_ids=[e.evidence_id for e in evidence if e.kind == 'financial'
                           and e.source_url == discovery.document_url])
+    # Operator-attested imports (prices, splits, consensus, peers) are secondary evidence with stated provenance.
+    if operator_imports:
+        from .operator_import import evidence as imported_evidence
+        known = {e.evidence_id for e in evidence}
+        for item in operator_imports:
+            rows = imported_evidence(item, request)
+            clash = sorted(known & {e.evidence_id for e in rows})
+            if clash:
+                raise ValueError(f'Operator import duplicates evidence IDs: {clash[:5]}')
+            known |= {e.evidence_id for e in rows}
+            evidence = evidence + rows
+            report.setdefault('operator_imports', []).append(
+                {'kind': item['kind'], 'records': len(rows), 'attested_by': item['attestation']['attested_by'],
+                 'source': item['attestation']['source_name']})
     # Every review object is validated together with the evidence it cites, never attached afterwards.
     data = ResearchInput(dataset_kind=dataset_kind, request=request, entities=[entity], evidence=evidence,
                          metrics=calculate(evidence, cutoff), relationships=[], event_evidence_ids=[],

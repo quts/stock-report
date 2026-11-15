@@ -22,6 +22,7 @@ def _metric(analysis, name):
 
 
 def assess(data, series, analysis, valuation, expectations, entity_id):
+    """`valuation` carries the market block and the historical/peer references."""
     profile_name, profile = sector_profile(entity_id)
     mandatory = set(profile['mandatory'])
     gaps = {g.field: g for g in data.data_gaps}
@@ -32,7 +33,10 @@ def assess(data, series, analysis, valuation, expectations, entity_id):
         if field == 'price_latest':
             return price['status'], price.get('note')
         if field == 'price_history':
-            return 'not_found', '沒有已查核的歷史股價來源'
+            ref = valuation.get('references', {}).get('historical_pe', {})
+            if ref.get('status') == 'sufficient':
+                return 'available', f'{ref["stats"]["count"]} 個季末估值點'
+            return 'not_found', f'歷史收盤價 {price.get("history_points", 0)} 筆，不足以建立歷史估值區間'
         if field == 'shares':
             return ('available', market['shares'].get('note')) if 'shares' in market else ('not_found', '沒有股數資料')
         if field == 'market_cap':
@@ -72,7 +76,10 @@ def assess(data, series, analysis, valuation, expectations, entity_id):
         if field == 'consensus':
             return ('available', None) if expectations['consensus'] else ('not_found', '沒有已查核的共識來源')
         if field == 'peers':
-            return 'not_found', '沒有已查核的同業估值資料'
+            peer = valuation.get('references', {}).get('peers', {}).get('pe_trailing')
+            if peer and peer['status'] == 'sufficient':
+                return 'available', f'{peer["stats"]["count"]} 家同業'
+            return 'not_found', '同業估值資料不足或未匯入'
         return 'not_found', None
 
     rows = []

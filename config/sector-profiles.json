@@ -1,42 +1,217 @@
 {
   "schema_version": "1",
-  "config_version": "0.1.0",
-  "notes": "Generic, sector-aware analysis framework. A profile says which metrics matter, which valuation methods are meaningful, and what to look for when interpreting them; it never encodes a company-specific conclusion. Tickers map to a profile by operator configuration; an unmapped ticker uses `general`.",
+  "config_version": "0.2.0",
+  "notes": "Generic, sector-aware analysis framework. A profile says which metrics matter, which valuation methods are meaningful, and what to look for when interpreting them; it never encodes a company-specific conclusion. Tickers map to a profile by operator configuration; an unmapped ticker uses `general`. `drivers` lists sector operating drivers computed by sector_drivers.py. `multiple_sanity_bounds` are wide plausibility limits used only to flag outliers (a WARNING); they are not fair-value ranges and never make a multiple evidence-based.",
   "profiles": {
     "general": {
       "label": "一般產業",
-      "key_metrics": ["revenue_growth_yoy", "operating_margin", "fcf_conversion", "net_debt_to_ebitda"],
-      "valuation_methods": ["pe_trailing", "pe_forward", "ev_ebitda", "p_fcf", "fcf_yield", "historical_range", "peer_relative", "scenario"],
-      "interpretation": ["成長是否來自量或價，並看利潤率是否同步改善", "盈餘是否轉成現金（OCF/淨利、FCF 轉換率）"],
-      "mandatory": ["price_latest", "revenue_quarterly", "net_income_quarterly", "eps", "operating_cash_flow", "capital_expenditure", "shares"]
+      "key_metrics": [
+        "revenue_growth_yoy",
+        "operating_margin",
+        "fcf_conversion",
+        "net_debt_to_ebitda"
+      ],
+      "valuation_methods": [
+        "pe_trailing",
+        "pe_forward",
+        "ev_ebitda",
+        "p_fcf",
+        "fcf_yield",
+        "historical_range",
+        "peer_relative",
+        "scenario"
+      ],
+      "interpretation": [
+        "成長是否來自量或價，並看利潤率是否同步改善",
+        "盈餘是否轉成現金（OCF/淨利、FCF 轉換率）"
+      ],
+      "mandatory": [
+        "price_latest",
+        "revenue_quarterly",
+        "net_income_quarterly",
+        "eps",
+        "operating_cash_flow",
+        "capital_expenditure",
+        "shares"
+      ],
+      "drivers": [
+        "working_capital_days"
+      ],
+      "multiple_sanity_bounds": {
+        "pe": [
+          8,
+          30
+        ]
+      }
     },
     "semiconductor_manufacturing": {
       "label": "半導體製造",
-      "key_metrics": ["revenue_growth_yoy", "gross_margin", "operating_margin", "capex_intensity", "fcf_conversion", "process_mix"],
-      "valuation_methods": ["pe_trailing", "pe_forward", "ev_ebitda", "p_fcf", "fcf_yield", "historical_range", "peer_relative", "scenario"],
-      "interpretation": ["資本支出強度與產能利用率決定未來毛利率與自由現金流", "先進製程占比反映定價能力與技術領先", "毛利率對匯率與新製程爬坡成本敏感"],
-      "mandatory": ["price_latest", "revenue_quarterly", "net_income_quarterly", "eps", "operating_cash_flow", "capital_expenditure", "shares"]
+      "key_metrics": [
+        "revenue_growth_yoy",
+        "gross_margin",
+        "operating_margin",
+        "capex_intensity",
+        "fcf_conversion",
+        "process_mix"
+      ],
+      "valuation_methods": [
+        "pe_trailing",
+        "pe_forward",
+        "ev_ebitda",
+        "p_fcf",
+        "fcf_yield",
+        "historical_range",
+        "peer_relative",
+        "scenario"
+      ],
+      "interpretation": [
+        "資本支出強度與產能利用率決定未來毛利率與自由現金流",
+        "先進製程占比反映定價能力與技術領先",
+        "毛利率對匯率與新製程爬坡成本敏感"
+      ],
+      "mandatory": [
+        "price_latest",
+        "revenue_quarterly",
+        "net_income_quarterly",
+        "eps",
+        "operating_cash_flow",
+        "capital_expenditure",
+        "shares"
+      ],
+      "drivers": [
+        "capex_intensity",
+        "depreciation_intensity",
+        "incremental_gross_margin",
+        "advanced_node_share"
+      ],
+      "multiple_sanity_bounds": {
+        "pe": [
+          10,
+          35
+        ]
+      }
     },
     "hardware_ai_infrastructure": {
       "label": "AI 基礎設施／硬體",
-      "key_metrics": ["revenue_growth_yoy", "gross_margin", "operating_margin", "fcf_conversion", "working_capital_change", "inventory_growth", "receivables_growth"],
-      "valuation_methods": ["pe_trailing", "pe_forward", "ev_ebitda", "p_fcf", "fcf_yield", "historical_range", "peer_relative", "scenario"],
-      "interpretation": ["訂單與積壓轉成營收的速度", "存貨與應收帳款是否快於營收成長，侵蝕現金轉換", "AI 產品組合對毛利率的稀釋"],
-      "mandatory": ["price_latest", "revenue_quarterly", "net_income_quarterly", "eps", "operating_cash_flow", "capital_expenditure", "shares"]
+      "key_metrics": [
+        "revenue_growth_yoy",
+        "gross_margin",
+        "operating_margin",
+        "fcf_conversion",
+        "working_capital_change",
+        "inventory_growth",
+        "receivables_growth"
+      ],
+      "valuation_methods": [
+        "pe_trailing",
+        "pe_forward",
+        "ev_ebitda",
+        "p_fcf",
+        "fcf_yield",
+        "historical_range",
+        "peer_relative",
+        "scenario"
+      ],
+      "interpretation": [
+        "訂單與積壓轉成營收的速度",
+        "存貨與應收帳款是否快於營收成長，侵蝕現金轉換",
+        "AI 產品組合對毛利率的稀釋"
+      ],
+      "mandatory": [
+        "price_latest",
+        "revenue_quarterly",
+        "net_income_quarterly",
+        "eps",
+        "operating_cash_flow",
+        "capital_expenditure",
+        "shares"
+      ],
+      "drivers": [
+        "working_capital_days",
+        "inventory_demand_assessment",
+        "backlog",
+        "orders",
+        "financing_receivables_growth"
+      ],
+      "multiple_sanity_bounds": {
+        "pe": [
+          8,
+          25
+        ]
+      }
     },
     "software": {
       "label": "軟體",
-      "key_metrics": ["revenue_growth_yoy", "gross_margin", "operating_margin", "fcf_conversion"],
-      "valuation_methods": ["pe_forward", "ev_ebitda", "p_fcf", "fcf_yield", "historical_range", "peer_relative", "scenario"],
-      "interpretation": ["ARR、續約率與遞延收入反映經常性收入", "自由現金流常高於 GAAP 淨利，需看股權激勵費用"],
-      "mandatory": ["price_latest", "revenue_quarterly", "operating_cash_flow", "shares"]
+      "key_metrics": [
+        "revenue_growth_yoy",
+        "gross_margin",
+        "operating_margin",
+        "fcf_conversion"
+      ],
+      "valuation_methods": [
+        "pe_forward",
+        "ev_ebitda",
+        "p_fcf",
+        "fcf_yield",
+        "historical_range",
+        "peer_relative",
+        "scenario"
+      ],
+      "interpretation": [
+        "ARR、續約率與遞延收入反映經常性收入",
+        "自由現金流常高於 GAAP 淨利，需看股權激勵費用"
+      ],
+      "mandatory": [
+        "price_latest",
+        "revenue_quarterly",
+        "operating_cash_flow",
+        "shares"
+      ],
+      "drivers": [
+        "working_capital_days"
+      ],
+      "multiple_sanity_bounds": {
+        "pe": [
+          15,
+          60
+        ]
+      }
     },
     "financials": {
       "label": "金融業",
-      "key_metrics": ["roe", "net_income_growth_yoy"],
-      "valuation_methods": ["p_b", "pe_trailing", "historical_range", "peer_relative", "scenario"],
-      "interpretation": ["資本適足率與資產品質決定可承擔的風險", "EV/EBITDA 與 FCF 對金融業不適用：負債是營業原料"],
-      "mandatory": ["price_latest", "net_income_quarterly", "eps", "total_equity", "shares"]
+      "key_metrics": [
+        "roe",
+        "net_income_growth_yoy"
+      ],
+      "valuation_methods": [
+        "p_b",
+        "pe_trailing",
+        "historical_range",
+        "peer_relative",
+        "scenario"
+      ],
+      "interpretation": [
+        "資本適足率與資產品質決定可承擔的風險",
+        "EV/EBITDA 與 FCF 對金融業不適用：負債是營業原料"
+      ],
+      "mandatory": [
+        "price_latest",
+        "net_income_quarterly",
+        "eps",
+        "total_equity",
+        "shares"
+      ],
+      "drivers": [],
+      "multiple_sanity_bounds": {
+        "pe": [
+          6,
+          20
+        ],
+        "p_b": [
+          0.5,
+          3
+        ]
+      }
     }
   },
   "tickers": {

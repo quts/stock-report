@@ -20,8 +20,15 @@ event_review.events 的已核實重大事件必須納入判斷；未解決線索
 股價估值不足不應刪掉有證據的公司基本面及營運分析；限制集中在末頁。company_research的事實分析獨立於outlook股價方向，但不得暗示被Gate拒絕的買賣建議。
 投資版型（report_profile=investment）另讀 investment_inputs.json：季度序列、財務指標、估值結果與資料缺口都已由 Python 計算，正文數字只能取自證據或該檔。
 thesis：market_pricing 說明目前股價隱含的預期（估值不可用時照實說明無法判斷），key_assumptions 列最影響報酬的假設，supporting／opposing 分列正反證據，invalidation 寫可驗證的推翻條件。
-scenarios：bull、base、bear 各一；每個假設標明 basis（historical_fact、management_guidance、consensus、model_assumption）並引用證據，指引不得標為 consensus。
-valuation_metric_value 由假設推得並在 financial_outcome 說明算法；倍數基礎沒有歷史或同業資料時必須標 model_assumption。不得給機率，不得捏造目標價或共識。
+scenarios：bull、base、bear 各一；target_period 必須等於 investment_inputs.json 的 forecast.horizon.label。
+不要直接指定 EPS：以 drivers（revenue_growth、operating_margin、non_operating_ratio、tax_rate、share_change、da_intensity、capex_intensity，皆為百分比）描述營運假設，程式逐季推導營收、淨利、EPS 與 CapEx，四季合計 NTM。
+Base 必須 forecast_method=quarterly：使用同季去年季節性、近期趨勢及明示假設。單季指引僅適用其實際季度；跨幣別換算需 guidance_fx_rate 與已核實 guidance_fx_evidence_ids。annual_sensitivity 僅作另列敏感度，不能作為 Base。
+OCF 需現金流量表非現金調整與有符號營運資金現金變動完整勾稽；餘額變化不是現金流，working_capital_intensity 僅診斷，禁止外推 ocf_residual_intensity。資料不全則 OCF／FCF 留白，不自行補值。
+每個 driver 須有 source_period、forecast_period、accounting_basis、derivation；逐季推估的衍生數字不可標為直接 management_guidance。operating_invalidations 須以同 NTM 期間營收成長、營業利益率的反向門檻檢驗，leading_indicators 另列。
+backtest.metrics 只含嚴格時點樣本；revised_diagnostic 是修訂歷史資料測試，不得混入時點樣本。樣本、覆蓋或現金流勾稽不足時一律維持 hypothetical_sensitivity，不得稱為驗證預測。
+沒填的 driver 會採用 forecast.drivers 的歷史錨點；歷史成長屬極端（status=extreme）時，必須以指引、共識或明確的 model_assumption 取代，不能直接外推。
+每個 driver 標明 basis（historical_fact 須落在歷史區間內；management_guidance／consensus 須引用對應證據，指引不得標為 consensus）。
+倍數：只有在 valuation.references 的歷史區間或同業資料為 sufficient 且倍數落在區間內時，才能標 historical_range／peer_median；否則標 model_assumption，結果是假設性敏感度，不得稱為目標價或合理價。EPS 與倍數不必同向。不得給機率，不得捏造共識。
 '''
 
 
