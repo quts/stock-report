@@ -1,0 +1,167 @@
+{
+  "schema_version": "1",
+  "package_id": "sec-nvda-activation-2026-11-15",
+  "prepared_at": "2026-11-15T07:17:19.963635+00:00",
+  "prepared_by": "Codex AI",
+  "prepared_by_kind": "assistant",
+  "status": "awaiting_source_review",
+  "registry_baseline_version": "0.5.1",
+  "target": {
+    "ticker": "NVDA",
+    "cik": "0001045810",
+    "expected_entity_name_contains": "NVIDIA",
+    "exchange": "NASDAQ",
+    "currency": "USD",
+    "share_class": "common",
+    "entity_config": "config/sec-entities.json"
+  },
+  "items": [
+    {
+      "source_id": "sec-xbrl-companyconcept",
+      "recommendation": "ready_for_source_review",
+      "endpoint": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "dataset_page": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+      "dataset_resource": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "license_name": "SEC public EDGAR filing content reuse policy",
+      "license_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+      "field_binding": {
+        "cik": [
+          "cik"
+        ],
+        "entity_name": [
+          "entityName"
+        ]
+      },
+      "sec_binding": {
+        "taxonomy": "us-gaap",
+        "annual_forms": [
+          "10-K"
+        ],
+        "min_period_days": 300,
+        "max_period_days": 400,
+        "roles": {
+          "revenue": {
+            "concepts": [
+              "RevenueFromContractWithCustomerExcludingAssessedTax",
+              "Revenues",
+              "SalesRevenueNet"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "revenue_current",
+              "revenue_prior"
+            ],
+            "required": true
+          },
+          "net_income": {
+            "concepts": [
+              "NetIncomeLoss"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "net_income"
+            ],
+            "required": true
+          },
+          "eps": {
+            "concepts": [
+              "EarningsPerShareDiluted",
+              "EarningsPerShareBasic"
+            ],
+            "units": [
+              "USD/shares"
+            ],
+            "unit": "per_share",
+            "metric_keys": [
+              "eps_current",
+              "eps_prior"
+            ],
+            "required": false
+          },
+          "operating_cash_flow": {
+            "concepts": [
+              "NetCashProvidedByUsedInOperatingActivities",
+              "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "operating_cash_flow"
+            ],
+            "required": false
+          },
+          "capital_expenditure": {
+            "concepts": [
+              "PaymentsToAcquirePropertyPlantAndEquipment"
+            ],
+            "units": [
+              "USD"
+            ],
+            "unit": "USD",
+            "metric_keys": [
+              "capital_expenditure"
+            ],
+            "required": false
+          }
+        },
+        "request_urls": [
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/Revenues.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/SalesRevenueNet.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetIncomeLoss.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/EarningsPerShareDiluted.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/EarningsPerShareBasic.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetCashProvidedByUsedInOperatingActivities.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/NetCashProvidedByUsedInOperatingActivitiesContinuingOperations.json",
+          "https://data.sec.gov/api/xbrl/companyconcept/CIK0001045810/us-gaap/PaymentsToAcquirePropertyPlantAndEquipment.json"
+        ]
+      },
+      "evidence_produced": [
+        "NVDA identity",
+        "Annual revenue, net income, EPS, operating cash flow and capital expenditure where present"
+      ],
+      "retained_normalized_fields": [
+        "Normalized facts, units, fiscal periods, filing dates and accession identifiers"
+      ],
+      "not_retained": [
+        "Raw responses",
+        "Response hashes",
+        "Contact details"
+      ],
+      "identity_findings": [
+        "Official NVDA 10-Q cover and live CIK/entityName contract agree."
+      ],
+      "time_findings": [
+        "Date-only filed timestamps use conservative end-of-day bound; annual facts only."
+      ],
+      "license_findings": [
+        "Official SEC FAQ permits free access and reuse of EDGAR public filing content."
+      ],
+      "proposed_scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "proposed_attribution": "Source: U.S. SEC EDGAR XBRL company concept API; normalized public filing facts, private use only.",
+      "report_effect": "Private normalized annual financial evidence only; missing prices and events remain missing.",
+      "review_checklist": [
+        "Verify official API, identity, filing dates, reuse policy and free access."
+      ],
+      "open_questions": []
+    }
+  ],
+  "human_attestation": null,
+  "source_review": null,
+  "notes": [
+    "AI review under user authorization; private use only. Live-tested issuer NVDA."
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-11-15T06:33:33.534524+00:00",
+  "csv_url": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data",
+  "json_url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+  "unique_target": true,
+  "name_matches": true,
+  "close_matches": true,
+  "date_matches": true,
+  "swagger_lists_endpoint": true,
+  "retained_source_values": false,
+  "retained_response_hash": false
+}

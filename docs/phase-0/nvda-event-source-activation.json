@@ -1,0 +1,75 @@
+{
+  "schema_version": "1",
+  "package_id": "sec-nvda-event-activation-20261115",
+  "prepared_at": "2026-11-15T07:48:31.683860+00:00",
+  "prepared_by": "Codex AI",
+  "prepared_by_kind": "assistant",
+  "status": "awaiting_source_review",
+  "registry_baseline_version": "0.5.1",
+  "target": {
+    "ticker": "NVDA",
+    "cik": "0001045810",
+    "expected_entity_name_contains": "NVIDIA",
+    "exchange": "NASDAQ",
+    "currency": "USD",
+    "share_class": "common",
+    "entity_config": "config/sec-entities.json"
+  },
+  "items": [
+    {
+      "source_id": "sec-edgar-archives-filing",
+      "recommendation": "ready_for_source_review",
+      "endpoint": "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}",
+      "dataset_page": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+      "dataset_resource": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/nvda-20261111.htm",
+      "license_name": "SEC EDGAR public filing reuse policy",
+      "license_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+      "field_binding": {
+        "cik": [
+          "archive_path_cik"
+        ],
+        "accession": [
+          "archive_path_accession"
+        ]
+      },
+      "sec_binding": null,
+      "evidence_produced": [
+        "Issuer-filed material events and scheduled catalysts"
+      ],
+      "retained_normalized_fields": [
+        "Reviewed facts, source URL, dates and evidence IDs"
+      ],
+      "not_retained": [
+        "Raw responses",
+        "Response hashes",
+        "Contact details"
+      ],
+      "identity_findings": [
+        "SEC檔案路徑CIK1045810與公司名稱、NVDA及NASDAQ封面一致。"
+      ],
+      "time_findings": [
+        "索引記載接受時間；本次採較保守的11/12美東固定UTC-05當日末作公開上界。"
+      ],
+      "license_findings": [
+        "官方FAQ允許公開申報內容免費存取再利用；僅正規化事實供個人PDF，原始回應、雜湊與分享維持關閉。"
+      ],
+      "proposed_scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "proposed_attribution": "Source: SEC EDGAR issuer filings; normalized facts for personal use only.",
+      "report_effect": "Adds verified CEO transition and scheduled earnings catalyst; no price direction implied.",
+      "review_checklist": [
+        "Verify official API, identity, filing dates, reuse policy and free access."
+      ],
+      "open_questions": []
+    }
+  ],
+  "human_attestation": null,
+  "source_review": null,
+  "notes": [
+    "AI review under user authorization; private use only. Live-tested issuer NVDA."
+  ]
+}

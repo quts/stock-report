@@ -1,0 +1,41 @@
+{
+  "schema_version": "1",
+  "config_version": "test-0.1.0",
+  "notes": "TEST FIXTURE ONLY. Extra tickers used to exercise instrument-type gating; not a project configuration and not a verification of any real instrument type.",
+  "instruments": [
+    {
+      "ticker": "2330.TW",
+      "code": "2330",
+      "exchange": "TWSE",
+      "instrument_type": "common_share",
+      "share_class": "common",
+      "expected_name_contains": "台積電",
+      "verified_by": "test-fixture",
+      "checked_at": "2026-11-15T00:00:00+00:00",
+      "evidence": "fixture",
+      "financial_statement_format": "general",
+      "fiscal_year_end_month": 12,
+      "financial_basis_evidence": "fixture"
+    },
+    {
+      "ticker": "2603.TW",
+      "code": "2603",
+      "exchange": "TWSE",
+      "instrument_type": "common_share",
+      "share_class": "common",
+      "verified_by": "test-fixture",
+      "checked_at": "2026-11-15T00:00:00+00:00",
+      "evidence": "fixture"
+    },
+    {
+      "ticker": "9105.TW",
+      "code": "9105",
+      "exchange": "TWSE",
+      "instrument_type": "depositary_receipt",
+      "share_class": "tdr",
+      "verified_by": "test-fixture",
+      "checked_at": "2026-11-15T00:00:00+00:00",
+      "evidence": "fixture: four-digit code that is not a common share"
+    }
+  ]
+}

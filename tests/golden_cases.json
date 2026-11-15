@@ -1,0 +1,19 @@
+{
+  "dataset_kind": "mock",
+  "version": "2",
+  "expected": {
+    "normal": "bullish",
+    "unknown_evidence": "insufficient",
+    "future_data": "insufficient",
+    "unverified_event": "insufficient",
+    "license_unknown": "insufficient",
+    "internal_use_denied": "insufficient",
+    "personal_use_not_shareable": "bullish",
+    "quant_mismatch": "insufficient",
+    "ratings_empty": "bullish",
+    "partial_financials": "bullish",
+    "core_missing": "insufficient",
+    "unresolved_conflict": "insufficient",
+    "wrong_entity": "insufficient"
+  }
+}

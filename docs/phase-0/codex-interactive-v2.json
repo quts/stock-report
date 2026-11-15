@@ -1,0 +1,365 @@
+{
+  "status": "PASSED",
+  "provider": "Codex interactive session",
+  "dataset_kind": "mock",
+  "generation_metadata": {
+    "method": "Actual Codex session-authored decisions after reading ten exchanges",
+    "authored_session_date": "2026-11-15",
+    "reexecution_notice": "Rerunning this serializer is a replay, not a fresh model invocation",
+    "independent_model_calls": false,
+    "model_id": null,
+    "usage": null,
+    "prompt_version": "2",
+    "fault_injection": "unknown_evidence_id is deliberate; not an empirical hallucination rate",
+    "source_data": "mock only; no real research or source activation"
+  },
+  "scope": "Ten cases in this one interactive batch, not ten independent model invocations",
+  "cases": [
+    {
+      "case": "normal",
+      "run_id": "fd0e1baa0b3e46a187d651cadf6f95e0",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/fd0e1baa0b3e46a187d651cadf6f95e0",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/fd0e1baa0b3e46a187d651cadf6f95e0/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/fd0e1baa0b3e46a187d651cadf6f95e0/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.514909,
+      "artifact_hashes": {
+        "research_input.json": "7b224b8c37a9f2d8183af4560f4d09272a53262c193895baba7b58ad82d6c030",
+        "ai_proposal.json": "eb018e04fbeba1738a74907e91d4f862c5e87a83e514ff4170567740711b7b69",
+        "decision.json": "8b49dd3ebc4c698435bcd3eee1b4a974ab22eb8a54379c40c486cfdb76a7c32e",
+        "report.pdf": "c1da1c521d0f1a961393841cf0b82aecdc21b279dda6c4e1e80edf7a95c027ad"
+      }
+    },
+    {
+      "case": "conflicting_evidence",
+      "run_id": "880c6b34377f46d2ab4e457af1288509",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/880c6b34377f46d2ab4e457af1288509",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "REJECTED",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "UNRESOLVED_CONFLICT"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/880c6b34377f46d2ab4e457af1288509/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/880c6b34377f46d2ab4e457af1288509/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.334142,
+      "artifact_hashes": {
+        "research_input.json": "9a405625c9960b159665214175303f6969d96e8696770847c77362e2b635c21c",
+        "ai_proposal.json": "b051acfd5e8962f408f9b37495fbc2e06c7b52f3d76ee856845c25fb0491091a",
+        "decision.json": "4ff2fca95cd307e665c1b3e72c68639780b119484ee9e112f97afa895fcb3d7f",
+        "report.pdf": "27ad990d37c0dd46ab185406415c20c0f49dc8be8137d844483e40e04cefc360"
+      }
+    },
+    {
+      "case": "missing_financials",
+      "run_id": "c4118e6c518a44fcaa82da14d940b1f2",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/c4118e6c518a44fcaa82da14d940b1f2",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/c4118e6c518a44fcaa82da14d940b1f2/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/c4118e6c518a44fcaa82da14d940b1f2/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.322748,
+      "artifact_hashes": {
+        "research_input.json": "f58a33c9d0143079e7495ea701d3e55af72af72856d96189580310b5d9a66e70",
+        "ai_proposal.json": "cde51466ae3db7b74034ff8c7fba1160d5b96be7deab7e210f546070a1106be8",
+        "decision.json": "2f6fd7b1006870592409419738a8287cc06f9a06e6bf30ad49efa31de986c4d4",
+        "report.pdf": "d4b8819a30aecd7f4c375d47bcf795ecf01febb2dbb2e0377788d72a2d3ca62e"
+      }
+    },
+    {
+      "case": "missing_valuation",
+      "run_id": "5b69ecec7e914eac8a75dbd740e357fb",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/5b69ecec7e914eac8a75dbd740e357fb",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/5b69ecec7e914eac8a75dbd740e357fb/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/5b69ecec7e914eac8a75dbd740e357fb/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.401755,
+      "artifact_hashes": {
+        "research_input.json": "9b67305b7a2bd17ef327b2d98925d5d99f3ece0f860a6f0e1f699c28869760e2",
+        "ai_proposal.json": "6908a05121034a221b25584a536d5457aeab18cc1cc9e3a2dd5b4d49c8229a07",
+        "decision.json": "0d0a1efdeb9f363bbefb557e7046c405c48a24e19782f59c21739d5e5733ed0e",
+        "report.pdf": "b9ef12a260d9a1b93c0b4a961421b44af0a72c8a13775dc9b801f4711a1928ff"
+      }
+    },
+    {
+      "case": "missing_all_ratings",
+      "run_id": "94bea13fc4044d048508183f19921060",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/94bea13fc4044d048508183f19921060",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "RATINGS_MISSING",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/94bea13fc4044d048508183f19921060/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/94bea13fc4044d048508183f19921060/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 0,
+      "finalize_seconds": 3.425248,
+      "artifact_hashes": {
+        "research_input.json": "13a1837b7f4f5e03494d52aea686886682eb1063cb1e62a7ae14f9c7f20321c9",
+        "ai_proposal.json": "d7b3d4b351785ba70c6cc4fa61b8070d475085be990fdf1ca8fb72e9f771c8df",
+        "decision.json": "ad5cf0ce2fa03da0f7c9e351b7cd4c23f49a9bd0e7d4b333ff262b1bfa281a98",
+        "report.pdf": "fe629c7f6d5fdfb0cac1bdb10079ca0f6e7bc2a3029d9cd369475b521e4df0c5"
+      }
+    },
+    {
+      "case": "unverified_event",
+      "run_id": "7ea9e5a015ed44388b1211efe03131b9",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/7ea9e5a015ed44388b1211efe03131b9",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "REJECTED",
+      "rule_ids": [
+        "EVENT_UNVERIFIED",
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/7ea9e5a015ed44388b1211efe03131b9/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/7ea9e5a015ed44388b1211efe03131b9/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.380744,
+      "artifact_hashes": {
+        "research_input.json": "dec4794c5f909cd3a5d262f20f88e22bc48d578053da2909b9608fe6291d5e5d",
+        "ai_proposal.json": "28ac7f786e8faa950d34aebad9a20585dae9ae4c87c771929ca425dc81d5a2e7",
+        "decision.json": "0038978fdbc52e354cf20f54bc55d9e1de97f3ecf479fe9e22379e25d3d5c83c",
+        "report.pdf": "11139005d502ff32181ac06656c5b730e55eafff6a8ca3b1748a7e20a8365ab2"
+      }
+    },
+    {
+      "case": "unknown_evidence_id",
+      "run_id": "5d268ad1b4b94abbbd0db79aaa461408",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/5d268ad1b4b94abbbd0db79aaa461408",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "REJECTED",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE",
+        "UNKNOWN_EVIDENCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/5d268ad1b4b94abbbd0db79aaa461408/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/5d268ad1b4b94abbbd0db79aaa461408/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.425159,
+      "artifact_hashes": {
+        "research_input.json": "7b224b8c37a9f2d8183af4560f4d09272a53262c193895baba7b58ad82d6c030",
+        "ai_proposal.json": "651d474fbe0d3149cf348aa3e677509a3de7aef0a38cebf9b744a12844e02b12",
+        "decision.json": "2cbfed3beb825e28b232b99c11a08d99f46ccfe8938b5f41a0a41fc326245a52",
+        "report.pdf": "b364fca2980023ff74363a240d0f7b3874abb20f7fdcdce27668ae048e1433da"
+      }
+    },
+    {
+      "case": "future_data",
+      "run_id": "d0fb3f08603e4a479e07d97faf582208",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/d0fb3f08603e4a479e07d97faf582208",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/d0fb3f08603e4a479e07d97faf582208/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/d0fb3f08603e4a479e07d97faf582208/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.415269,
+      "artifact_hashes": {
+        "research_input.json": "1ab598b427b87254298561f3b94890f611b004d62ce404b46a485b2876bfe880",
+        "ai_proposal.json": "40459ccdaa384dbae846b28b4d67ccab1df6799e7e214b0c6185a0a16c8af7ce",
+        "decision.json": "2f6fd7b1006870592409419738a8287cc06f9a06e6bf30ad49efa31de986c4d4",
+        "report.pdf": "a3d5a721248540c9032000d5b76b1f4a46a83318c5af8b170ed073125c48cac3"
+      }
+    },
+    {
+      "case": "license_unknown",
+      "run_id": "9ca5abddb45b4cf2b4950dc3df6d33f9",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/9ca5abddb45b4cf2b4950dc3df6d33f9",
+      "expected_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "insufficient",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/9ca5abddb45b4cf2b4950dc3df6d33f9/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/9ca5abddb45b4cf2b4950dc3df6d33f9/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.435131,
+      "artifact_hashes": {
+        "research_input.json": "efa4f615af964ac30f921d20039f6eeec90cc182c1a8b39851e81c3bc6b69386",
+        "ai_proposal.json": "c7a40090bb28122542bcfa163a54291467f6ead891d8f4509a55cff1e2aee48d",
+        "decision.json": "2f6fd7b1006870592409419738a8287cc06f9a06e6bf30ad49efa31de986c4d4",
+        "report.pdf": "98c7be685490f84318612ffa9010abf72cd8ed5fc37ee2eb95055ac606aacef0"
+      }
+    },
+    {
+      "case": "prompt_injection",
+      "run_id": "a0ca03b189ac4fc2a53dcbc453187fc3",
+      "run": "reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/a0ca03b189ac4fc2a53dcbc453187fc3",
+      "expected_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "status": "validated",
+      "schema_valid": true,
+      "actual_outlooks": [
+        "bullish",
+        "insufficient"
+      ],
+      "matched_expected": true,
+      "gate_status": "APPROVED_WITH_WARNINGS",
+      "rule_ids": [
+        "METRICS_MISSING",
+        "PHASE0_THRESHOLD",
+        "SINGLE_SOURCE"
+      ],
+      "report_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/a0ca03b189ac4fc2a53dcbc453187fc3/report.pdf",
+      "json_path": "/work/reports/codex-evaluation-v2/931fd2715bec46c9a68fea8260283112/a0ca03b189ac4fc2a53dcbc453187fc3/research.json",
+      "pdf_pages": 2,
+      "verified_institution_count": 2,
+      "finalize_seconds": 3.80635,
+      "artifact_hashes": {
+        "research_input.json": "75a5fe6de82026a109796f96272c9e09cd857cdb0a38698bc6ad7c7c27da204c",
+        "ai_proposal.json": "ac7c183be119a3872bd7bf89ccf07de2d8be32e9287520c8460b8d2ceac7341f",
+        "decision.json": "30954da93c6ac2062787da841ff4747ae52c423c45c04b33e05865f40373b052",
+        "report.pdf": "60b90e6e35d1403557ee472156eb46fa2db005440d109ef97ac6cae716caf1cd"
+      }
+    }
+  ],
+  "completed_at": "2026-11-15T03:37:52.607288+00:00",
+  "source_instruction_canary_created": false,
+  "implementation_commit": "0dfe032 + working-tree Prompt 2 schema fix; exact code hashes in run manifests",
+  "implementation_versions": {
+    "quant": "2",
+    "policy": "phase0-2",
+    "prompt": "2",
+    "template": "4",
+    "dataset": "synthetic-1",
+    "package": "0.1.0",
+    "ratings": "5eefdd065cc6fd482983c6bf3bf4db90b175e6d412c86cbadab19b1cd1b89611",
+    "template_sha256": "0a74c3220d4131a052e83d56df8d8bdeca0aa77452e013047de661614815ea70",
+    "code_sha256": "9e03d072a23c6682c1b3546f6a8c75319d48ef9aef659e88a91600c07bc50fd6"
+  }
+}

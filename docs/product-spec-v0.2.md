@@ -2,7 +2,10 @@
 
 > 狀態：已合併的 V0.2 產品規格；本文件為單一有效規格來源（不是開始實作的指令）  
 > 驗證計畫：[Phase 0 Feasibility Plan](./phase-0-feasibility-plan.md)  
-> 本版目的：凍結已確認的產品決策；將尚無法驗證的資料能力與授權問題移交 Phase 0，不將假設冒充已實現能力。
+> 本版目的：凍結已確認的產品決策；將尚無法驗證的資料能力與授權問題移交 Phase 0，不將假設冒充已實現能力。  
+> **2026-11-15 範圍變更（使用者明示，取代原「偶爾分享 PDF」設計）**：所有輸出**僅供使用者本人使用，永不對外分享或散布**；保留易讀的 PDF 報告。原分享版 PDF 與再散布授權要求不再是報告條件，本文件已就地改寫；來源、身份、時點查核與內部使用授權控管全數保留。
+
+> **2026-11-15 個股研究 V2（使用者明示，取代本文件中「1–2 頁」與兩頁版型的規定）**：PDF 改為 1–4 頁（`max_pdf_pages` 1–4，預設 4；設 2 仍使用舊的兩頁版型）。真實個股研究必須納入截止時點前最新一期財報，否則不能算完成，四頁報告也不發布。主流媒體經查核後可作為 secondary 來源。報告採四頁易讀格式：公司概況、最新財務、消息與下次財報預期、3-6m／6-12m 分析，最後附單一資料限制與來源附錄。操作契約見 [個股研究 V2](./phase-0/stock-research-v2.md)。
 
 ## 1. 產品目標與範圍
 
@@ -19,7 +22,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 | 研究時間 | 中長期 3–12 個月；**分開**輸出 3–6、6–12 個月展望 |
 | 研究對象數 | 事件研究最多深入分析 **5 家公司**（台美股合計，不要求市場配額） |
 | 資料 API | 月預算 **US$0**；優先官方開放資料與合法免費來源 |
-| 使用情境 | 個人研究，PDF 偶爾分享給少數朋友；需要逐來源核對再散布條款 |
+| 使用情境 | **僅供使用者本人使用**；PDF 與所有輸出不分享、不散布，沒有公開分享功能。仍需逐來源確認內部使用權限；個人使用不等於已取得權限 |
 | 投顧評等 | 以實際可驗證機構資料統計；不足時**照樣產 PDF**，明確標示樣本與缺失 |
 | 財務/估值缺失 | **適應性研究**：省略不可驗證指標，揭露限制；證據不足時不下方向性結論 |
 | 研究方法 | **Hybrid**：Python Quant + AI Evidence 推論 |
@@ -32,7 +35,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 | POC 策略 | 先做獨立 Phase 0 資料/授權/LLM 可行性驗證，再決定全面開發 |
 | 失敗政策 | 結論可局部降級，不能以 Mock 或臆測填補真實數據 |
 
-> **未確認不等於決策**：任何免費 Provider 可得性、API 額度、新聞/行情/評等再散布權、Codex 具體自動化能力，都必須以 Phase 0 實測及當時有效條款確認。
+> **未確認不等於決策**：任何免費 Provider 可得性、API 額度、新聞/行情/評等的內部使用權、Codex 具體自動化能力，都必須以 Phase 0 實測及當時有效條款確認。
 
 ## 2. 使用情境與輸入契約
 
@@ -40,7 +43,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 
 **Stock Research**：指定股票代碼或公司名稱；查證交易所/股類/幣別，收集研究截止時已公布的財報、行情、事件與機構評等。對 3–6、6–12 個月各輸出研究傾向。
 
-**Event Research**：輸入自然語言事件；先驗證事件發生或政策實施狀態，再探索與事件有可追溯關聯的公司，最多深入研究五家公司；若關聯僅為推測則標示 Hypothetical。公司候選排序規則待 Phase 0 驗證，不可把「相關」直接說成「受益」。
+**Event Research**：輸入自然語言事件；先驗證事件發生或政策實施狀態，再探索與事件有可追溯關聯的公司，最多深入研究五家公司；若關聯僅為推測則標示 Hypothetical。Phase 0 已加入 [有界新聞索引與公司線索](phase-0/news-discovery.md)，以及 [匯入事件卷宗的有界排序](phase-0/event-ranking.md)。搜尋提及不自動轉為已核實關聯；排序依關聯類別與獨立來源數可重現選取。新聞服務真實可用性、全市場候選探索及真實資料排序效能仍待驗證，不可把「相關」直接說成「受益」。
 
 自然語言範例：
 - 「研究 NVDA 過去 30 天的重大事件，並分析未來 3–6 與 6–12 個月，產生兩頁 PDF。」
@@ -48,7 +51,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 
 ### 2.2 標準化輸入
 
-使用 Pydantic Schema 表達 `mode`、`ticker/exchange` 或 `event_query`、`research_as_of`、`lookback_days`、`horizons`、`max_companies=5`、`language=zh-TW`、`max_pdf_pages=2`、`sharing_profile`。有效輸入僅能藉受控參數傳給 CLI，不得由 LLM 任意組 shell 字串。
+使用 Pydantic Schema 表達 `mode`、`ticker/exchange` 或 `event_query`、`research_as_of`、`lookback_days`、`horizons`、`max_companies=5`、`language=zh-TW`、`max_pdf_pages`（1–4，預設 4；V2 變更）、`sharing_profile`（相容用欄位，只接受 `private`；要求任何分享設定的 Request 會被拒絕，不會默默降級）。有效輸入僅能藉受控參數傳給 CLI，不得由 LLM 任意組 shell 字串。
 
 `research_as_of` 必須記錄時區；區分事件時間、資料發布時間、資料擷取時間與交易市場時間。研究截止日後才公開的資料不得用於該歷史時點研究。
 
@@ -59,7 +62,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 `Natural Language → Validated Research Request → Research Planner → Providers → Evidence Store/Validation → Quant Engine + AI Evidence Proposal → Policy Gate → PDF/JSON/Manifest`
 
 - **Research Planner**：辨識市場、標的與事件，管控最多五家公司及分析範圍。
-- **Provider Adapters**：官方公告、財報、價格、新聞索引、機構評等；資料取得和分享授權分開處理。
+- **Provider Adapters**：官方公告、財報、價格、新聞索引、機構評等；資料取得和內部使用授權分開處理。
 - **Evidence Store**：保存來源、期別、時間戳、聲明與證據關聯、去重以及許可範圍；原始全文快照僅在授權允許時保存。
 - **Quant Engine**：純 Python、確定性公式計算；不讓 LLM 代算股價／估值／評等比例。
 - **AI Evidence Engine**：根據受控結構化證據分析事件、產業、競爭與風險；先輸出 Schema 驗證過的 Proposal。
@@ -78,13 +81,34 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 - `source_url`、`publisher`、`source_type`、`source_record_id`、`source_hash`（如允許）。
 - `event_time`、`published_at`、`retrieved_at`、`research_as_of`。
 - `verification_status`（verified / unverified / conflicting / unavailable）。
-- `license_status`、`attribution`、`shareable_in_pdf`（未確認預設 false）。
+- `license_status`、`attribution`、`internal_use_allowed`（未確認預設 false；個人報告的權限依據）。
+- `shareable_in_pdf`：舊版再散布欄位，僅為相容與稽核而保留，預設 false；**不是任何報告條件**，系統不會自行設為 true。
 
 來源 Tier 只說明來源性質：官方原始資料、可追溯的媒體或二手資料、未確認傳聞；Tier 不保證每個主張正確。重大事件需驗證實際主張內容，避免把相互轉載的同源新聞當作獨立證據。
 
-### 4.2 分享授權
+### 4.2 個人使用與內部使用授權
 
-免費存取 **不等於** 免費再散布。必須逐 Provider／逐資料集記錄引用要求、允許內部計算與分享的範圍、查證日期及條款 URL。分享版 PDF 只包含權利確認可使用的內容、自己生成的圖表和合規的摘要/引用；未知權限時不輸出相關原始內容。禁止整頁複製第三方研究報告或重製受限制圖表。
+報告僅供使用者本人使用，不分享、不散布；因此**再散布權不是報告條件，個人報告不需要任何再散布簽認**。但免費存取或「只給自己看」都 **不等於** 已取得使用權：必須逐 Provider／逐資料集記錄引用要求、允許內部使用的範圍、查證日期、條款 URL 及查核依據。
+
+**查核依據（2026-11-15 使用者授權）**：來源可由下列任一方式確認，兩者分開記錄、互不冒充：
+
+- **人工簽認**（`human_attestation`）：人工逐字條款引用與具名簽認；`human_attested` 只代表這一種。
+- **AI 來源查核**（`assistant_source_review`）：使用者授權 AI 查核官方來源、身份、時間與使用條款。必須對官方來源、標的身份、發布時間、使用條款、免費取得五個面向各留下可追溯的官方 https 網址與逐字引用，且沒有未決問題，才算證據充分；否則維持 `unknown` 並封鎖。AI 查核只能開啟最低限度的個人自用權限 `internal_use_allowed`，不能開啟原始回應／雜湊留存或任何散布，也不得記錄成人工簽認。
+
+`source_reviewed` 表示具備上述任一依據，`review_basis` 記錄是哪一種；真實證據的 `verified` 以此為準。
+
+權限分層，互不推導：
+
+| 權限 | 允許的事 | 未取得時 |
+| --- | --- | --- |
+| `internal_use_allowed`（需 `confirmed`） | 來源數值寫入本機研究目錄；進入個人 PDF、Quant 指標與 AI 提案 | 不落盤、不進 PDF、不支撐任何指標或結論 |
+| `store_response_hash`／`store_raw_response` | 本機原始稽核資料：保留回應雜湊／原始回應 | 不保留雜湊或原始回應；即使 PDF 可用也不代表可留存原始資料 |
+| `pdf_share_allowed`／`shareable_in_pdf`（舊欄位） | 無；本產品沒有分享功能 | 不影響個人報告 |
+
+- `unknown` 與 `restricted` 來源一律封鎖：不因個人使用而放行，也不因「AI 看過」而放行；查核證據不足即維持封鎖。
+- 內部使用已確認、但再散布欄位為 false 的證據，**可以**用於個人 PDF 及其指標與提案。
+- 個人 PDF 與本機 JSON／SQLite 稽核檔都不得對外提供；PDF 每頁標示「僅供個人使用・不得散布 / Personal use only / Not for distribution」。
+- 仍禁止整頁複製第三方研究報告或重製受限制圖表。
 
 ### 4.3 投顧共識
 
@@ -126,7 +150,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 
 ### 5.3 Policy Gate（擬定規則）
 
-**Hard Gates**：錯誤標的、研究截止日後資料、虛構或不存在的 Evidence ID、計算與來源不一致、未核實重大事件被寫成事實、禁止分享的內容、核心結論缺乏證據。攔截範圍以**違規主張或研究期限**為優先；不是所有違規都要讓整份 PDF 消失。
+**Hard Gates**：錯誤標的、研究截止日後資料、虛構或不存在的 Evidence ID、計算與來源不一致、未核實重大事件被寫成事實、未確認內部使用權限（unknown／restricted）的內容、核心結論缺乏證據。攔截範圍以**違規主張或研究期限**為優先；不是所有違規都要讓整份 PDF 消失。
 
 **Soft Gates**：評等不全、部分財務／估值缺失、單一來源、Quant/AI 分歧、同業不可比等，降級、附警告或省略該指標。
 
@@ -140,7 +164,7 @@ Gate 狀態：`APPROVED`、`APPROVED_WITH_WARNINGS`、`REVISE`、`REJECTED`。�
 
 ## 6. PDF / 報告契約
 
-共用字型、引用、風險、品質元件，但分股票與事件版型；A4、繁體中文、最多兩頁，易讀優先，不得用極小字級塞內容。
+共用字型、引用、風險、品質元件，但分股票與事件版型；A4、繁體中文、最多四頁（V2；四頁個股版型見 [個股研究 V2](./phase-0/stock-research-v2.md)，`max_pdf_pages=2` 保留以下兩頁版型），易讀優先，不得用極小字級塞內容。每頁標示「僅供個人使用・不得散布 / Personal use only / Not for distribution」；合成資料另保留 DEMO / SYNTHETIC DATA 標記。
 
 **股票研究**
 - 第 1 頁：標的識別、資料截至時間、基本面與估值關鍵數字、重大事件、市場反應、風險。
@@ -181,17 +205,17 @@ CLI 需具備單一研究請求的固定執行契約，並回傳機器可讀的 
 
 **Replay** 使用同一快照、AI Proposal、Policy 與模板重產，要求統計與方向一致。**Fresh Run** 會重取資料與模型推論，允許不同結果。PDF 內容應可比對，但不強制第一版 PDF 位元組完全相同。
 
-`reports/` 預設不納入 Git；Codex 最終回覆研究標的、期間、警告、PDF/JSON 的可存取路徑。若因授權/權限/資料不足無法產出，必須如實告知。
+Manifest 記錄 `distribution=personal_use_only`，不列任何可分享檔案。`reports/` 預設不納入 Git；Codex 最終回覆研究標的、期間、警告、PDF/JSON 的可存取路徑。若因授權/權限/資料不足無法產出，必須如實告知。
 
 ## 9. 驗收與不在範圍
 
 完整驗收由 [Phase 0 計畫](./phase-0-feasibility-plan.md) 定義。MVP 必須有固定測資的台股、美股、股票與事件雙入口 E2E；缺評等時仍可生成 PDF；Hard Gate 故障注入不得漏放；Replay 結果一致；真實資料驗證要與 Mock 測試分開呈現。
 
-**非 V0.2/MVP 範圍**：全市場完整投顧共識保證、盤中即時交易、實際下單、每次必定準確的股價預測、未校準的 0–100 投資分數、無人值守雲端排程、多 Agent 與大型分散式部署、任意付費資料來源、完整量化績效回測。將來再另開設計決策。
+**非 V0.2/MVP 範圍**：任何公開或對他人的分享／散布功能、全市場完整投顧共識保證、盤中即時交易、實際下單、每次必定準確的股價預測、未校準的 0–100 投資分數、無人值守雲端排程、多 Agent 與大型分散式部署、任意付費資料來源、完整量化績效回測。將來再另開設計決策。
 
 ## 10. 待 Phase 0 驗證，不阻礙規格 Review
 
-1. 美國與台灣免費行情來源是否完整，是否允許在分享 PDF 中再利用。
+1. 美國與台灣免費行情來源是否完整，是否允許個人研究的內部使用與本機留存。
 2. 台美股逐機構評等的免費覆蓋率、有效性與合法使用範圍。
 3. Codex 本機結構化提案、權限／額度與可重播的資料交換。
 4. Policy Gate「證據充分」的操作性閾值，以及測試案例期望輸出。

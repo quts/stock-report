@@ -1,0 +1,684 @@
+{
+  "schema_version": "1",
+  "registry_version": "0.6.1",
+  "updated_at": "2026-11-15T08:51:32.926018+00:00",
+  "policy": "Lawful, free access for personal non-distributed use only. Under the user's 2026-11-15 authorization, a sufficient AI review of official source, identity, time, terms and free access may confirm a specific source. Human attestations remain separately recorded. Unknown or restricted sources stay closed. Accessibility alone is not permission; no sharing, paid API, raw response or response hash retention is enabled by AI review.",
+  "sources": [
+    {
+      "source_id": "twse-openapi-stock-day-all",
+      "publisher": "臺灣證券交易所",
+      "attribution": "金融監督管理委員會證券期貨局／臺灣證券交易所，2026，盤後資訊 > 個股日成交資訊（11549）；依政府資料開放授權條款第1版釋出：https://data.gov.tw/license。原機關未推薦本研究。",
+      "endpoint_scope": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "terms_url": "https://data.gov.tw/dataset/11549",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/dataset/11549",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集層級的授權標示與指定資源連結；不涵蓋本專案實際呼叫的 openapi.twse.com.tw JSON 端點對應"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "重製、散布",
+          "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        },
+        {
+          "terms_url": "https://data.gov.tw/dataset/11549",
+          "checked_at": "2026-11-15T06:33:06+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "本次重新查核資料集授權、免費計費與API文件連結；範圍限2330身份與最近收盤。"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-15T06:33:06+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "免授權金進行利用",
+          "excerpt_covers": "第二節利用權與第三節及附件顯名要求；正規化資料本機保存及私人PDF，無分享功能。"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex AI",
+        "reviewed_at": "2026-11-15T06:35:34+00:00",
+        "authorization": "使用者於2026-11-15明示由AI查核，證據充分才啟用；最低合法免費、僅自用不散布；見AGENTS.md",
+        "reviewed_endpoint_scope": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "OAS標準之API說明文件網址 https://openapi.twse.com.tw/v1/swagger.json",
+            "conclusion": "政府資料集直接連結官方API文件；本次指定CSV與JSON之2330名稱、日期、收盤及唯一性比對通過，Swagger列出端點。見docs/phase-0/ai-twse-binding.json。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://investor.tsmc.com/sites/ir/sec-filings/2025_20F%20Report.pdf",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "The principal trading market for our common shares is the Taiwan Stock Exchange.",
+            "conclusion": "官方Form20-F PDF第63頁Item9另列普通股代號2330；與公司官方FAQ及交換資料的台積電名稱交叉核對。只啟用既有2330.TW身份與最近收盤。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "每1日",
+            "conclusion": "只確認每日更新及交易日期，未宣告精確發布時刻。採回應完成後observed_availability保守上界，研究截止時間不得早於採集，不當作即時或歷史可得資料。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "政府資料開放授權條款-第1版",
+            "conclusion": "資料集明列開放授權及指定CSV/API文件，限本次核實端點，不擴及其他交易所資料集。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/license",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "免授權金進行利用",
+            "conclusion": "第二節允許重製、編輯等利用；第三節及附件要求顯名。本機正規化保存與私人PDF保留提供機關、資料集、年份與條款網址。禁止本產品對外散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://data.gov.tw/dataset/11549",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "免費",
+            "conclusion": "官方計費方式明列免費；本次CSV與JSON直接取得，無API Key、付費訂閱或繞過存取限制。"
+          }
+        ]
+      },
+      "open_questions": [],
+      "notes": "2026-11-15依使用者新政策完成AI查核。資料集11549、官方API文件與本輪CSV/JSON日期/名稱/收盤比對形成有限證據；詳見docs/phase-0/ai-source-review.md。僅2330.TW身份與最近收盤、正規化本機保存與私人PDF。原始回應、回應雜湊與分享維持關閉。精確發布時間未知，以觀測上界限制用途；單筆收盤不能支持方向性結論。"
+    },
+    {
+      "source_id": "tpex-openapi-mainboard-daily-close",
+      "publisher": "財團法人中華民國證券櫃檯買賣中心",
+      "attribution": "資料來源：證券櫃檯買賣中心 OpenAPI（授權範圍未確認）",
+      "endpoint_scope": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes",
+      "terms_url": "https://data.gov.tw/dataset/11371",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/dataset/11371",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集層級的授權標示與指定資源連結；不涵蓋本專案實際呼叫的 openapi JSON 端點對應"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "重製、散布",
+          "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
+        "資料發布時間是否有官方宣告未確認"
+      ],
+      "notes": "官方資料集授權標示已由 Codex 查核；2026-11-15 在記憶體內比對本次目標的 CSV／JSON 名稱與收盤欄位一致。證據見 docs/phase-0/taiwan-source-binding.json。這是有限範圍的助手查核，缺人工來源核對與簽認，故維持 unknown，不保存來源數值或分享。"
+    },
+    {
+      "source_id": "twse-openapi-income-general",
+      "publisher": "臺灣證券交易所",
+      "attribution": "資料來源：臺灣證券交易所 OpenAPI 上市公司綜合損益表（一般業）（授權範圍未確認）",
+      "endpoint_scope": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
+      "terms_url": "https://data.gov.tw/dataset/91998",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/dataset/91998",
+          "checked_at": "2026-11-15T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code（Fable）助手；2026-11-15 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集「上市公司綜合損益表(一般業)」頁面的授權方式標示、計費方式「免費」與指定 CSV 資源；不涵蓋本專案實際呼叫的 JSON 端點對應，也不含金額單位或累計基礎的說明"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "重製、散布",
+          "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
+        "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者目前只有實測交叉比對，沒有官方條文",
+        "出表日期不是公司申報日；官方是否提供申報／公告時間未確認",
+        "目標六欄 CSV／JSON 本次比對一致（financial-source-binding.json），不推及完整資料集；金額級距與累計定義仍缺官方契約"
+      ],
+      "notes": "2026-11-15 由 Claude Code 查核資料集頁面並在記憶體內檢視端點回應形狀（欄位名稱、列數、目標列唯一）；未保存任何來源數值。使用者已選擇維持 unknown、暫不啟用，故無內部保存、分享、雜湊或原始回應權限。證據見 docs/phase-0/taiwan-financial-source-notes.md。"
+    },
+    {
+      "source_id": "tpex-openapi-income-general",
+      "publisher": "財團法人中華民國證券櫃檯買賣中心",
+      "attribution": "資料來源：證券櫃檯買賣中心 OpenAPI 上櫃公司綜合損益表（一般業）（授權範圍未確認）",
+      "endpoint_scope": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci",
+      "terms_url": "https://data.gov.tw/dataset/94853",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/dataset/94853",
+          "checked_at": "2026-11-15T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code（Fable）助手；2026-11-15 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集「上櫃公司綜合損益表(一般業)」頁面的授權方式標示、計費方式「免費」與指定 CSV 資源；不涵蓋本專案實際呼叫的 JSON 端點對應，也不含金額單位或累計基礎的說明"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-14T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
+          "excerpt": "重製、散布",
+          "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
+        "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者目前只有實測交叉比對，沒有官方條文",
+        "出表日期不是公司申報日；官方是否提供申報／公告時間未確認",
+        "指定 CSV 與本專案 TPEx JSON 目標六欄本次比對一致（financial-source-binding.json）；非完整資料集或授權等價證明"
+      ],
+      "notes": "2026-11-15 由 Claude Code 查核資料集頁面並在記憶體內檢視端點回應形狀（欄位名稱、列數、目標列唯一）；未保存任何來源數值。使用者已選擇維持 unknown、暫不啟用，故無內部保存、分享、雜湊或原始回應權限。證據見 docs/phase-0/taiwan-financial-source-notes.md。"
+    },
+    {
+      "source_id": "yahoo-chart-daily-close",
+      "publisher": "Yahoo Finance",
+      "source_class": "secondary",
+      "attribution": "Source: Yahoo Finance chart endpoint (terms unverified)",
+      "endpoint_scope": "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2y&interval=1d&events=split",
+      "terms_url": "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html",
+      "declared_status": "unknown",
+      "scope": {},
+      "terms_evidence": [],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [
+        "Endpoint support, identity, adjustment basis and storage/sharing rights require verification"
+      ],
+      "notes": "No activation or retention rights. Official Help describes adjusted close generally, but chart close field adjustment remains undocumented here; Help access returned 429 and terms access 999. Excluded from recommended activation pending a supported contract. See docs/phase-0/pre-human-review.md."
+    },
+    {
+      "source_id": "sec-xbrl-companyconcept",
+      "publisher": "U.S. Securities and Exchange Commission",
+      "attribution": "Source: U.S. SEC EDGAR XBRL company concept API; normalized public filing facts, private use only.",
+      "endpoint_scope": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+      "terms_url": "https://www.sec.gov/about/developer-resources",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data",
+          "checked_at": "2026-11-15T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex；日期佔位，非精確查核時刻",
+          "excerpt": "Please declare your user agent in request headers",
+          "excerpt_covers": "自動存取應宣告 User-Agent；頁面並提供含聯絡資訊的範例。不構成所有第三方申報內容的權利保證。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/developer-resources",
+          "checked_at": "2026-11-15T00:00:00+08:00",
+          "checked_by": "assistant",
+          "checker": "Codex；日期佔位，非精確查核時刻",
+          "excerpt": "10 requests per second",
+          "excerpt_covers": "每位使用者合計請求上限，跨機器計算；本專案更保守。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+          "checked_at": "2026-11-15T07:17:19.963635+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "data.sec.gov",
+          "excerpt_covers": "SEC 官方文件直接指定此主機及 companyconcept 端點；本次 NVDA 真實採集通過 CIK 與公司名稱比對。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/developer-resources",
+          "checked_at": "2026-11-15T07:17:19.963635+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "no more than 10 requests per second",
+          "excerpt_covers": "識別 User-Agent、限制請求速率並只抓必要欄位；使用者已另外提供聯絡資訊，僅經環境變數傳入。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T07:17:19.963635+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex AI",
+          "excerpt": "EDGAR public filing content are free to access and reuse.",
+          "excerpt_covers": "官方 FAQ 明確允許 EDGAR 公開申報內容免費存取與再利用；本次僅保存正規化財報事實供本人私人PDF，不含圖片、商標、第三方外連或散布。"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "notes": "AI來源查核涵蓋SEC公開申報結構化事實。本次NVDA身份及年度欄位經官方文件與真實採集驗證。市場及股份類別仍來自設定並經官方10-Q封面核對。年度財報不代表最新季度或投資結論；原始回應、雜湊與分享維持關閉。",
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex AI",
+        "reviewed_at": "2026-11-15T07:17:19.963635+00:00",
+        "authorization": "使用者2026-11-15授權AI查核官方來源、身份、時間與條款；最低合法免費、僅自用不散布；見AGENTS.md。",
+        "reviewed_endpoint_scope": "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "data.sec.gov",
+            "conclusion": "SEC 官方文件直接指定此主機及 companyconcept 端點；本次 NVDA 真實採集通過 CIK 與公司名稱比對。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000075/nvda-20260726.htm",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "NVDA",
+            "conclusion": "官方 NVIDIA 10-Q 封面列普通股、NVDA 與 Nasdaq Global Select Market；官方檔案路徑 CIK 1045810 與 API 的0001045810及 NVIDIA 名稱一致。本次實際驗證標的為NVDA。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "as submissions are disseminated",
+            "conclusion": "API 隨申報公布更新；年度資料使用原申報 filed 日期，以UTC-05當日末作可得時間上界，不假設精確發布時刻。只涵蓋年度10-K，不涵蓋最新季度或新聞。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/developer-resources",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "no more than 10 requests per second",
+            "conclusion": "識別 User-Agent、限制請求速率並只抓必要欄位；使用者已另外提供聯絡資訊，僅經環境變數傳入。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "EDGAR public filing content are free to access and reuse.",
+            "conclusion": "官方 FAQ 明確允許 EDGAR 公開申報內容免費存取與再利用；本次僅保存正規化財報事實供本人私人PDF，不含圖片、商標、第三方外連或散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T07:17:19.963635+00:00",
+            "excerpt": "do not require any authentication or API keys to access",
+            "conclusion": "官方API不需認證或API Key，本次直接採集成功；不使用付費服務。"
+          }
+        ]
+      }
+    },
+    {
+      "source_id": "sec-edgar-archives-filing",
+      "publisher": "U.S. Securities and Exchange Commission",
+      "source_class": "official",
+      "attribution": "Source: SEC EDGAR issuer filings; normalized facts for personal use only.",
+      "endpoint_scope": "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}",
+      "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+          "checked_at": "2026-11-15T07:48:31.683860+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex",
+          "excerpt": "SEC Accession No. 0001045810-26-000082",
+          "excerpt_covers": "SEC官方申報索引連到8-K與EX-99.1，僅正規化公開申報事實。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T07:48:31.683860+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex",
+          "excerpt": "EDGAR public filing content are free to access and reuse.",
+          "excerpt_covers": "官方FAQ允許公開申報內容免費存取再利用；僅正規化事實供個人PDF，原始回應、雜湊與分享維持關閉。"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex",
+        "reviewed_at": "2026-11-15T07:48:31.683860+00:00",
+        "authorization": "使用者2026-11-15授權AI查核官方來源；AGENTS.md；最低合法免費、僅本人自用不散布。",
+        "reviewed_endpoint_scope": "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "SEC Accession No. 0001045810-26-000082",
+            "conclusion": "SEC官方申報索引連到8-K與EX-99.1，僅正規化公開申報事實。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/nvda-20261111.htm",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "NVIDIA CORPORATION",
+            "conclusion": "SEC檔案路徑CIK1045810與公司名稱、NVDA及NASDAQ封面一致。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000082/0001045810-26-000082-index.htm",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "2026-11-12 08:52:41",
+            "conclusion": "索引記載接受時間；本次採較保守的11/12美東固定UTC-05當日末作公開上界。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "EDGAR public filing content are free to access and reuse.",
+            "conclusion": "官方FAQ允許公開申報內容免費存取再利用；僅正規化事實供個人PDF，原始回應、雜湊與分享維持關閉。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T07:48:31.683860+00:00",
+            "excerpt": "EDGAR public filing content are free to access and reuse.",
+            "conclusion": "公開申報無需登入或API Key；自動採集宣告操作人提供的聯絡資訊，速率不超過每秒一請求。"
+          }
+        ],
+        "unresolved": []
+      }
+    },
+    {
+      "source_id": "sec-submissions-history",
+      "publisher": "U.S. Securities and Exchange Commission",
+      "source_class": "official",
+      "endpoint_scope": "https://data.sec.gov/submissions/CIK{cik}.json",
+      "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "attribution": "Source: U.S. SEC EDGAR submissions history; normalized filing metadata, private use only.",
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex financial research agent",
+        "reviewed_at": "2026-11-15T08:32:37Z",
+        "authorization": "使用者2026-11-15授權AI查核官方來源；最新要求最新一期財報為必要。AGENTS.md，僅本人自用不散布。",
+        "reviewed_endpoint_scope": "https://data.sec.gov/submissions/CIK{cik}.json",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "https://data.sec.gov/submissions/CIK##########.json",
+            "conclusion": "SEC官方API文件指定公司申報歷史端點；只保存正規化申報中繼資料。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "Where the ########## is the entity’s 10-digit central index key (CIK), including leading zeros.",
+            "conclusion": "以十位CIK綁定發行人；另核對回應的名稱、股票代碼與交易所。DELL由官方10-Q封面及CIK1571996交叉驗證。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "The JSON structures are updated throughout the day, in real time, as submissions are disseminated.",
+            "conclusion": "申報歷史包含發布與接受時間；依截止日前已可得的申報選最新一期，不以報告期間代替公開時間，也不假設零延遲。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "All Government-created content on sec.gov and EDGAR public filing content are free to access and reuse.",
+            "conclusion": "SEC官方FAQ明示公開申報可免費存取再利用。僅個人正規化資料；保留來源標示，原始回應、回應雜湊與分享維持關閉。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+            "checked_at": "2026-11-15T08:32:37Z",
+            "excerpt": "These APIs do not require any authentication or API keys to access.",
+            "conclusion": "官方API無須認證或API Key；僅用操作人提供的聯絡資訊宣告User-Agent，依SEC速率限制保守存取。"
+          }
+        ],
+        "unresolved": []
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
+          "checked_at": "2026-11-15T08:32:37Z",
+          "checked_by": "assistant",
+          "checker": "Codex financial research agent",
+          "excerpt": "https://data.sec.gov/submissions/CIK##########.json",
+          "excerpt_covers": "SEC官方指定公司申報歷史JSON端點。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T08:32:37Z",
+          "checked_by": "assistant",
+          "checker": "Codex financial research agent",
+          "excerpt": "All Government-created content on sec.gov and EDGAR public filing content are free to access and reuse.",
+          "excerpt_covers": "公開申報資料免費存取及再利用；本候選僅正規化資料供個人使用。"
+        },
+        {
+          "terms_url": "https://www.sec.gov/about/webmaster-frequently-asked-questions",
+          "checked_at": "2026-11-15T08:32:37Z",
+          "checked_by": "assistant",
+          "checker": "Codex financial research agent",
+          "excerpt": "Please declare your user agent in request headers:",
+          "excerpt_covers": "需宣告User-Agent，含操作人提供的聯絡資訊；同頁最大速率每秒10請求，本專案採更保守限制。"
+        }
+      ]
+    },
+    {
+      "source_id": "dell-ir-next-earnings-1661",
+      "publisher": "Dell Technologies",
+      "source_class": "official",
+      "attribution": "資料來源：Dell Technologies；© 2026 Dell Inc.；僅供本人私人研究。",
+      "endpoint_scope": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+      "terms_url": "https://www.dell.com/en-us/legal/lp/site-terms-of-use-copyright",
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex research agent dell_media_preview",
+        "reviewed_at": "2026-11-15T08:34:18+00:00",
+        "authorization": "使用者2026-11-15授權AI查核來源並要求最新財報及下次財報預期新聞；AGENTS.md，僅本人自用不散布。",
+        "reviewed_endpoint_scope": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "Source: Dell Technologies",
+            "conclusion": "Dell官方投資人關係網域的公司自發公告；不是媒體獨立採訪。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "NYSE: DELL",
+            "conclusion": "公告列出NYSE:DELL，和已設定CIK1571996的Dell Technologies身份一致。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "Released November 10, 2026",
+            "conclusion": "來源明示公開日期，日期型上界採美東UTC-05當日末；不得倒填為較早時點。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.dell.com/en-us/legal/lp/site-terms-of-use-copyright",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "solely for personal, noncommercial use only",
+            "conclusion": "官方copyright頁允許個人非商業使用的顯示、複製及下載。僅正規化公告日程事實及短引文、保留權利標示；不取圖片、全文改作或公開散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+            "checked_at": "2026-11-15T08:34:18+00:00",
+            "excerpt": "public",
+            "conclusion": "已透過官方公開頁完整讀取，無登入、付款或API Key；公告並明示電話會議向公眾提供。範圍只限此公告事實。"
+          }
+        ]
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.dell.com/en-us/legal/lp/site-terms-of-use-copyright",
+          "checked_at": "2026-11-15T08:34:18+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex research agent dell_media_preview",
+          "excerpt": "solely for personal, noncommercial use only",
+          "excerpt_covers": "單一官方公告日程的正規化事實供本人研究；保留權利標示，不存原始回應、雜湊，不散布。"
+        },
+        {
+          "terms_url": "https://investors.delltechnologies.com/news-events/press-releases/detail/1661/dell-technologies-to-hold-conference-call-nov-24-to-discuss-third-quarter-fiscal-2027-financial-results",
+          "checked_at": "2026-11-15T08:34:18+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex research agent dell_media_preview",
+          "excerpt": "Source: Dell Technologies",
+          "excerpt_covers": "Dell官方投資人關係網域的公司自發公告；不是媒體獨立採訪。"
+        }
+      ],
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "declared_status": "confirmed",
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": []
+    },
+    {
+      "source_id": "lemonde-economy-rss",
+      "publisher": "Le Monde",
+      "source_class": "secondary",
+      "attribution": "資料來源：Le Monde 經濟 RSS 標題與摘要；僅供本人私人閱讀與研究，不散布。",
+      "endpoint_scope": "https://www.lemonde.fr/en/economy/rss_full.xml",
+      "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+          "checked_at": "2026-11-15T08:48:03+00:00",
+          "checked_by": "assistant",
+          "checker": "Codex research agent dell_media_preview",
+          "excerpt": "strictly personal, non-professional and non-collective use",
+          "excerpt_covers": "官方RSS專用頁授權單人非職業、非集體讀取；僅此經濟RSS的標題、摘要、日期、原始連結及發稿者，不含原文、圖片、全文或全站爬取。"
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "open_questions": [],
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Codex research agent dell_media_preview",
+        "reviewed_at": "2026-11-15T08:48:03+00:00",
+        "authorization": "使用者2026-11-15明示納入主流媒體，並授權AI查核官方來源；AGENTS.md。僅本人私人非職業使用，不分享、不散布、不作模型或軟體開發訓練。",
+        "reviewed_endpoint_scope": "https://www.lemonde.fr/en/economy/rss_full.xml",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "Economy",
+            "conclusion": "官方RSS說明頁的Economy項目列出本經濟feed；實測endpoint與官方https網域一致，限定單一RSS而非文章全文或全站。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "Le Monde",
+            "conclusion": "官方來源身份已核對；08:46:33 UTC的Apple Container即時採集成功，parser驗證channel.title包含monde。只有來源契約與數量中繼資料被保存，未假造任何未見的RSS標題。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "latest articles published",
+            "conclusion": "官方RSS頁明示發布後提供最新文章。即時parser對實際item.pubDate進行時區感知解析並排除未來時間；15筆符合的Observation均使用source_declared_timestamp。此說明不把RSS頁本身的發布日期當作新聞日期，也不宣稱歷史feed完整。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "strictly personal",
+            "conclusion": "RSS專用許可明示單人非職業、非集體使用與自動feed聚合。一般條款另禁全站crawl、大量蒐集及開發/訓練；本次僅既有軟體讀取一個feed供本人研究，不作這些用途、不追抓全文。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://www.lemonde.fr/en/about-us/article/2026/03/27/le-monde-rss-feeds_6751860_115.html",
+            "checked_at": "2026-11-15T08:48:03+00:00",
+            "excerpt": "Any other use must be authorized and a fee paid.",
+            "conclusion": "官方頁對許可範圍外用途另要求授權與付費；本次狹義個人RSS在Apple Container實測無登入、API Key或付款直接成功。僅保存metadata的inspection證實傳輸成功，不把完整網站或訂閱文章也視為免費。"
+          }
+        ]
+      },
+      "notes": "僅為來源登錄候選，未修改config。啟用前須activation-check，通過後提升registry_version並重新採集；unknown期間的舊採集不能沿用新權限。媒體摘要仍是secondary敘述，不能自動變成公司已驗證事實或市場共識。"
+    }
+  ]
+}

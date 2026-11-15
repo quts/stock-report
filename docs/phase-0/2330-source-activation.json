@@ -1,0 +1,147 @@
+{
+  "schema_version": "1",
+  "package_id": "tw-2330-activation-2026-11-15",
+  "prepared_at": "2026-11-15T00:00:00+08:00",
+  "prepared_by": "Claude Code（Fable）助手；2026-11-15 為整理日期，00:00 是日期佔位而非精確時刻",
+  "prepared_by_kind": "assistant",
+  "status": "awaiting_source_review",
+  "registry_baseline_version": "0.5.1",
+  "target": {
+    "ticker": "2330.TW",
+    "code": "2330",
+    "exchange": "TWSE",
+    "currency": "TWD",
+    "share_class": "common",
+    "instrument_config": "config/tw-instruments.json"
+  },
+  "items": [
+    {
+      "source_id": "twse-openapi-stock-day-all",
+      "recommendation": "ready_for_source_review",
+      "endpoint": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+      "dataset_page": "https://data.gov.tw/dataset/11549",
+      "dataset_resource": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data",
+      "license_name": "政府資料開放授權條款－第1版",
+      "license_url": "https://data.gov.tw/license",
+      "field_binding": {
+        "code": ["Code", "證券代號"],
+        "name": ["Name", "證券名稱"],
+        "close": ["ClosingPrice", "收盤價"],
+        "date": ["Date", "日期"]
+      },
+      "evidence_produced": [
+        "twse-openapi-stock-day-all-2330.TW-identity（kind=identity）",
+        "twse-openapi-stock-day-all-2330.TW-close（kind=price，metric_key=close，unit=per_share，currency=TWD）"
+      ],
+      "retained_normalized_fields": [
+        "代號與來源名稱（Code、Name）",
+        "最新一個交易日的收盤價（ClosingPrice）",
+        "來源交易日原值（Date，存於 source_period_raw）",
+        "端點網址、擷取／觀測時間、公開時間基礎、授權登錄檔版本與顯名文字"
+      ],
+      "not_retained": [
+        "原始回應（store_raw_response=false；不啟用原始回應快取）",
+        "回應雜湊（store_response_hash=false；source_hash 保持 null）",
+        "回應中其他上市證券的任何列",
+        "成交股數、成交金額、開盤、最高、最低、漲跌價差、成交筆數"
+      ],
+      "identity_findings": [
+        "端點以 Code 唯一命中 2330；來源名稱必須包含設定的「台積電」，否則採集失敗。",
+        "普通股身份來自 config/tw-instruments.json 的 assistant-poc-declaration，不是官方有價證券種類資料，也不是人工簽認。",
+        "2026-11-15 台北時間（2026-11-14 UTC）於記憶體內比對資料集指定 CSV 與本端點 JSON：2330 的名稱與收盤欄位一致（docs/phase-0/taiwan-source-binding.json）；未保存來源數值。"
+      ],
+      "time_findings": [
+        "來源未宣告公開時間；published_at 僅為 HTTP 回應完成後的觀測可得性上界（publication_basis=observed_availability）。",
+        "Date 是交易日（實測為民國格式），只作為 source_period_raw 與事件時間上界，不當作公開日。",
+        "端點只提供最新一個交易日；研究截止時點不得早於採集時間，不回填歷史截止日。"
+      ],
+      "license_findings": [
+        "資料集 11549「盤後資訊 > 個股日成交資訊」頁面標示免費、每 1 日更新、政府資料開放授權條款－第1版，提供機關為金融監督管理委員會證券期貨局（助理於 2026-11-14 查核）。",
+        "資料集指定資源為 TWSE 的 CSV；備註連到 TWSE OpenAPI 文件。本專案呼叫的是 openapi.twse.com.tw 的 JSON 端點，其與資料集的對應目前只有上述兩個欄位的實測一致，沒有官方條文明示。",
+        "授權條款允許重製、改作等利用並要求顯名；不代表原機關推薦，也不授與商標或專利權。",
+        "TWSE 網站一般使用條款與資料集個別授權需分開判斷；本審查包只主張資料集 11549 的範圍。"
+      ],
+      "proposed_scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "proposed_attribution": "金融監督管理委員會證券期貨局／臺灣證券交易所，2026，盤後資訊 > 個股日成交資訊（11549）；依政府資料開放授權條款第1版釋出：https://data.gov.tw/license。原機關未推薦本研究。",
+      "report_effect": "啟用後 2330.TW 只有身份與單筆最新收盤價：核心來源紀錄 1 筆，低於方向門檻 2 筆。只能產生兩個期限皆為「資料不足」的個人 PDF，不會有方向性結論、成長率、本益比或跨期漲跌幅。",
+      "human_checklist": [],
+      "review_checklist": [
+        "AI已重新開啟官方資料集11549與授權條款，記錄免費及開放利用、顯名依據，不冒稱人工查核。",
+        "AI已核對官方API文件及指定CSV/JSON之2330名稱、日期、收盤；見ai-twse-binding.json。",
+        "AI已核對台積電官方FAQ及2025 Form20-F Item9的普通股上市身份；時間只採觀測可得上界。",
+        "僅開啟正規化資料之internal_use_allowed；其餘權限關閉，依使用者新政策由Codex執行與驗收。",
+        "activation-check只比較0.4.1封閉基準與0.5.0候選，查核依據記在source_review，並非人工簽認。"
+      ],
+      "open_questions": [
+        "資料發布時間與更新時點沒有官方宣告；啟用後仍只能做最新時點研究。",
+        "本次確認僅限2330名稱、日期、收盤與來源對應，不推及其他資料集。"
+      ]
+    },
+    {
+      "source_id": "twse-openapi-income-general",
+      "recommendation": "not_recommended_yet",
+      "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
+      "dataset_page": "https://data.gov.tw/dataset/91998",
+      "dataset_resource": "https://mopsfin.twse.com.tw/opendata/t187ap06_L_ci.csv（已比對目標六欄，非全資料集驗證）",
+      "license_name": "政府資料開放授權條款－第1版",
+      "license_url": "https://data.gov.tw/license",
+      "field_binding": {
+        "code": ["公司代號"],
+        "name": ["公司名稱"],
+        "year": ["年度"],
+        "quarter": ["季別"],
+        "table_date": ["出表日期"],
+        "revenue": ["營業收入"],
+        "net_income_parent": ["淨利（淨損）歸屬於母公司業主"],
+        "eps_basic": ["基本每股盈餘（元）"]
+      },
+      "evidence_produced": [
+        "最新一期年初至今累計的營業收入、歸屬母公司淨利、基本 EPS（kind=financial，period_basis=cumulative_ytd）"
+      ],
+      "retained_normalized_fields": [],
+      "not_retained": [
+        "本項目不建議啟用；任何來源數值、原始回應與回應雜湊皆不保存"
+      ],
+      "identity_findings": [
+        "2330 於一般業綜合損益表彙總端點恰有一列（2026-11-15 實測形狀，未保存數值）。",
+        "財報格式（一般業）與會計年度結束月份（12 月）是專案設定的 POC 宣告，未以年報或章程人工核對。"
+      ],
+      "time_findings": [
+        "出表日期不是公司申報或公告日；來源沒有申報時間欄位。",
+        "期間起訖由年度、季別與設定的會計年度推得，不是來源欄位。"
+      ],
+      "license_findings": [
+        "資料集 91998 頁面標示免費與政府資料開放授權條款－第1版（助理於 2026-11-15 查核）。",
+        "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者只有實測交叉比對。",
+        "2026-11-15 已完成目標名稱、年度、季別、營收、歸屬母公司淨利與 EPS 的 CSV／JSON 記憶體比對，結果一致；見 financial-source-binding.json。未比對全部欄位，不據此推定未宣告單位。"
+      ],
+      "proposed_scope": {
+        "internal_use_allowed": false,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "proposed_attribution": "資料來源：臺灣證券交易所 OpenAPI 上市公司綜合損益表（一般業）（授權範圍未確認）",
+      "report_effect": "不啟用。若日後啟用，可提供第二筆核心來源紀錄與同期淨利率，但仍無年增率、本益比或自由現金流。",
+      "human_checklist": [],
+      "open_questions": [
+        "金額單位與累計基礎缺官方條文",
+        "已完成目標六欄比對，但非完整資料集逐欄驗證",
+        "缺公司申報／公告時間",
+        "會計年度結束月份未人工核對"
+      ]
+    }
+  ],
+  "human_attestation": null,
+  "notes": [
+    "使用者2026-11-15最新授權取代先前維持關閉：由AI核對官方來源、身份、時間、條款與免費取得，充分才啟用；本包記錄0.4.1至0.5.0有限變更，詳見ai-source-review.md。",
+    "本審查包由助理整理，不授與任何權限，也不是人工來源查證；使用者對電腦或開發工作的概括授權不等於來源審查。",
+    "登錄檔0.5.0僅TWSE最近收盤來源經AI查核confirmed；其餘來源維持unknown，所有分享/原始回應/回應雜湊權限關閉。",
+    "啟用範圍以來源（端點）為單位；2330.TW 的限定來自 config/tw-instruments.json 僅設定此一 TWSE 標的，未設定的代號會被採集器拒絕。"
+  ]
+}

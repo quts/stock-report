@@ -1,0 +1,5 @@
+{
+  "version": "1",
+  "default": {"Strong Buy": "Buy", "Buy": "Buy", "Hold": "Hold", "Sell": "Sell", "Strong Sell": "Sell"},
+  "institutions": {}
+}

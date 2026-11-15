@@ -1,0 +1,44 @@
+{
+  "daily": [
+    {
+      "Date": "1151113",
+      "SecuritiesCompanyCode": "3105",
+      "CompanyName": "穩懋",
+      "Close": "50.00",
+      "Change": "+0.50",
+      "Open": "49.50",
+      "High": "50.50",
+      "Low": "49.00",
+      "Average": "49.80",
+      "TradingShares": "1000000",
+      "TransactionAmount": "50000000",
+      "TransactionNumber": "2000",
+      "LatestBidPrice": "49.95",
+      "LatesAskPrice": "50.00",
+      "Capitals": "400000000",
+      "NextReferencePrice": "50.00",
+      "NextLimitUp": "55.00",
+      "NextLimitDown": "45.00"
+    },
+    {
+      "Date": "1151113",
+      "SecuritiesCompanyCode": "6488",
+      "CompanyName": "環球晶",
+      "Close": "200.00",
+      "Change": "-1.00",
+      "Open": "201.00",
+      "High": "202.00",
+      "Low": "199.00",
+      "Average": "200.50",
+      "TradingShares": "300000",
+      "TransactionAmount": "60000000",
+      "TransactionNumber": "1200",
+      "LatestBidPrice": "199.50",
+      "LatesAskPrice": "200.00",
+      "Capitals": "528113725",
+      "NextReferencePrice": "200.00",
+      "NextLimitUp": "220.00",
+      "NextLimitDown": "180.00"
+    }
+  ]
+}

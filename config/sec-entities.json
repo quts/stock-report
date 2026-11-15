@@ -1,0 +1,31 @@
+{
+  "schema_version": "1",
+  "config_version": "0.2.0",
+  "notes": "Operator-maintained ticker→CIK map for the SEC adapter. The CIK is the identity key used in the request URL and is re-checked against the response. expected_entity_name_contains is an additional normalized containment check on the response entityName; a mismatch is a hard failure, not a warning. Extend this file to collect further US issuers; no code change is required.",
+  "entities": [
+    {
+      "ticker": "NVDA",
+      "cik": "0001045810",
+      "expected_entity_name_contains": "NVIDIA",
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "share_class": "common"
+    },
+    {
+      "ticker": "AMD",
+      "cik": "0000002488",
+      "expected_entity_name_contains": "ADVANCED MICRO DEVICES",
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "share_class": "common"
+    },
+    {
+      "ticker": "DELL",
+      "cik": "0001571996",
+      "expected_entity_name_contains": "DELL",
+      "exchange": "NYSE",
+      "currency": "USD",
+      "share_class": "Class C common"
+    }
+  ]
+}
