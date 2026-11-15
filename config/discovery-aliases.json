@@ -1,0 +1,10 @@
+{
+  "schema_version": "1",
+  "config_version": "0.1.0",
+  "entities": [
+    {"entity_id": "2330.TW", "names": ["台積電", "台积电", "TSMC", "Taiwan Semiconductor Manufacturing"], "ticker_tokens": ["$2330", "TWSE:2330", "2330.TW"]},
+    {"entity_id": "NVDA", "names": ["NVIDIA", "輝達", "英伟达"], "ticker_tokens": ["$NVDA", "NASDAQ:NVDA"]},
+    {"entity_id": "AMD", "names": ["Advanced Micro Devices", "超微半導體"], "ticker_tokens": ["$AMD", "NASDAQ:AMD"]},
+    {"entity_id": "6488.TWO", "names": ["環球晶", "环球晶", "GlobalWafers"], "ticker_tokens": ["$6488", "TPEx:6488", "6488.TWO"]}
+  ]
+}

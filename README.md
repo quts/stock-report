@@ -1,5 +1,7 @@
 # Stock Report
 
+`news-discover` 已加入自動新聞索引查詢與支援公司提及比對，詳見 [搜尋操作與限制](docs/phase-0/news-discovery.md)。搜尋只產生待查線索，不等於事件成立或公司受益；來源關閉時，真實結果只保留契約與數量中繼資料。
+
 事件卷宗與候選排序已加入 `event-rank`，詳見 [操作與限制](docs/phase-0/event-ranking.md)。排序依據可用關聯證據，不代表投資方向；目前仍不會自動搜尋全網新聞。`demo` 的事件報告會先經排序再產生 PDF。2330 來源查核包為未啟用參考，使用者已再次選擇維持來源關閉，不需要重複確認。
 
 本機投資研究工具的 **Phase 0 可執行 POC**。依 [產品規格](docs/product-spec-v0.2.md) 與 [驗證計畫](docs/phase-0-feasibility-plan.md) 建立，尚未宣告正式 MVP 或 Phase 0 GO。

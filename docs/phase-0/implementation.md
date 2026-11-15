@@ -19,6 +19,8 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' ./scripts/runtime.sh smoke 
 
 ## 固定執行契約
 
+`news-discover --request --output` 支援固定新聞索引端點的有界查詢及未核實公司提及；真實模式必須明示 `--allow-network`，來源未核對時僅保存狀態與數量。離線完整線索須明示合成 Fixture。詳細限制與實際 HTTP 429 紀錄見 [新聞探索](news-discovery.md)。搜尋輸出不能直接當成事件卷宗或研究證據匯入。
+
 事件增量支援 `event-rank --dossier` 與唯讀 `activation-check --package`。前者只排序卷宗中有證據的有界候選集合，細節見 [事件卷宗與排序](event-ranking.md)，不聲稱自動搜尋新聞或全市場探索。`prepare --provider synthetic-event` 只接受明示的合成事件證據包；真實資料仍只走 import。事件選取說明更新後 Template 為 4；Prompt 為 2。
 
 `prepare --request JSON --provider mock|import [--evidence-bundle JSON] --output reports` 驗證 Request，產生 UUID 研究目錄、Evidence SQLite、JSON、提案 Schema、Prompt、輸入雜湊。匯入數值會重新計算，不能信任外部提供的 Quant 結果；不得把合成資料標為真實資料。

@@ -1,0 +1,11 @@
+{
+  "fixture_kind": "synthetic-news-index",
+  "payload": {
+    "articles": [
+      {"title": "DEMO: NVIDIA and TSMC discuss a synthetic chip policy", "url": "https://news.example.invalid/demo-policy", "domain": "news.example.invalid", "seendate": "20261113T090000Z"},
+      {"title": "DEMO: NVIDIA and TSMC discuss a synthetic chip policy", "url": "https://news.example.invalid/demo-policy?utm_source=demo", "domain": "news.example.invalid", "seendate": "20261113T090000Z"},
+      {"title": "DEMO: $AMD and 台積電 mentioned in an invented event", "url": "https://other.example.invalid/demo", "domain": "other.example.invalid", "seendate": "20261112T090000Z"},
+      {"title": "DEMO: 2330 widgets and AMD are ambiguous bare tokens", "url": "https://news.example.invalid/ambiguous", "domain": "news.example.invalid", "seendate": "20261111T090000Z"}
+    ]
+  }
+}

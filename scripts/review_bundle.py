@@ -2,6 +2,7 @@
 from pathlib import Path
 from datetime import datetime, timezone
 from shutil import copyfile
+from xml.etree import ElementTree
 from stock_report.evaluation import load_evaluation
 from stock_report.analysis import synthetic_proposal
 from stock_report.mock import fixture
@@ -46,6 +47,16 @@ for scenario,expected in golden['expected'].items():
 write_json(output/'policy-gate-tests'/'results.json',{'dataset_kind':'mock','cases':actual})
 if not all(r['passed'] for r in actual):raise SystemExit('Golden fault injection failed')
 index=read_json('reports/demo/index.json')
+for artifact in ('news-discovery.json', 'event-ranking.json'):
+    source = Path('reports/demo') / artifact
+    if source.exists():
+        copyfile(source, output / artifact)
+news_network = output / 'discovery-network-junit.xml'
+news_contract = {'status': 'NOT_RUN'}
+if news_network.exists():
+    suites = ElementTree.parse(news_network).getroot().iter('testsuite')
+    failed = any(int(s.get('failures', '0')) or int(s.get('errors', '0')) for s in suites)
+    news_contract = {'status': 'FAILED' if failed else 'PASSED', 'artifact': news_network.name}
 for name,label in [('stock-nvda','stock'),('event','event')]:
     row=next(r for r in index if r.get('example')==name)
     copyfile(row['report_path'],output/f'sample-{label}.pdf')
@@ -56,7 +67,8 @@ write_json(output/'research-manifest.json',{'generated_at':datetime.now(timezone
     'source_binding':'taiwan-source-binding.json', 'interactive_evaluation':'llm-evaluation.json',
     'real_source_smoke':'source-smoke.json' if (output/'source-smoke.json').exists() else 'NOT_RUN',
     'license_registry':read_json('config/source-licenses.json')['registry_version'],
-    'real_research_e2e':'NOT_PASSED'})
+    'real_research_e2e':'NOT_PASSED', 'news_index_network_contract':news_contract,
+    'synthetic_news_discovery':'news-discovery.json' if (output/'news-discovery.json').exists() else 'NOT_RUN'})
 coverage={}
 for row in index:
     if 'example' in row:coverage.update(row['coverage'])

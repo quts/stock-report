@@ -9,6 +9,7 @@ from .analysis import exchange, synthetic_proposal
 from .collect import (SEC_CONTACT_ENV, build_bundle, collect, load_collection, persist, persistence_blockers,
                       request_template)
 from .events import EventDossier, load_universe, rank_dossier
+from .discovery import discover
 from .licensing import load_registry
 from .models import Request
 from .pipeline import prepare, load_prepared, finalize, replay
@@ -84,6 +85,12 @@ def parser():
     rank.add_argument('--output', required=True, type=Path)
     rank.add_argument('--universe', type=Path, default=None)
     rank.add_argument('--license-registry', type=Path, default=None)
+    news = sub.add_parser('news-discover', help='Bounded news-index discovery; mentions are unverified leads')
+    news.add_argument('--request', required=True, type=Path)
+    news.add_argument('--output', required=True, type=Path)
+    news.add_argument('--allow-network', action='store_true')
+    news.add_argument('--fixture', type=Path, help='Authored synthetic index fixture only')
+    news.add_argument('--max-results', type=int, default=50)
     act = sub.add_parser('activation-check', help='Read-only check of a source activation package')
     act.add_argument('--package', required=True, type=Path)
     act.add_argument('--candidate-registry', type=Path, help='Human-edited registry to compare; never applied')
@@ -172,6 +179,17 @@ def main(argv=None):
             write_json(args.output, template)
             result = {'status': 'success', 'request_path': str(args.output),
                       'research_as_of': template.research_as_of.isoformat()}
+        elif args.command == 'news-discover':
+            if args.fixture and args.allow_network:
+                raise ValueError('Choose either an authored fixture or explicit network discovery')
+            if args.output.exists():
+                raise ValueError('Refusing to overwrite an existing discovery report')
+            request = Request.model_validate(read_json(args.request))
+            result = discover(request, allow_network=args.allow_network, fixture=args.fixture,
+                              max_results=args.max_results)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            write_json(args.output, result)
+            result = {**result, 'discovery_path': str(args.output.resolve())}
         elif args.command == 'event-rank':
             dossier = EventDossier.model_validate(read_json(args.dossier))
             # A real dossier is always checked against the versioned registry; a mock one never needs it.
@@ -210,7 +228,7 @@ def main(argv=None):
                 write_json(args.output / f'{model.__name__}.schema.json', model.model_json_schema())
             result = {'status': 'success', 'schema_path': str(args.output.resolve())}
         print(json.dumps(result, ensure_ascii=False))
-        return 1 if result.get('status') == 'blocked' else 0
+        return 1 if result.get('status') in ('blocked', 'failed') else 0
     except Exception as exc:
         # Do not echo exception text from providers, source contents or credentials.
         print(json.dumps({'status': 'failed', 'error_type': type(exc).__name__,

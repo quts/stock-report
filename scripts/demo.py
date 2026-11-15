@@ -4,6 +4,7 @@ from stock_report.models import Request
 from stock_report.pipeline import prepare, finalize, replay, load_prepared
 from stock_report.analysis import synthetic_proposal
 from stock_report.events import load_universe, rank_dossier, synthetic_dossier
+from stock_report.discovery import discover
 from stock_report.storage import read_json, write_json
 
 root = Path('reports/demo')
@@ -12,6 +13,8 @@ for name in ('stock-nvda', 'stock-twse', 'stock-tpex', 'event'):
     request = Request.model_validate(read_json(Path('examples') / f'{name}.json'))
     ranking_path = None
     if name == 'event':
+        # Search mentions are leads only; the reviewed dossier remains a separate authored fixture.
+        write_json(root / 'news-discovery.json', discover(request, fixture='examples/news/index-synthetic.json'))
         bundle, ranking = rank_dossier(synthetic_dossier(request), load_universe())
         if bundle is None:
             raise ValueError('Synthetic event ranking did not produce a bundle')
@@ -27,6 +30,7 @@ for name in ('stock-nvda', 'stock-twse', 'stock-tpex', 'event'):
     result['example'] = name
     if ranking_path:
         result['ranking_path'] = str(ranking_path.resolve())
+        result['discovery_path'] = str((root / 'news-discovery.json').resolve())
     results.append(result)
 results.append(replay(Path(results[0]['report_path']).parent, root))
 write_json(root / 'index.json', results)
