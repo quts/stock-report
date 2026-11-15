@@ -99,7 +99,7 @@ for name in ('provider-feasibility.md','phase-0-review.md','codex-interactive-ev
              'codex-interactive-evaluation.json','taiwan-license-review-evidence.md','taiwan-source-binding.json',
              'pre-human-review.md','financial-source-binding.json','2330-source-activation.json',
              'taiwan-financial-source-notes.md','us-price-source-notes.md','codex-interactive-v2.json',
-             'event-ranking.md','news-discovery.md','operations.md'):
+             'event-ranking.md','news-discovery.md','operations.md','local-code-review.md'):
     source=Path('docs/phase-0')/name
     if source.exists():copyfile(source,output/name)
 print(output.resolve())

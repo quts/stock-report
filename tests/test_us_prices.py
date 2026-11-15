@@ -101,6 +101,7 @@ def evidence():
     # These are authored test records, with explicit test-only permissions.
     for row in rows:
         row.verification_status = 'verified'
+        row.license_status = 'confirmed'
         row.internal_use_allowed = True
         row.price_adjustment = 'split_adjusted' if row.kind == 'price' else None
     return rows

@@ -9,7 +9,8 @@ VERSION = '2'
 
 def usable(e: Evidence, cutoff) -> bool:
     return (e.verification_status == 'verified' and e.published_at <= cutoff
-            and e.event_time <= cutoff and e.internal_use_allowed)
+            and e.event_time <= cutoff and e.research_as_of == cutoff
+            and e.license_status == 'confirmed' and e.internal_use_allowed)
 
 def comparable_years(current, prior):
     a, b = re.fullmatch(r'FY(\d{4})', current or ''), re.fullmatch(r'FY(\d{4})', prior or '')

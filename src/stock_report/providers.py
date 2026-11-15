@@ -78,10 +78,11 @@ def probes(output, user_agent, retries=1, interval=1.0):
             if name.startswith('sec') and '@' not in user_agent:
                 raise ValueError('SEC probe blocked: configure a declared User-Agent with contact email; no personal login data is reused')
             data, transport = client.get_json(url)
-            row.update(status='retrieved', transport=transport)
+            row.update(status='retrieved', transport={key: transport[key] for key in ('cached', 'attempts')
+                                                       if key in transport})
             if name.startswith('sec'):
                 facts = data.get('facts', {}).get('us-gaap', {})
-                row['sample'] = {'entityName': data.get('entityName'), 'cik': data.get('cik'),
+                row['sample'] = {'identity_present': bool(data.get('entityName') and data.get('cik')),
                                  'us_gaap_concepts': len(facts)}
                 if not facts or not data.get('entityName'):
                     raise ValueError('SEC response missing identity or financial facts')
@@ -90,11 +91,14 @@ def probes(output, user_agent, retries=1, interval=1.0):
                 if not isinstance(data, list):
                     raise ValueError('Expected a list of exchange records')
                 selected = [r for r in data if isinstance(r, dict) and ticker in {str(v).strip() for v in r.values()}]
-                row['sample'] = {'target_ticker': ticker, 'matched_records': selected[:1], 'record_count': len(data)}
+                row['sample'] = {'target_ticker': ticker, 'matched_record_count': len(selected),
+                                 'record_count': len(data)}
                 if not selected:
                     raise ValueError('Target ticker not found in endpoint response')
         except Exception as exc:
-            row.update(status='failed', error_type=type(exc).__name__, error=str(exc)[:250])
+            # Exceptions may contain provider response text or operator contact details.
+            row.update(status='failed', error_type=type(exc).__name__,
+                       error='Probe failed; source contents and exception text are not retained')
         row['elapsed_seconds'] = round(time.monotonic() - started, 3)
         results.append(row)
     write_json(directory / 'provider-probes.json', {'dataset_kind': 'real', 'results': results,

@@ -56,6 +56,25 @@ def test_future_values_excluded_from_quant(data):
     result = {m.name:m for m in calculate(data.evidence,data.request.research_as_of)}
     assert result['revenue_growth'].value is None
 
+
+@pytest.mark.parametrize('status', ['unknown', 'restricted'])
+def test_unconfirmed_values_cannot_influence_metrics_even_with_internal_flag(data, status):
+    record = next(e for e in data.evidence if e.metric_key == 'revenue_current')
+    record.license_status = status
+    assert record.internal_use_allowed
+    metrics = {m.name: m for m in calculate(data.evidence, data.request.research_as_of)}
+    assert metrics['revenue_growth'].value is None
+    assert metrics['net_margin'].value is None
+    assert all(record.evidence_id not in m.evidence_ids for m in metrics.values())
+
+
+def test_different_research_cutoff_cannot_influence_metrics(data):
+    record = next(e for e in data.evidence if e.metric_key == 'revenue_current')
+    record.research_as_of -= timedelta(days=1)
+    metrics = {m.name: m for m in calculate(data.evidence, data.request.research_as_of)}
+    assert metrics['revenue_growth'].value is None
+    assert all(record.evidence_id not in m.evidence_ids for m in metrics.values())
+
 def test_nonfinite_evidence_rejected(data):
     payload=data.model_dump(mode='json')
     payload['evidence'][1]['value'] = math.inf

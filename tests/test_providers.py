@@ -30,3 +30,30 @@ def test_network_failure_is_recorded_no_synthetic_fallback(tmp_path,monkeypatch)
     report=read_json(tmp_path/'provider-probes.json')
     assert report['dataset_kind']=='real'
     assert all(r['status']=='failed' and not r['shareable_in_pdf'] for r in report['results'])
+
+
+def test_unknown_probe_never_persists_source_values_or_hashes(tmp_path, monkeypatch):
+    def response(self, url):
+        data = ({'entityName': 'PRIVATE_ISSUER', 'cik': 'PRIVATE_CIK',
+                 'facts': {'us-gaap': {'PRIVATE_CONCEPT': {'value': 918273.45}}}}
+                if 'sec.gov' in url else
+                [{'Code': '2330', 'Name': 'PRIVATE_ISSUER', 'ClosingPrice': 918273.45},
+                 {'Code': '6488', 'Name': 'PRIVATE_ISSUER', 'ClosingPrice': 918273.45}])
+        return data, {'cached': False, 'attempts': 1, 'response_sha256': 'PRIVATE_HASH'}
+    monkeypatch.setattr(HTTPClient, 'get_json', response)
+    result = probes(tmp_path, 'test contact@example.invalid')
+    assert result['retrieved'] == 4
+    text = (tmp_path / 'provider-probes.json').read_text()
+    for forbidden in ('PRIVATE_', '918273.45', 'response_sha256', 'contact@example.invalid'):
+        assert forbidden not in text
+    assert all(row['license_status'] == 'unknown' for row in read_json(tmp_path / 'provider-probes.json')['results'])
+
+
+def test_probe_error_does_not_persist_response_or_contact(tmp_path, monkeypatch):
+    def fail(*args, **kwargs):
+        raise ValueError('PRIVATE_RESPONSE contact@example.invalid')
+    monkeypatch.setattr(HTTPClient, 'get_json', fail)
+    probes(tmp_path, 'test contact@example.invalid')
+    text = (tmp_path / 'provider-probes.json').read_text()
+    assert 'PRIVATE_RESPONSE' not in text and 'contact@example.invalid' not in text
+    assert all(row['error_type'] == 'ValueError' for row in read_json(tmp_path / 'provider-probes.json')['results'])

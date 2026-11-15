@@ -4,6 +4,8 @@
 
 ## 收斂結果
 
+開 PR 前的本機審查另修正舊 probe 的未知權限留存及 Quant 入口的授權／截止時點檢查；發現、修正與人工核對順序見 [本機 Code Review](local-code-review.md)。人工核對僅涵蓋有限來源，啟用後仍須另做真實資料驗收。
+
 最終交付包稽核補正：`doctor` 與 Review Bundle 共用測試狀態判讀，零測試為 NOT_RUN、全部跳過為 SKIPPED、部分跳過為 PARTIAL，不能再把未執行契約標成 PASSED。交付包同時收錄本文件、財報比對、有限啟用參考及現行互動驗證摘要，manifest 明列現行驗證入口。
 
 最終功能稽核另補了目前版本的實際 Codex 十例互動批次，並修正其揭露的 Prompt 版本契約不一致；結果見 [新版互動驗證](codex-interactive-evaluation.md)。來源查核不再是唯一核對項目，交換 Schema、Gate、成品雜湊及現行 PDF 也已納入前置驗證。
