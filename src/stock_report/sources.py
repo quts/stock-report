@@ -150,9 +150,10 @@ def bind_field(record, names):
 # Normalized roles served by the Taiwan income-statement summaries. `money` figures keep the
 # undeclared source scale and are only meaningful as ratios inside one filing record.
 TW_INCOME_ROLES = {
-    'revenue_current': {'field': 'revenue', 'kind': 'money', 'label': '營業收入'},
-    'net_income': {'field': 'net_income_parent', 'kind': 'money', 'label': '歸屬於母公司業主之淨利（淨損）'},
-    'eps_current': {'field': 'eps_basic', 'kind': 'per_share', 'label': '基本每股盈餘'},
+    'revenue_current': {'field': 'revenue', 'kind': 'money', 'label': '營業收入', 'metric': 'revenue'},
+    'net_income': {'field': 'net_income_parent', 'kind': 'money', 'label': '歸屬於母公司業主之淨利（淨損）',
+                   'metric': 'net_income'},
+    'eps_current': {'field': 'eps_basic', 'kind': 'per_share', 'label': '基本每股盈餘', 'metric': 'basic_eps'},
 }
 
 # Field contracts are provisional until a recorded network smoke run confirms them;
@@ -563,6 +564,7 @@ class TaiwanIncomeStatementAdapter(TaiwanInstrumentAdapter):
                 unit, unit_raw, unit_text = self.profile['money_unit'], None, '來源未宣告金額級距'
             observations.append(Observation(
                 evidence_id=f'{self.source_id}-{ticker}-{role}'[:80], kind='financial', role=role,
+                financial_metric=spec.get('metric'),
                 claim=f'{name}（{code}）{spec["label"]}（來源欄位「{field}」）{value}（{unit_text}），'
                       f'期間 {window_text}（來源年度 {year_raw}、季別 {quarter_raw}）；非單季、非 TTM。',
                 value=value, unit=unit, currency=self.profile['currency'], period=period, period_start=start,

@@ -80,11 +80,16 @@ def projection(data, decision, mapping, company_research=None):
     if event_review_state(data):
         limitations.append('近期重大事件查核未完成；本報告是財務快照，不是完整個股研究，也不代表沒有重大事件。')
     if financial_review_state(data): limitations.append('最新一期財報尚未完整納入；本報告只涵蓋已列示的財務資料。')
+    if data.request.mode == 'stock' and not any(e.financial_metric == 'operating_cash_flow' for e in allowed.values()):
+        limitations.append('未取得可用的現金流量資料。')
     if not any(e.kind == 'price' for e in allowed.values()): limitations.append('未取得現價與可比較估值，未提供目標價或即時交易判斷。')
     if not any(e.kind == 'rating' for e in allowed.values()): limitations.append('未取得可驗證的機構評等共識。')
     if data.earnings_preview: limitations.extend(data.earnings_preview.limitations)
     if data.event_review: limitations.extend(lead.summary for lead in data.event_review.unresolved_leads)
-    return {'research_scope': research_scope(data), 'completion_blockers': event_review_state(data), 'data': data, 'decision': decision, 'companies': companies, 'labels': LABELS, 'metric_labels': METRICS,
+    statement_periods = sorted({e.period_end for e in allowed.values() if e.kind == 'financial'
+                                and e.statement_kind == 'fact' and e.period_end and e.financial_metric == 'revenue'})
+    return {'latest_statement_period': statement_periods[-1] if statement_periods else None,
+            'research_scope': research_scope(data), 'completion_blockers': event_review_state(data), 'data': data, 'decision': decision, 'companies': companies, 'labels': LABELS, 'metric_labels': METRICS,
             'event_records': [allowed[eid] for eid in data.event_evidence_ids if eid in allowed and allowed[eid].kind == 'event' and allowed[eid].entity_id == 'EVENT'],
             'sources': list(allowed.values()), 'display_sources': unique_sources, 'synthetic': data.dataset_kind == 'mock',
             'references': references, 'source_numbers': source_numbers, 'limitations': list(dict.fromkeys(limitations)),

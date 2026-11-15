@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "registry_version": "0.6.1",
+  "registry_version": "0.6.2",
   "updated_at": "2026-11-15T08:51:32.926018+00:00",
   "policy": "Lawful, free access for personal non-distributed use only. Under the user's 2026-11-15 authorization, a sufficient AI review of official source, identity, time, terms and free access may confirm a specific source. Human attestations remain separately recorded. Unknown or restricted sources stay closed. Accessibility alone is not permission; no sharing, paid API, raw response or response hash retention is enabled by AI review.",
   "sources": [
@@ -147,11 +147,16 @@
     {
       "source_id": "twse-openapi-income-general",
       "publisher": "臺灣證券交易所",
-      "attribution": "資料來源：臺灣證券交易所 OpenAPI 上市公司綜合損益表（一般業）（授權範圍未確認）",
+      "attribution": "金融監督管理委員會證券期貨局／臺灣證券交易所，2026，上市公司綜合損益表(一般業)（91998）；依政府資料開放授權條款第1版釋出：https://data.gov.tw/license。原機關未推薦本研究。",
       "endpoint_scope": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
       "terms_url": "https://data.gov.tw/dataset/91998",
-      "declared_status": "unknown",
-      "scope": {},
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
       "terms_evidence": [
         {
           "terms_url": "https://data.gov.tw/dataset/91998",
@@ -168,17 +173,82 @@
           "checker": "Codex 互動助手；2026-11-14 為查核日期，00:00 是日期佔位而非精確查核時刻",
           "excerpt": "重製、散布",
           "excerpt_covers": "開放授權允許的利用範圍與必要標示義務"
+        },
+        {
+          "terms_url": "https://data.gov.tw/dataset/91998",
+          "checked_at": "2026-11-15T13:16:06+00:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code (claude-opus-5-5)",
+          "excerpt": "政府資料開放授權條款-第1版",
+          "excerpt_covers": "資料集91998授權方式、免費計費、提供機關與OAS API文件連結；本次即時查核。"
+        },
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-15T13:16:06+00:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code (claude-opus-5-5)",
+          "excerpt": "免授權金進行利用",
+          "excerpt_covers": "第二節利用範圍（重製、編輯、改作）與顯名要求；正規化本機保存與私人PDF。"
         }
       ],
       "attested_by": null,
       "attested_at": null,
-      "open_questions": [
-        "AGENTS.md 要求真實研究使用已人工查證的證據；目前僅有助手查核紀錄，缺使用者人工簽認",
-        "資料集頁面未宣告金額單位，也未說明數值為年初至今累計；兩者目前只有實測交叉比對，沒有官方條文",
-        "出表日期不是公司申報日；官方是否提供申報／公告時間未確認",
-        "目標六欄 CSV／JSON 本次比對一致（financial-source-binding.json），不推及完整資料集；金額級距與累計定義仍缺官方契約"
-      ],
-      "notes": "2026-11-15 由 Claude Code 查核資料集頁面並在記憶體內檢視端點回應形狀（欄位名稱、列數、目標列唯一）；未保存任何來源數值。使用者已選擇維持 unknown、暫不啟用，故無內部保存、分享、雜湊或原始回應權限。證據見 docs/phase-0/taiwan-financial-source-notes.md。"
+      "open_questions": [],
+      "notes": "2026-11-15 Claude Code依使用者授權完成AI查核（非人工簽認）。僅開放internal_use_allowed；原始回應、雜湊與分享維持關閉。金額級距未宣告：只作同一紀錄內比率與期間覆蓋；跨來源金額比較仍禁止。",
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Claude Code (claude-opus-5-5)",
+        "reviewed_at": "2026-11-15T13:16:06+00:00",
+        "authorization": "使用者於2026-11-15明示由AI查核並要求支援台股最新財報，證據充分才啟用；最低合法免費、僅自用不散布；見AGENTS.md",
+        "reviewed_endpoint_scope": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://data.gov.tw/dataset/91998",
+            "checked_at": "2026-11-15T13:16:06+00:00",
+            "excerpt": "OAS標準之API說明文件網址 https://openapi.twse.com.tw/v1/swagger.json",
+            "conclusion": "政府資料集直接連到TWSE官方API文件；swagger.json列出/opendata/t187ap06_L_ci，摘要「上市公司綜合損益表(一般業)」。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2",
+            "checked_at": "2026-11-15T13:16:06+00:00",
+            "excerpt": "2330 台積電",
+            "conclusion": "TWSE上市證券代號表列出2330台積電；端點以公司代號唯一命中，名稱須含設定的「台積電」，否則採集失敗。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://data.gov.tw/dataset/91998",
+            "checked_at": "2026-11-15T13:16:06+00:00",
+            "excerpt": "每3月",
+            "conclusion": "來源只宣告更新頻率與出表日期，沒有公司申報時間；採觀測可得性上界，不支援早於採集的截止時點。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/dataset/91998",
+            "checked_at": "2026-11-15T13:16:06+00:00",
+            "excerpt": "政府資料開放授權條款-第1版",
+            "conclusion": "資料集明列開放授權；範圍限本端點。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/license",
+            "checked_at": "2026-11-15T13:16:06+00:00",
+            "excerpt": "免授權金進行利用",
+            "conclusion": "允許重製、改作等利用並須顯名；本產品僅私人使用、不對外散布。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://data.gov.tw/dataset/91998",
+            "checked_at": "2026-11-15T13:16:06+00:00",
+            "excerpt": "免費",
+            "conclusion": "計費方式免費；端點無需API Key或登入。"
+          }
+        ]
+      }
     },
     {
       "source_id": "tpex-openapi-income-general",

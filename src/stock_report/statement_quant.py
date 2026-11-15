@@ -16,6 +16,8 @@ LABELS = {
     'csg_revenue': 'CSG 營收', 'csg_operating_income': 'CSG 營業利益',
     'ai_server_revenue': 'AI 伺服器營收',
     'diluted_eps_gaap': 'GAAP 稀釋 EPS', 'diluted_eps_non_gaap': 'Non-GAAP 稀釋 EPS',
+    'basic_eps': '基本 EPS', 'gross_margin': '毛利率', 'operating_margin': '營業利益率',
+    'total_assets': '總資產', 'total_liabilities': '總負債', 'bonds_payable': '應付公司債',
 }
 
 
@@ -24,7 +26,11 @@ def format_amount(value, unit, currency=None):
         return '—'
     if unit in ('USD', 'TWD'):
         return (f'{value / 1e8:,.2f} 億' if abs(value) >= 1e8 else f'{value:,.2f} ') + {'USD': '美元', 'TWD': '元'}.get(currency or unit, unit)
-    return f'{value:,.2f}' + {'per_share': ' 美元／股', 'percent': '%', 'million': ' 百萬'}.get(unit, '')
+    if unit == 'per_share':
+        return f'{value:,.2f} ' + {'TWD': '元／股'}.get(currency, '美元／股')
+    if unit == 'source_scale_undeclared':
+        return f'{value:,.0f}（來源未宣告單位）'
+    return f'{value:,.2f}' + {'percent': '%', 'million': ' 百萬'}.get(unit, '')
 
 
 def statement_metrics(data):

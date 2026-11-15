@@ -1,0 +1,98 @@
+{
+ "schema_version": "1",
+ "package_id": "twse-income-2330-20261115",
+ "prepared_at": "2026-11-15T13:16:06+00:00",
+ "prepared_by": "Claude Code (claude-opus-5-5)",
+ "prepared_by_kind": "assistant",
+ "status": "awaiting_source_review",
+ "registry_baseline_version": "0.6.1",
+ "target": {
+  "ticker": "2330.TW",
+  "code": "2330",
+  "exchange": "TWSE",
+  "currency": "TWD",
+  "share_class": "common",
+  "instrument_config": "config/tw-instruments.json"
+ },
+ "items": [
+  {
+   "source_id": "twse-openapi-income-general",
+   "recommendation": "ready_for_source_review",
+   "endpoint": "https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
+   "dataset_page": "https://data.gov.tw/dataset/91998",
+   "dataset_resource": "https://mopsfin.twse.com.tw/opendata/t187ap06_L_ci.csv（已比對目標六欄，非全資料集驗證）",
+   "license_name": "政府資料開放授權條款－第1版",
+   "license_url": "https://data.gov.tw/license",
+   "field_binding": {
+    "code": [
+     "公司代號"
+    ],
+    "name": [
+     "公司名稱"
+    ],
+    "year": [
+     "年度"
+    ],
+    "quarter": [
+     "季別"
+    ],
+    "table_date": [
+     "出表日期"
+    ],
+    "revenue": [
+     "營業收入"
+    ],
+    "net_income_parent": [
+     "淨利（淨損）歸屬於母公司業主"
+    ],
+    "eps_basic": [
+     "基本每股盈餘（元）"
+    ]
+   },
+   "evidence_produced": [
+    "最新一期年初至今累計的營業收入、歸屬母公司淨利、基本 EPS（kind=financial，period_basis=cumulative_ytd）"
+   ],
+   "retained_normalized_fields": [
+    "公司代號與名稱",
+    "年度、季別與推得的期間起訖（年初至今累計）",
+    "營業收入、歸屬母公司淨利、基本 EPS 原值",
+    "出表日期原值（source_published_raw）",
+    "端點網址、觀測時間、授權登錄檔版本與顯名"
+   ],
+   "not_retained": [
+    "原始回應（store_raw_response=false）",
+    "回應雜湊（store_response_hash=false）",
+    "其他公司的任何列",
+    "其他損益科目"
+   ],
+   "identity_findings": [
+    "2330 於一般業綜合損益表彙總端點恰有一列（2026-11-15 實測形狀，未保存數值）。",
+    "財報格式（一般業）與會計年度結束月份（12 月）是專案設定的 POC 宣告，未以年報或章程人工核對。"
+   ],
+   "time_findings": [
+    "資料集頁面更新頻率「每3月」；來源只有出表日期，沒有公司申報時間。published_at 採觀測可得性上界（observed_availability），研究截止時點不得早於採集。",
+    "期間起訖由年度／季別與 config/tw-instruments.json 的會計年度推得；2330 的曆年制已由公司 2026/11/10 6-K「nine months ended September 30, 2026」佐證。"
+   ],
+   "license_findings": [
+    "資料集 91998 頁面：授權方式「政府資料開放授權條款-第1版」、計費方式「免費」、提供機關金融監督管理委員會證券期貨局；備註列出 OAS API 文件 https://openapi.twse.com.tw/v1/swagger.json。",
+    "swagger.json 列出 /opendata/t187ap06_L_ci，摘要「上市公司綜合損益表(一般業)」。",
+    "授權條款第二節：免授權金進行利用，包括重製、改作；須顯名。"
+   ],
+   "proposed_scope": {
+    "internal_use_allowed": true,
+    "pdf_share_allowed": false,
+    "store_response_hash": false,
+    "store_raw_response": false
+   },
+   "proposed_attribution": "金融監督管理委員會證券期貨局／臺灣證券交易所，2026，上市公司綜合損益表(一般業)（91998）；依政府資料開放授權條款第1版釋出：https://data.gov.tw/license。原機關未推薦本研究。",
+   "report_effect": "提供 2330 最新一期年初至今累計營收、淨利與 EPS（金額級距未宣告，只作同一紀錄內比率與期間覆蓋檢查）。",
+   "open_questions": [],
+   "review_checklist": [
+    "官方來源、身份、發布時間、使用條款、免費取得五面向各附官方網址與逐字引用。"
+   ]
+  }
+ ],
+ "notes": [
+  "只開放 internal_use_allowed；雜湊、原始回應與舊分享欄位維持關閉。"
+ ]
+}

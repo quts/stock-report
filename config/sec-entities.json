@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
-  "config_version": "0.2.0",
-  "notes": "Operator-maintained ticker→CIK map for the SEC adapter. The CIK is the identity key used in the request URL and is re-checked against the response. expected_entity_name_contains is an additional normalized containment check on the response entityName; a mismatch is a hard failure, not a warning. Extend this file to collect further US issuers; no code change is required.",
+  "config_version": "0.3.0",
+  "notes": "Operator-maintained ticker→CIK map for the SEC adapter. The CIK is the identity key used in the request URL and is re-checked against the response. expected_entity_name_contains is an additional normalized containment check on the response entityName; a mismatch is a hard failure, not a warning. Extend this file to collect further US issuers; no code change is required. 2330.TW maps to Taiwan Semiconductor Manufacturing (CIK 0001046179), the SEC filer (Form 20-F/6-K) and issuer of the TWSE 2330 common shares; its 6-K headers state \"TWSE: 2330, NYSE: TSM\". The row is used only to bind archive document URLs to that issuer; the latest-financials check for TWSE/TPEx tickers follows the Taiwan statutory deadline, not the SEC 10-Q/10-K index. The 2330.TW name check is \"TSMC\" because TSMC exhibits (e.g. earnings releases) name the issuer only as \"TSMC (TWSE: 2330, NYSE: TSM)\"; the archive-path CIK remains the identity key.",
   "entities": [
     {
       "ticker": "NVDA",
@@ -26,6 +26,14 @@
       "exchange": "NYSE",
       "currency": "USD",
       "share_class": "Class C common"
+    },
+    {
+      "ticker": "2330.TW",
+      "cik": "0001046179",
+      "expected_entity_name_contains": "TSMC",
+      "exchange": "TWSE",
+      "currency": "TWD",
+      "share_class": "common"
     }
   ]
 }
