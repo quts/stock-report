@@ -139,3 +139,16 @@ def test_bad_citation_in_company_research_blocks_publication(tmp_path, request_m
     with pytest.raises(ValueError, match='unlicensed'):
         finalize(run, run / 'ai_proposal.json', Path('config/ratings.json'))
     assert not (run / 'report.pdf').exists()
+
+
+def test_incomplete_event_review_is_stated_in_the_appendix(data, proposal, mapping, tmp_path):
+    data.event_review = None
+    view = projection(data, evaluate(data, proposal), mapping, [company_research(data)])
+    assert any('重大事件查核未完成' in item for item in view['limitations'])
+
+
+def test_tracking_conditions_do_not_double_punctuate(data, proposal, mapping):
+    for p in proposal.outlooks:
+        p.invalidation_conditions = ['條件一。', '條件二。']
+    view = projection(data, evaluate(data, proposal), mapping, [company_research(data)])
+    assert all(c in ('條件一', '條件二') for o in view['companies'][0]['reader_outlooks'] for c in o['conditions'])

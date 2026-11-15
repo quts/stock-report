@@ -67,12 +67,14 @@ def projection(data, decision, mapping, company_research=None):
         company['reader_outlooks'] = [{'horizon': p.horizon, 'outlook': p.outlook,
             'text': p.interpretation.split('｜分析說明：')[-1] if '｜分析說明：' in p.interpretation
                     else p.interpretation, 'evidence_ids': p.supporting_evidence_ids + p.counter_evidence_ids,
-            'conditions': p.invalidation_conditions} for p in company['outlooks']]
+            'conditions': [c.rstrip('。；; ') for c in p.invalidation_conditions]} for p in company['outlooks']]
     # Material events lead the short source list; duplicate financial endpoints add no context.
     unique_sources = list({(e.source_url, e.article_url): e for e in sorted(allowed.values(), key=lambda e: e.kind == 'event', reverse=True)}.values())
     source_numbers = {(e.source_url, e.article_url): i + 1 for i, e in enumerate(unique_sources)}
     references = {eid: source_numbers[(e.source_url, e.article_url)] for eid, e in allowed.items()}
     limitations = []
+    if event_review_state(data):
+        limitations.append('近期重大事件查核未完成；本報告是財務快照，不是完整個股研究，也不代表沒有重大事件。')
     if financial_review_state(data): limitations.append('最新一期財報尚未完整納入；本報告只涵蓋已列示的財務資料。')
     if not any(e.kind == 'price' for e in allowed.values()): limitations.append('未取得現價與可比較估值，未提供目標價或即時交易判斷。')
     if not any(e.kind == 'rating' for e in allowed.values()): limitations.append('未取得可驗證的機構評等共識。')
