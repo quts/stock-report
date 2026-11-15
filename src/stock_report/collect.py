@@ -14,7 +14,7 @@ from typing import Literal
 import uuid
 from pydantic import AwareDatetime, Field
 from .models import (Entity, Evidence, Model, Request, ResearchInput, SourceClass, FilingDiscovery,
-                     LatestFinancialReview, EarningsPreviewReview, financial_review_state)
+                     LatestFinancialReview, EarningsPreviewReview, DataGap, financial_review_state)
 from .mock import VERSIONS
 from .providers import HTTPClient
 from .quant import calculate
@@ -282,7 +282,8 @@ def to_evidence(observation, request, license_snapshot, capture_mode, verified_c
         kind=observation.kind, value=observation.value, unit=observation.unit, currency=observation.currency,
         period=observation.period, period_start=observation.period_start, period_end=observation.period_end,
         period_basis=observation.period_basis, source_url=observation.source_url, publisher=license_snapshot['publisher'],
-        article_url=observation.article_url,
+        article_url=observation.article_url, accounting_basis=observation.accounting_basis,
+        target_period_end=observation.target_period_end,
         # A fixture is authored content whatever it imitates; a real capture keeps the class of its
         # source, so a secondary provider is never presented as an official record.
         source_type=source_class if capture_mode == 'network' else 'synthetic',
@@ -318,7 +319,8 @@ def exclusion_reason(evidence, request):
     return None
 
 
-def build_bundle(request, collections, *, registry, allow_fixture_capture=False, earnings_preview=None):
+def build_bundle(request, collections, *, registry, allow_fixture_capture=False, earnings_preview=None, data_gaps=None,
+                 operator_imports=None):
     """Return (research_input_or_None, report). Blockers are reported, never worked around."""
     cutoff = request.research_as_of
     blockers, exclusions, notes, evidence, summary = [], [], [], [], []
@@ -441,12 +443,27 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False,
         latest_financials = LatestFinancialReview(discovery=discovery,
             evidence_ids=[e.evidence_id for e in evidence if e.kind == 'financial'
                           and e.source_url == discovery.document_url])
+    # Operator-attested imports (prices, splits, consensus, peers) are secondary evidence with stated provenance.
+    if operator_imports:
+        from .operator_import import evidence as imported_evidence
+        known = {e.evidence_id for e in evidence}
+        for item in operator_imports:
+            rows = imported_evidence(item, request)
+            clash = sorted(known & {e.evidence_id for e in rows})
+            if clash:
+                raise ValueError(f'Operator import duplicates evidence IDs: {clash[:5]}')
+            known |= {e.evidence_id for e in rows}
+            evidence = evidence + rows
+            report.setdefault('operator_imports', []).append(
+                {'kind': item['kind'], 'records': len(rows), 'attested_by': item['attestation']['attested_by'],
+                 'source': item['attestation']['source_name']})
     # Every review object is validated together with the evidence it cites, never attached afterwards.
     data = ResearchInput(dataset_kind=dataset_kind, request=request, entities=[entity], evidence=evidence,
                          metrics=calculate(evidence, cutoff), relationships=[], event_evidence_ids=[],
                          latest_financials=latest_financials,
                          earnings_preview=(EarningsPreviewReview.model_validate(earnings_preview)
                                            if earnings_preview is not None else None),
+                         data_gaps=[DataGap.model_validate(g) for g in (data_gaps or [])],
                          versions={**VERSIONS, 'dataset': 'real-collected-1' if dataset_kind == 'real'
                                    else 'fixture-capture-1'})
     report['latest_financial_report_status'] = financial_review_state(data) or ['covered']

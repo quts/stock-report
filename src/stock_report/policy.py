@@ -55,6 +55,25 @@ def validate_company_research(data, proposal):
     return sections
 
 
+def validate_thesis(data, proposal):
+    """Thesis paragraphs and scenario citations obey the same evidence rules as company research."""
+    index = {e.evidence_id: e for e in data.evidence}
+    entities = {e.entity_id for e in data.entities}
+
+    def bad(ids, entity):
+        return any(i not in index or index[i].entity_id != entity or not reportable(index[i], data.request) for i in ids)
+    for t in proposal.thesis:
+        if t.entity_id not in entities:
+            raise ValueError('Thesis must name a supported entity')
+        if any(bad(p.evidence_ids, t.entity_id) for p in [t.market_pricing, *t.key_assumptions, *t.supporting, *t.opposing]):
+            raise ValueError('Investment thesis cites unavailable or unlicensed evidence')
+    for s in proposal.scenarios:
+        if s.entity_id not in entities:
+            raise ValueError('Scenario must name a supported entity')
+        if bad(s.multiple_evidence_ids + [i for a in s.assumptions for i in a.evidence_ids], s.entity_id):
+            raise ValueError('Scenario cites unavailable or unlicensed evidence')
+
+
 def directional_text(*texts):
     return any(DIRECTIONAL_TEXT.search(text or '') for text in texts)
 

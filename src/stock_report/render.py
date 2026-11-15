@@ -96,7 +96,7 @@ def projection(data, decision, mapping, company_research=None):
             'statement_labels': STATEMENT_LABELS}
 
 
-def render(data, decision, mapping, path, company_research=None):
+def render(data, decision, mapping, path, company_research=None, investment=None):
     from weasyprint import HTML
     def deny_resources(url, *args, **kwargs):
         raise ValueError('External and local URL resource fetching is disabled')
@@ -108,6 +108,31 @@ def render(data, decision, mapping, path, company_research=None):
     env.filters['amount'] = lambda e: format_amount(e.value, e.unit, e.currency)
     env.filters['taipei'] = lambda stamp: stamp.astimezone(timezone(timedelta(hours=8))).strftime('%Y/%m/%d %H:%M')
     template = 'research-four.html' if data.request.mode == 'stock' and data.request.max_pdf_pages >= 4 and company_research else 'report.html'
+    if investment is not None and data.request.report_profile == 'investment' and company_research:
+        template = 'research-investment.html'
+        from .engine import charts_for
+        from .research_contract import STATUS_LABELS
+        from .valuation import METHOD_LABELS
+        from .materiality import AREA_LABELS
+        currency = data.entities[0].currency
+        env.filters['money'] = lambda v, cur=currency: format_amount(v, cur, cur)
+        env.filters['pct'] = lambda v, d=1: '—' if v is None else f'{v:,.{d}f}%'
+        env.filters['num'] = lambda v, d=2: '—' if v is None else f'{v:,.{d}f}'
+        env.filters['status'] = lambda s: STATUS_LABELS.get(s, s)
+        context.update(inv=investment, charts=charts_for(investment), currency=currency, method_labels=METHOD_LABELS,
+                       basis_labels={'historical_fact': '歷史事實', 'management_guidance': '公司指引', 'guidance_informed_model': '衍生假設',
+                                     'consensus': '市場共識', 'model_assumption': '模型假設'},
+                       thesis=(investment.get('thesis') or [None])[0],
+                       driver_labels={'inventory_days': '存貨天數', 'receivable_days': '應收天數', 'payable_days': '應付天數',
+                                      'cash_conversion_cycle': '現金轉換循環', 'capex_intensity': '資本支出強度',
+                                      'depreciation_intensity': '折舊攤銷占營收', 'incremental_gross_margin': '新增營收的毛利率',
+                                      'advanced_node_share': '先進製程占比', 'backlog': '積壓訂單', 'orders': '單季訂單',
+                                      'financing_receivables_net_growth': '融資應收變動',
+                                      'financing_receivables_growth': '融資應收變動',
+                                      'inventory_demand_assessment': '存貨與需求'})
+    elif investment is not None and investment.get('gates') and investment['gates']['grade'] == 'limited' \
+            and data.dataset_kind == 'real':
+        context['limitations'].append('研究品質檢查未全數通過：' + '、'.join(investment['gates']['critical_failures']) + '。')
     html = env.get_template(template).render(**context)
     document = HTML(string=html, url_fetcher=deny_resources).render()
     if not 1 <= len(document.pages) <= data.request.max_pdf_pages:

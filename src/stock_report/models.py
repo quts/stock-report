@@ -63,7 +63,11 @@ class Request(Model):
     horizons: list[Horizon] = Field(default_factory=lambda: ['3-6m', '6-12m'])
     max_companies: int = Field(default=5, ge=1, le=5)
     language: Literal['zh-TW'] = 'zh-TW'
-    max_pdf_pages: int = Field(default=4, ge=1, le=4)
+    max_pdf_pages: int = Field(default=4, ge=1, le=8)
+    # `four_page` keeps the compact layout (at most four pages). `investment` adds the
+    # deterministic financial-analysis, valuation and scenario sections and may use up to
+    # eight pages rather than omitting material analysis.
+    report_profile: Literal['four_page', 'investment'] = 'four_page'
     # Outputs are exclusively for the operator's personal use. No sharing profile exists, and a
     # request asking for one is rejected instead of being quietly downgraded.
     sharing_profile: Literal['private'] = 'private'
@@ -76,6 +80,10 @@ class Request(Model):
             raise ValueError('Event mode requires event_query and forbids ticker/exchange')
         if sorted(self.horizons) != ['3-6m', '6-12m']:
             raise ValueError('Both distinct research horizons are required')
+        if self.report_profile == 'four_page' and self.max_pdf_pages > 4:
+            raise ValueError('The four-page profile allows at most four pages')
+        if self.report_profile == 'investment' and (self.mode != 'stock' or self.max_pdf_pages < 4):
+            raise ValueError('The investment profile is a stock report of four to eight pages')
         return self
 
 class Evidence(Model):
@@ -96,6 +104,12 @@ class Evidence(Model):
     price_adjustment: PriceAdjustment | None = None
     source_url: str
     article_url: str | None = Field(default=None, pattern=r'^https://[^\s]+$', max_length=1000)
+    # Accounting basis of a financial figure. Reported (GAAP/IFRS) and adjusted figures never
+    # share a series or a ratio; None means the source did not classify it.
+    accounting_basis: Literal['gaap', 'ifrs', 'non_gaap', 'company_adjusted', 'not_applicable'] | None = None
+    # Period a forward estimate refers to, so guidance, consensus and actuals align on dates
+    # rather than on free-text labels.
+    target_period_end: date | None = None
     publisher: str
     source_type: Literal['official', 'secondary', 'synthetic']
     source_record_id: str
@@ -164,6 +178,23 @@ EventCategory = Literal['management_change', 'guidance', 'earnings', 'merger_acq
                         'legal', 'financing', 'product', 'other']
 
 
+ImpactArea = Literal['revenue_earnings', 'free_cash_flow', 'competitive_position', 'capital_allocation',
+                     'valuation', 'regulatory_geopolitical']
+DataStatus = Literal['available', 'not_applicable', 'not_disclosed', 'not_found', 'source_unavailable',
+                     'conflicting', 'stale']
+
+
+class DataGap(Model):
+    """A recorded outcome for a required field that has no usable value.
+
+    A failed retrieval is `source_unavailable`, never proof that the data does not exist."""
+    field: str = Field(pattern=r'^[a-z0-9_]+$', max_length=60)
+    status: Literal['not_applicable', 'not_disclosed', 'not_found', 'source_unavailable']
+    reason: str = Field(min_length=1, max_length=300)
+    sources_tried: list[str] = Field(default_factory=list, max_length=12)
+    checked_at: AwareDatetime
+
+
 class MaterialLead(Model):
     """A potentially material event the review could not establish from usable evidence.
 
@@ -184,6 +215,7 @@ class ReviewedEvent(Model):
     event_time: AwareDatetime
     verification: Literal['official', 'secondary_corroborated']
     evidence_ids: list[str] = Field(min_length=1, max_length=6)
+    impact_areas: list[ImpactArea] = Field(default_factory=list, max_length=6)
 
 
 class EventReview(Model):
@@ -376,6 +408,7 @@ class ResearchInput(Model):
     event_review: EventReview | None = None
     latest_financials: LatestFinancialReview | None = None
     earnings_preview: EarningsPreviewReview | None = None
+    data_gaps: list[DataGap] = Field(default_factory=list, max_length=60)
     versions: dict[str, str]
 
     @model_validator(mode='after')
@@ -440,6 +473,67 @@ class CompanyResearch(Model):
     earnings_preview: list[CitedParagraph] = Field(default_factory=list, max_length=6)
     monitoring: list[CitedParagraph] = Field(default_factory=list, max_length=6)
 
+class Assumption(Model):
+    """One explicit scenario input. A model assumption is labelled as such, never as a fact."""
+    name: str = Field(min_length=1, max_length=80)
+    value: float
+    unit: str = Field(min_length=1, max_length=40)
+    basis: Literal['historical_fact', 'management_guidance', 'guidance_informed_model', 'consensus', 'model_assumption']
+    evidence_ids: list[str] = Field(default_factory=list, max_length=64)
+    rationale: str = Field(min_length=1, max_length=300)
+    source_period: str | None = None
+    forecast_period: str | None = None
+    accounting_basis: str | None = None
+    derivation: str | None = None
+
+
+ForecastDriver = Literal['revenue_growth', 'operating_margin', 'non_operating_ratio', 'tax_rate', 'share_change',
+                         'da_intensity', 'capex_intensity', 'working_capital_intensity', 'ocf_residual_intensity']
+
+
+class OperatingInvalidation(Model):
+    driver: ForecastDriver
+    operator: Literal['lt', 'gt']
+    threshold: float
+    period: str
+    rationale: str = Field(min_length=1, max_length=300)
+
+
+class ScenarioProposal(Model):
+    entity_id: str
+    name: Literal['bull', 'base', 'bear']
+    # Must equal the engine's forecast horizon label (see investment_inputs.json forecast.horizon).
+    target_period: str = Field(min_length=1, max_length=40)
+    # Driver-based forecast: each driver is a percentage with its origin. Omitted drivers fall back to
+    # the deterministic historical anchor and are labelled historical_fact.
+    drivers: dict[ForecastDriver, Assumption] = Field(default_factory=dict)
+    forecast_method: Literal['quarterly', 'annual_sensitivity'] = 'quarterly'
+    guidance_fx_rate: float | None = Field(default=None, gt=0)
+    guidance_fx_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+    assumptions: list[Assumption] = Field(default_factory=list, max_length=8)
+    financial_outcome: str = Field(min_length=1, max_length=400)
+    valuation_metric: Literal['eps', 'fcf_per_share', 'book_value_per_share', 'ebitda']
+    # Legacy direct input. With drivers the engine computes the metric; a supplied value must reconcile.
+    valuation_metric_value: float | None = None
+    multiple_method: Literal['pe', 'p_fcf', 'p_b', 'ev_ebitda']
+    multiple: float = Field(gt=0, le=200)
+    multiple_basis: Literal['current_trailing', 'historical_range', 'peer_median', 'model_assumption']
+    multiple_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+    catalysts: list[str] = Field(default_factory=list, max_length=5)
+    invalidation_conditions: list[str] = Field(min_length=1, max_length=5)
+    operating_invalidations: list[OperatingInvalidation] = Field(default_factory=list, max_length=8)
+    leading_indicators: list[str] = Field(default_factory=list, max_length=5)
+
+
+class InvestmentThesis(Model):
+    entity_id: str
+    market_pricing: CitedParagraph
+    key_assumptions: list[CitedParagraph] = Field(min_length=1, max_length=4)
+    supporting: list[CitedParagraph] = Field(default_factory=list, max_length=4)
+    opposing: list[CitedParagraph] = Field(default_factory=list, max_length=4)
+    invalidation: list[str] = Field(min_length=1, max_length=5)
+
+
 class HorizonProposal(Model):
     entity_id: str
     horizon: Horizon
@@ -455,10 +549,12 @@ class HorizonProposal(Model):
 class Proposal(Model):
     input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     model: str
-    prompt_version: Literal['4'] = '4'
+    prompt_version: Literal['6'] = '6'
     usage: dict[str, int] | None = None
     outlooks: list[HorizonProposal] = Field(max_length=10)
     company_research: list[CompanyResearch] = Field(default_factory=list, max_length=5)
+    thesis: list[InvestmentThesis] = Field(default_factory=list, max_length=5)
+    scenarios: list[ScenarioProposal] = Field(default_factory=list, max_length=15)
 
 class Finding(Model):
     rule_id: str

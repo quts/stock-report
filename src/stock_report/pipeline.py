@@ -8,7 +8,8 @@ from . import __version__
 from .analysis import exchange
 from .models import Request, ResearchInput, Proposal, event_review_state, research_scope, financial_review_state
 from .mock import fixture, VERSIONS
-from .policy import evaluate, reportable, validate_company_research
+from .policy import evaluate, reportable, validate_company_research, validate_thesis
+from . import engine
 from .quant import calculate, consensus
 from .render import render
 from .storage import digest, read_json, write_json, save_evidence
@@ -144,10 +145,24 @@ def finalize(directory, proposal_path, mapping_path):
         raise ValueError('Synthetic proposal cannot be applied to real data')
     decision = evaluate(data, proposal)
     company_research = validate_company_research(data, proposal)
+    validate_thesis(data, proposal)
+    # One deterministic research pass; its quality gates decide whether the report is complete.
+    investment = engine.run(data, proposal, decision)
+    if investment is not None:
+        write_json(directory / 'investment.json', engine.public(investment))
+        # Pipeline diagnostics live in a machine-readable QA artifact, not in the report body.
+        write_json(directory / 'qa.json', engine.public({
+            'report_grade': investment['gates']['grade'] if investment['gates'] else None,
+            'quality_gates': investment['gates']['checks'] if investment['gates'] else [],
+            'market_data': investment['market_data'], 'forecast_calibration': investment['forecast'].get('calibration'),
+            'ocf_reconciliation': investment['forecast'].get('reconciliation'),
+            'forecast_backtest': investment['forecast'].get('backtest'),
+            'forecast_notes': investment['forecast']['notes'], 'scenario_problems': investment['scenarios']['problems'],
+            'sector_drivers_unavailable': investment['sector_drivers']['unavailable']}))
     # File output is transactional: the personal PDF is written only after all checks pass.
     temp_pdf = directory / '.report.pending.pdf'
     try:
-        pages = render(data, decision, mapping, temp_pdf, company_research=company_research)
+        pages = render(data, decision, mapping, temp_pdf, company_research=company_research, investment=investment)
     except Exception:
         temp_pdf.unlink(missing_ok=True)
         raise
@@ -161,13 +176,22 @@ def finalize(directory, proposal_path, mapping_path):
               'distribution': DISTRIBUTION, **completion(data),
               'privacy': 'Personal use only. Local audit JSON; never distributed'}
     report['company_research'] = [section.model_dump(mode='json') for section in company_research]
+    if investment is not None:
+        gates = investment['gates']
+        report['report_grade'] = gates['grade']
+        report['quality_gates'] = gates['checks']
+        report['data_completeness'] = investment['completeness']
+        report['valuation'] = engine.jsonable(investment['valuation'])
+        report['scenarios'] = engine.jsonable(investment['scenarios'])
+        report['thesis'] = [t.model_dump(mode='json') for t in proposal.thesis]
     write_json(directory / 'research.json', report)
     write_json(directory / 'decision.json', decision)
     write_json(directory / 'ai_proposal.json', proposal)
     write_json(directory / 'rating_mapping.json', mapping)
     artifacts = ['research_input.json', 'ai_proposal.json', 'rating_mapping.json', 'evidence.json', 'evidence.sqlite', 'decision.json', 'research.json', 'report.pdf']
-    if (directory / 'statement_metrics.json').exists():
-        artifacts.append('statement_metrics.json')
+    for optional in ('statement_metrics.json', 'investment.json', 'investment_inputs.json', 'qa.json'):
+        if (directory / optional).exists():
+            artifacts.append(optional)
     manifest = {'run_id': prepared['run_id'], 'created_at': datetime.now(timezone.utc).isoformat(),
                 'research_as_of': data.request.research_as_of.isoformat(), 'dataset_kind': data.dataset_kind,
                 'versions': runtime_versions(mapping, data), 'proposal_model': proposal.model, 'usage': proposal.usage,
@@ -178,9 +202,12 @@ def finalize(directory, proposal_path, mapping_path):
                 'hashes': {name: byte_hash(directory / name) for name in artifacts}}
     write_json(directory / 'manifest.json', manifest)
     warnings = completion_warnings(data) + sorted({f.message for f in decision.findings})
+    if investment is not None and investment['gates']['grade'] == 'limited':
+        warnings.insert(0, '受限報告：品質檢查未通過 ' + '、'.join(investment['gates']['critical_failures']))
     if data.dataset_kind == 'mock':
         warnings.insert(0, 'DEMO / SYNTHETIC DATA')
     return {'run_id': prepared['run_id'], 'status': 'partial' if warnings else 'success',
+            'report_grade': investment['gates']['grade'] if investment else None,
             'gate_status': decision.status, 'distribution': DISTRIBUTION, **completion(data), 'report_path': str(report_path), 'json_path': str(directory / 'research.json'),
             'research_as_of': data.request.research_as_of.isoformat(), 'coverage': coverage(data), 'warnings': warnings}
 
