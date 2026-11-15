@@ -2,7 +2,7 @@
 from pathlib import Path
 from datetime import datetime, timezone
 from shutil import copyfile
-from xml.etree import ElementTree
+from stock_report.diagnostics import recorded_tests
 from stock_report.evaluation import load_evaluation
 from stock_report.analysis import synthetic_proposal
 from stock_report.mock import fixture
@@ -52,17 +52,9 @@ for artifact in ('news-discovery.json', 'event-ranking.json'):
     if source.exists():
         copyfile(source, output / artifact)
 news_network = output / 'discovery-network-junit.xml'
-news_contract = {'status': 'NOT_RUN'}
-if news_network.exists():
-    suites = ElementTree.parse(news_network).getroot().iter('testsuite')
-    failed = any(int(s.get('failures', '0')) or int(s.get('errors', '0')) for s in suites)
-    news_contract = {'status': 'FAILED' if failed else 'PASSED', 'artifact': news_network.name}
+news_contract = recorded_tests(news_network)
 rss_network = output / 'rss-network-junit.xml'
-rss_contract = {'status': 'NOT_RUN'}
-if rss_network.exists():
-    suites = ElementTree.parse(rss_network).getroot().iter('testsuite')
-    failed = any(int(s.get('failures', '0')) or int(s.get('errors', '0')) for s in suites)
-    rss_contract = {'status': 'FAILED' if failed else 'PASSED', 'artifact': rss_network.name}
+rss_contract = recorded_tests(rss_network)
 for name,label in [('stock-nvda','stock'),('event','event')]:
     row=next(r for r in index if r.get('example')==name)
     copyfile(row['report_path'],output/f'sample-{label}.pdf')
@@ -71,6 +63,8 @@ write_json(output/'research-manifest.json',{'generated_at':datetime.now(timezone
     'replay_verified':any('replay_of' in r for r in index), 'test_results':'provider-increment-junit.xml', 'network_test_results':'network-junit.xml',
     'real_data_probe':'provider-probes.json' if (output/'provider-probes.json').exists() else 'legacy probe archived privately',
     'source_binding':'taiwan-source-binding.json', 'interactive_evaluation':'llm-evaluation.json',
+    'current_interactive_evaluation':'llm-evaluation-current.json' if Path('docs/phase-0/codex-interactive-v2.json').exists() else 'NOT_RUN',
+    'pre_human_review':'pre-human-review.md',
     'real_source_smoke':'source-smoke.json' if (output/'source-smoke.json').exists() else 'NOT_RUN',
     'license_registry':read_json('config/source-licenses.json')['registry_version'],
     'real_research_e2e':'NOT_PASSED', 'news_index_network_contract':news_contract,
@@ -102,7 +96,10 @@ if Path('docs/phase-0/codex-interactive-v2.json').exists():
         Path('reports/codex-evaluation-v2/llm-evaluation.json'),
         Path('docs/phase-0/codex-interactive-v2.json'),Path('reports/codex-evaluation-v2')))
 for name in ('provider-feasibility.md','phase-0-review.md','codex-interactive-evaluation.md',
-             'codex-interactive-evaluation.json','taiwan-license-review-evidence.md','taiwan-source-binding.json'):
+             'codex-interactive-evaluation.json','taiwan-license-review-evidence.md','taiwan-source-binding.json',
+             'pre-human-review.md','financial-source-binding.json','2330-source-activation.json',
+             'taiwan-financial-source-notes.md','us-price-source-notes.md','codex-interactive-v2.json',
+             'event-ranking.md','news-discovery.md','operations.md'):
     source=Path('docs/phase-0')/name
     if source.exists():copyfile(source,output/name)
 print(output.resolve())

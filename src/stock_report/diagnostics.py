@@ -14,7 +14,17 @@ def recorded_tests(path):
     suites = list(ElementTree.parse(path).getroot().iter('testsuite'))
     counts = {name: sum(int(s.get(name, '0')) for s in suites)
               for name in ('tests', 'failures', 'errors', 'skipped')}
-    return {'status': 'FAILED' if counts['failures'] or counts['errors'] else 'PASSED',
+    if counts['failures'] or counts['errors']:
+        status = 'FAILED'
+    elif not counts['tests']:
+        status = 'NOT_RUN'
+    elif counts['skipped'] >= counts['tests']:
+        status = 'SKIPPED'
+    elif counts['skipped']:
+        status = 'PARTIAL'
+    else:
+        status = 'PASSED'
+    return {'status': status,
             'path': str(path), **counts,
             'scope': 'Recorded artifact only; not a fresh test run or proof of real research'}
 

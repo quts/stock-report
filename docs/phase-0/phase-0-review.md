@@ -41,7 +41,7 @@
 
 ## 實際測試與交付紀錄
 
-- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸為 433 passed、10 deselected，包含 Prompt 版本交換的回歸測試。`scripts/runtime.sh verify` 全套完成：測試、四份合成報告及 Replay、PDF 預覽與 Review Bundle。新版實際互動批次另驗十例，不併作獨立模型呼叫數。`reports/phase-0/acceptance.json` 記錄 offline_acceptance_passed、來源全關閉及正式 MVP GO=false。
+- `reports/phase-0/provider-increment-junit.xml`：最新完整離線回歸為 436 passed、10 deselected，包含 Prompt 版本交換與未執行契約不誤報通過的回歸測試。`scripts/runtime.sh verify` 全套完成：測試、四份合成報告及 Replay、PDF 預覽與 Review Bundle。新版實際互動批次另驗十例，不併作獨立模型呼叫數。`reports/phase-0/acceptance.json` 記錄 offline_acceptance_passed、來源全關閉及正式 MVP GO=false。
 - `reports/phase-0/rss-network-junit.xml`：官方 NVIDIA 新聞稿 RSS 的真實網路契約 1 passed。另以受控 NVDA Request 實際執行 CLI，20 項 Feed 中有 18 項符合窗口的候選統計；只保存數量與狀態，沒有保存標題、文章連結、原始回應或雜湊，紀錄為 `reports/news/nvda-feed-inspection.json`。這不是已啟用的研究證據。
 - `reports/phase-0/discovery-network-junit.xml`：新聞索引實際網路契約 1 failed（HTTP 429），沒有宣稱真實搜尋驗收通過。Review Bundle 的 research-manifest.json 明列 FAILED，合成搜尋紀錄另列，沒有混成真實證據。
 - `reports/phase-0/us-price-network-junit.xml`：NVDA／AMD 次級行情來源的實際契約測試 2 passed；沒有保存價格、原始回應或雜湊，亦未啟用權限。
