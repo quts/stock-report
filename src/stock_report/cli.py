@@ -13,10 +13,11 @@ from .discovery import discover
 from .rss import discover_feed
 from .diagnostics import doctor
 from .licensing import load_registry
-from .models import Request
+from .models import Request, ResearchInput
 from .pipeline import prepare, load_prepared, finalize, replay
 from .providers import probes
 from .sources import PROFILES
+from .stock_events import StockEventDossier, merge_stock_events
 from .storage import read_json, write_json
 
 
@@ -87,6 +88,11 @@ def parser():
     rank.add_argument('--output', required=True, type=Path)
     rank.add_argument('--universe', type=Path, default=None)
     rank.add_argument('--license-registry', type=Path, default=None)
+    sev = sub.add_parser('stock-events', help='Merge a reviewed stock event dossier into a stock evidence bundle; no network')
+    sev.add_argument('--bundle', required=True, type=Path, help='Existing stock evidence bundle without an event review')
+    sev.add_argument('--dossier', required=True, type=Path)
+    sev.add_argument('--output', required=True, type=Path)
+    sev.add_argument('--license-registry', type=Path, default=None)
     news = sub.add_parser('news-discover', help='Bounded news-index discovery; mentions are unverified leads')
     news.add_argument('--request', required=True, type=Path)
     news.add_argument('--output', required=True, type=Path)
@@ -223,6 +229,23 @@ def main(argv=None):
                 result.update(bundle_path=str(directory / 'event-bundle.json'),
                               request_path=str(directory / 'request.json'),
                               next_provider='import' if data.dataset_kind == 'real' else 'synthetic-event')
+        elif args.command == 'stock-events':
+            if args.output.exists():
+                raise ValueError('Refusing to overwrite an existing bundle; write the merged bundle to a new path')
+            bundle = ResearchInput.model_validate(read_json(args.bundle))
+            dossier = StockEventDossier.model_validate(read_json(args.dossier))
+            registry = load_registry(args.license_registry) if dossier.dossier_kind == 'real' else None
+            data, report = merge_stock_events(bundle, dossier, registry)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            report_path = args.output.with_name(args.output.stem + '-report.json')
+            write_json(report_path, report)
+            result = {key: report[key] for key in ('status', 'dossier_kind', 'event_review_status', 'verified_events',
+                                                   'unresolved_leads', 'evidence_exclusions', 'blockers', 'warnings')}
+            result.update(report_path=str(report_path), research_as_of=report['request']['research_as_of'])
+            if data is not None:
+                write_json(args.output, data)
+                result.update(bundle_path=str(args.output),
+                              next_provider='import' if data.dataset_kind == 'real' else None)
         elif args.command == 'activation-check':
             result = activation_check(args.package, load_registry(args.license_registry),
                                       args.instruments, args.candidate_registry)
@@ -232,8 +255,8 @@ def main(argv=None):
             result = probes(args.output, args.user_agent, args.retries)
         else:
             args.output.mkdir(parents=True, exist_ok=True)
-            from .models import Evidence, ResearchInput, Proposal
-            for model in (Request, Evidence, ResearchInput, Proposal):
+            from .models import Evidence, Proposal
+            for model in (Request, Evidence, ResearchInput, Proposal, StockEventDossier):
                 write_json(args.output / f'{model.__name__}.schema.json', model.model_json_schema())
             result = {'status': 'success', 'schema_path': str(args.output.resolve())}
         print(json.dumps(result, ensure_ascii=False))

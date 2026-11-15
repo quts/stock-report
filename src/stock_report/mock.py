@@ -1,6 +1,6 @@
 """Explicitly synthetic fixtures, never a fallback for failed real requests."""
 from datetime import timedelta
-from .models import Entity, Evidence, ResearchInput, Relationship
+from .models import Entity, Evidence, EventReview, ResearchInput, Relationship, ReviewedEvent
 from .quant import calculate
 
 ENTITIES = {
@@ -9,7 +9,7 @@ ENTITIES = {
     '2330.TW': ('台積電（合成測資）', 'TWSE', 'TWD'),
     '6488.TWO': ('環球晶（合成測資）', 'TPEx', 'TWD'),
 }
-VERSIONS = {'quant': '2', 'policy': 'phase0-2', 'prompt': '2', 'template': '4', 'dataset': 'synthetic-1'}
+VERSIONS = {'quant': '2', 'policy': 'phase0-3', 'prompt': '3', 'template': '5', 'dataset': 'synthetic-1'}
 
 
 def fixture(request):
@@ -48,5 +48,15 @@ def fixture(request):
     event_ids = []
     if request.mode == 'event':
         event_ids.append(record('EVENT', 'announcement', 'event', 'DEMO 合成跨市場產業事件，並非真實政策公告'))
+    review = None
+    if request.mode == 'stock':
+        # An authored stand-in for a completed review, so the demo exercises the full stock layout.
+        review = EventReview(status='completed', window_start=cutoff - timedelta(days=request.lookback_days),
+            window_end=cutoff, reviewed_by='synthetic-fixture', reviewer='synthetic fixture (not a real review)',
+            reviewed_at=cutoff, sources_checked=['合成測資；未查閱任何真實來源'],
+            events=[ReviewedEvent(event_id=f'{t}-risk', title='合成風險事件（非真實新聞）', category='other',
+                                  materiality='notable', status='occurred', event_time=cutoff - timedelta(days=3),
+                                  verification='official', evidence_ids=[f'{t}-risk']) for t in tickers])
     return ResearchInput(dataset_kind='mock', request=request, entities=entities, evidence=evidence,
-        metrics=calculate(evidence, cutoff), relationships=relations, event_evidence_ids=event_ids, versions=VERSIONS)
+        metrics=calculate(evidence, cutoff), relationships=relations, event_evidence_ids=event_ids,
+        event_review=review, versions=VERSIONS)

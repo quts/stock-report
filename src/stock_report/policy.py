@@ -5,10 +5,27 @@ whether a record is confirmed for internal use. The legacy redistribution flag
 (`shareable_in_pdf`) is recorded for audit compatibility and is never consulted here.
 Personal use is not a permission in itself: unknown or restricted sources stay blocked.
 """
-from .models import Decision, Finding, HorizonProposal
+import re
+from .models import Decision, Finding, HorizonProposal, event_review_state
 from .quant import calculate, usable
 
-VERSION = 'phase0-2'
+VERSION = 'phase0-3'
+GENERIC_INSUFFICIENT = '核心資料不足，無方向性結論。'
+# An insufficient outlook may explain what is missing; it may never read as a direction. This is a
+# lexical guard, not comprehension: any hit discards the text in favour of the generic wording.
+DIRECTIONAL_TEXT = re.compile(
+    r'偏多|看多|看好|看漲|利多|樂觀|買進|買入|加碼|上漲|上行|上修|成長動能|受惠|偏空|看空|看壞|看跌|利空|悲觀|賣出|減碼|下跌|下行|下修|'
+    r'bullish|bearish|upside|downside|outperform|underperform|\bbuy\b|\bsell\b|\blong\b|\bshort\b', re.IGNORECASE)
+EVENT_REVIEW_MESSAGES = {
+    'EVENT_REVIEW_MISSING': '近期重大事件查核未執行（證據包沒有事件查核紀錄）；僅為財務快照，不發布方向性結論',
+    'EVENT_REVIEW_NOT_RUN': '近期重大事件查核未執行；僅為財務快照，不發布方向性結論',
+    'EVENT_REVIEW_FAILED': '近期重大事件查核失敗；不代表沒有重大事件，不發布方向性結論',
+    'MATERIAL_LEAD_UNRESOLVED': '存在未解決的重大事件線索；不發布方向性結論',
+}
+
+
+def directional_text(*texts):
+    return any(DIRECTIONAL_TEXT.search(text or '') for text in texts)
 
 
 def internally_licensed(e):
@@ -34,14 +51,18 @@ def evaluate(data, proposal):
     expected = {(e, h) for e in entities for h in data.request.horizons}
     if len(pairs) != len(set(pairs)) or set(pairs) != expected:
         raise ValueError('Proposal must contain exactly one outlook per entity and horizon')
+    review_state = event_review_state(data)
     for p in proposal.outlooks:
-        problems = []
+        problems, bad_refs, reasons = [], set(), []
         def add(rule, message, ids=(), severity='hard'):
             f = Finding(rule_id=rule, entity_id=p.entity_id, horizon=p.horizon,
                         evidence_ids=list(ids), message=message, severity=severity)
             findings.append(f)
             if severity == 'hard':
                 problems.append(rule)
+                bad_refs.update(ids)
+                if message not in reasons:
+                    reasons.append(message)
         refs = list(dict.fromkeys(p.supporting_evidence_ids + p.counter_evidence_ids))
         if p.entity_id in bad_quant:
             add('QUANT_MISMATCH', '量化結果與原始證據重算不符')
@@ -68,6 +89,8 @@ def evaluate(data, proposal):
         independent = {(e.publisher, e.source_record_id) for e in core}
         if p.outlook != 'insufficient' and (len(independent) < 2 or not p.invalidation_conditions):
             add('CORE_INSUFFICIENT', '核心證據不足或缺少反轉條件；門檻尚待 Phase 0 校準')
+        for code in review_state:
+            add(code, EVENT_REVIEW_MESSAGES[code])
         if data.request.mode == 'event':
             event_refs = [index.get(eid) for eid in data.event_evidence_ids]
             if not event_refs or not all(e and e.kind == 'event' and e.entity_id == 'EVENT' and reportable(e, data.request) for e in event_refs):
@@ -98,13 +121,29 @@ def evaluate(data, proposal):
         if any(m.value is None for m in data.metrics if m.entity_id == p.entity_id):
             add('METRICS_MISSING', '部分財務或估值缺失，已省略不可驗證指標', severity='soft')
         add('PHASE0_THRESHOLD', 'Phase 0 規則未經實際投資效能驗證', severity='soft')
-        if problems:
-            approved.append(HorizonProposal(entity_id=p.entity_id, horizon=p.horizon, outlook='insufficient',
-                supporting_evidence_ids=[], counter_evidence_ids=[], interpretation='證據或報告條件不足；請查閱決策紀錄。',
-                assumptions=[], unresolved_conflicts=['；'.join(problems)], invalidation_conditions=[]))
-        elif p.outlook == 'insufficient':
-            approved.append(HorizonProposal(entity_id=p.entity_id, horizon=p.horizon, outlook='insufficient',
-                supporting_evidence_ids=[], counter_evidence_ids=[], interpretation='核心資料不足，無方向性結論。'))
+        if p.outlook == 'insufficient' or problems:
+            # The Gate's own reasons always lead. A proposal that was itself `insufficient` keeps its
+            # explanation and the evidence that passed every check; a downgraded directional proposal
+            # keeps neither, because its text and citations argued for a direction.
+            own = p.outlook == 'insufficient'
+            texts = [p.interpretation, p.conflict_resolution, *p.assumptions, *p.invalidation_conditions]
+            if own and directional_text(*texts):
+                add('INSUFFICIENT_DIRECTIONAL_TEXT', '資料不足的說明含方向性用語，已改用通用說明', severity='soft')
+                own = False
+            gate = ('未形成方向性結論：' + '；'.join(reasons)) if problems else ''
+            if own and p.interpretation.strip():
+                text = (gate + '｜分析說明：' if gate else '') + p.interpretation.strip()
+            else:
+                text = gate or GENERIC_INSUFFICIENT
+            keep = lambda ids: [eid for eid in ids if eid in index and eid not in bad_refs] if own else []
+            approved.append(HorizonProposal(
+                entity_id=p.entity_id, horizon=p.horizon, outlook='insufficient',
+                supporting_evidence_ids=keep(p.supporting_evidence_ids),
+                counter_evidence_ids=keep(p.counter_evidence_ids),
+                interpretation=text if len(text) <= 350 else text[:349] + '…',
+                assumptions=list(p.assumptions) if own else [],
+                unresolved_conflicts=['；'.join(problems)[:300]] if problems else [],
+                invalidation_conditions=[]))
         else:
             approved.append(p)
     rejected = sum(p.outlook == 'insufficient' for p in approved)

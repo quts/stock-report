@@ -6,7 +6,7 @@ import hashlib
 import uuid
 from . import __version__
 from .analysis import exchange
-from .models import Request, ResearchInput, Proposal
+from .models import Request, ResearchInput, Proposal, event_review_state, research_scope
 from .mock import fixture, VERSIONS
 from .policy import evaluate, reportable
 from .quant import calculate, consensus
@@ -38,6 +38,35 @@ def coverage(data):
             fields[kind] = 'unavailable' if not rows else 'available' if all(reportable(e, data.request) for e in rows) else 'partial' if any(reportable(e, data.request) for e in rows) else 'license_unknown' if any(e.license_status == 'unknown' for e in rows) else 'unavailable'
         result[entity.entity_id] = fields
     return result
+
+
+SNAPSHOT_NOTICE = ('僅為財務快照：近期重大事件查核未完成，不是完整個股研究；'
+                   '不得回報為研究完成，也不得解讀為沒有重大事件')
+
+
+def completion(data):
+    """Explicit, machine-readable answer to "is this complete stock research?" for every delivery."""
+    state = event_review_state(data)
+    review = data.event_review
+    result = {'research_scope': research_scope(data), 'completion_blockers': state,
+              'event_review': None if review is None else {
+                  'status': review.status, 'reviewed_by': review.reviewed_by,
+                  'window_start': review.window_start.isoformat() if review.window_start else None,
+                  'window_end': review.window_end.isoformat() if review.window_end else None,
+                  'verified_events': [e.event_id for e in review.events],
+                  'unresolved_leads': [lead.lead_id for lead in review.unresolved_leads]}}
+    if data.request.mode == 'stock':
+        result['research_complete'] = not state
+        result['event_review_status'] = review.status if review is not None else 'not_run'
+    return result
+
+
+def completion_warnings(data):
+    scope = research_scope(data)
+    notes = [SNAPSHOT_NOTICE] if scope == 'financial_snapshot' else []
+    if data.event_review is not None and data.event_review.unresolved_leads:
+        notes.append('存在未解決的重大事件線索；各期限展望維持資料不足')
+    return notes
 
 
 def prepare(request, root, source=None, synthetic_source=False):
@@ -74,8 +103,9 @@ def prepare(request, root, source=None, synthetic_source=False):
     exchange(data, directory)
     write_json(directory / 'prepared.json', {'run_id': run_id, 'input_sha256': digest(data), 'status': 'prepared'})
     return {'run_id': run_id, 'status': 'prepared', 'research_input_path': str(directory / 'research_input.json'),
-            'research_as_of': request.research_as_of.isoformat(), 'coverage': coverage(data),
-            'warnings': ['DEMO / SYNTHETIC DATA'] if data.dataset_kind == 'mock' else ['Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)']}
+            'research_as_of': request.research_as_of.isoformat(), 'coverage': coverage(data), **completion(data),
+            'warnings': (['DEMO / SYNTHETIC DATA'] if data.dataset_kind == 'mock' else ['Real evidence import requires a recorded source/licence review (human attestation or qualified assistant review)'])
+                        + completion_warnings(data)}
 
 
 def load_prepared(directory):
@@ -114,7 +144,7 @@ def finalize(directory, proposal_path, mapping_path):
               'metrics': [m.model_dump(mode='json') for m in calculate(data.evidence, data.request.research_as_of)],
               'approved_outlooks': [p.model_dump(mode='json') for p in decision.outlooks],
               'consensus': {e.entity_id: consensus(data.evidence, e.entity_id, data.request.research_as_of, mapping) for e in data.entities},
-              'distribution': DISTRIBUTION,
+              'distribution': DISTRIBUTION, **completion(data),
               'privacy': 'Personal use only. Local audit JSON; never distributed'}
     write_json(directory / 'research.json', report)
     write_json(directory / 'decision.json', decision)
@@ -126,15 +156,15 @@ def finalize(directory, proposal_path, mapping_path):
                 'versions': runtime_versions(mapping, data), 'proposal_model': proposal.model, 'usage': proposal.usage,
                 'input_sha256': digest(data), 'decision_sha256': digest(decision), 'pdf_pages': pages,
                 # Nothing is cleared for redistribution. `shareable_files` is a legacy key kept empty.
-                'distribution': DISTRIBUTION, 'personal_report_files': ['report.pdf'],
+                'distribution': DISTRIBUTION, 'personal_report_files': ['report.pdf'], **completion(data),
                 'shareable_files': [], 'audit_files_private': True,
                 'hashes': {name: byte_hash(directory / name) for name in artifacts}}
     write_json(directory / 'manifest.json', manifest)
-    warnings = sorted({f.message for f in decision.findings})
+    warnings = completion_warnings(data) + sorted({f.message for f in decision.findings})
     if data.dataset_kind == 'mock':
         warnings.insert(0, 'DEMO / SYNTHETIC DATA')
     return {'run_id': prepared['run_id'], 'status': 'partial' if warnings else 'success',
-            'gate_status': decision.status, 'distribution': DISTRIBUTION, 'report_path': str(report_path), 'json_path': str(directory / 'research.json'),
+            'gate_status': decision.status, 'distribution': DISTRIBUTION, **completion(data), 'report_path': str(report_path), 'json_path': str(directory / 'research.json'),
             'research_as_of': data.request.research_as_of.isoformat(), 'coverage': coverage(data), 'warnings': warnings}
 
 

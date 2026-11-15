@@ -278,6 +278,21 @@ PROFILES = {
 }
 
 
+# Reviewer-cited filing documents. Nothing is collected from these by this code: a record enters
+# only through a reviewed dossier, and the path CIK binds the document to the configured issuer
+# (EDGAR archive paths carry the CIK without leading zeros).
+FILING_PROFILES = {
+    'sec-edgar-archives-filing': {
+        'adapter': 'sec_filing_document', 'source_class': 'official',
+        'endpoint': 'https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}',
+        'entities_config': 'config/sec-entities.json',
+        'segments': {'cik': r'[1-9]\d{0,9}', 'accession': r'\d{18}', 'document': r'[A-Za-z0-9][A-Za-z0-9._-]{0,120}'},
+        'identity_binding': {'cik': ['archive_path_cik'], 'accession': ['archive_path_accession']},
+        'evidence_kinds': ['event'],
+    },
+}
+
+
 # What a source *is* and what its figures have been adjusted for are claims that need evidence in
 # the code and the source notes. A per-run profile override may rebind field names; it may not
 # assert provenance.
