@@ -9,7 +9,7 @@ ENTITIES = {
     '2330.TW': ('台積電（合成測資）', 'TWSE', 'TWD'),
     '6488.TWO': ('環球晶（合成測資）', 'TPEx', 'TWD'),
 }
-VERSIONS = {'quant': '1', 'policy': 'phase0-2', 'prompt': '2', 'template': '3', 'dataset': 'synthetic-1'}
+VERSIONS = {'quant': '1', 'policy': 'phase0-2', 'prompt': '2', 'template': '4', 'dataset': 'synthetic-1'}
 
 
 def fixture(request):

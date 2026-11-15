@@ -41,7 +41,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 <h2>公司關聯與影響路徑</h2>
 <table><tr><th>公司 / 市場</th><th>關聯類別</th><th>追溯依據</th></tr>
 {% for c in companies %}<tr><td>{{ c.entity.entity_id }} / {{ c.entity.exchange }}</td><td>{{ {'direct':'直接', 'indirect':'間接', 'hypothetical':'Hypothetical／假設'}.get(c.relationship, '未確認') }}</td><td>{{ c.relationship_evidence_ids|join(', ') or '未確認' }}</td></tr>{% endfor %}</table>
-<p>關聯不等於受益。候選選取目前只驗證固定測資順序，尚未驗證真實事件的探索與排序能力。</p>
+<p>關聯不等於受益，也不保證候選搜尋完整。選取與排序依據請查本機事件卷宗及排序紀錄（如有）；支援範圍以外的公司未納入。</p>
 <h2>主要限制</h2><p>事件狀態、公司曝險與傳導假設需要分開查證。假設關聯不提出偏多、偏空或中性結論。</p>
 {% endif %}
 <h2>主要來源與使用範圍</h2>

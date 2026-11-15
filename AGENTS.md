@@ -25,4 +25,5 @@
 
 - 真實採集使用 `cli collect --allow-network`，權限確認後再 `request-template` → `bundle` → `prepare --provider import`；Fixture 不能冒充 Real Data。
 - 使用者於 2026-11-15 選擇維持來源 `unknown`、暫不啟用；除非使用者另行明示，維持 `config/source-licenses.json` 的封閉權限，只保留檢視用中繼資料。
+- 使用者於同日再次確認「維持關閉，繼續其他實作」；不再主動追問相同來源啟用，查核包只作未啟用參考，繼續程式及合成驗證。
 - 網路契約測試需明示 `scripts/runtime.sh test -m network`；一般測試預設排除 network。SEC 聯絡資訊須由操作人提供，不取自登入資料。

@@ -1,5 +1,7 @@
 # Stock Report
 
+事件卷宗與候選排序已加入 `event-rank`，詳見 [操作與限制](docs/phase-0/event-ranking.md)。排序依據可用關聯證據，不代表投資方向；目前仍不會自動搜尋全網新聞。`demo` 的事件報告會先經排序再產生 PDF。2330 來源查核包為未啟用參考，使用者已再次選擇維持來源關閉，不需要重複確認。
+
 本機投資研究工具的 **Phase 0 可執行 POC**。依 [產品規格](docs/product-spec-v0.2.md) 與 [驗證計畫](docs/phase-0-feasibility-plan.md) 建立，尚未宣告正式 MVP 或 Phase 0 GO。
 
 已實作 Schema 驗證、Prepare → 提案交換 → Finalize、SQLite 證據庫、Python 確定性計算、機構評等統計、逐公司／逐期限 Policy Gate、兩頁繁體中文 PDF、稽核 JSON／Manifest 與隔離 Replay。合成資料明確標示 `DEMO / SYNTHETIC DATA`，真實資料失敗不會自動退回 Mock。

@@ -4,9 +4,11 @@ from datetime import datetime
 import json
 from pathlib import Path
 import sys
+from .activation import check as activation_check
 from .analysis import exchange, synthetic_proposal
 from .collect import (SEC_CONTACT_ENV, build_bundle, collect, load_collection, persist, persistence_blockers,
                       request_template)
+from .events import EventDossier, load_universe, rank_dossier
 from .licensing import load_registry
 from .models import Request
 from .pipeline import prepare, load_prepared, finalize, replay
@@ -34,7 +36,7 @@ def parser():
     sub = p.add_subparsers(dest='command', required=True)
     prep = sub.add_parser('prepare', help='Validate and prepare a snapshot')
     prep.add_argument('--request', required=True, type=Path)
-    prep.add_argument('--provider', choices=['mock', 'import'], required=True)
+    prep.add_argument('--provider', choices=['mock', 'import', 'synthetic-event'], required=True)
     prep.add_argument('--evidence-bundle', type=Path)
     prep.add_argument('--output', type=Path, default=Path('reports'))
     analyze = sub.add_parser('analyze', help='Export schema/prompt for Codex; no paid API')
@@ -77,6 +79,16 @@ def parser():
     probe.add_argument('--user-agent', required=True)
     probe.add_argument('--output', type=Path, default=Path('reports/feasibility'))
     probe.add_argument('--retries', type=int, default=1)
+    rank = sub.add_parser('event-rank', help='Verify an event dossier and rank its candidates deterministically')
+    rank.add_argument('--dossier', required=True, type=Path)
+    rank.add_argument('--output', required=True, type=Path)
+    rank.add_argument('--universe', type=Path, default=None)
+    rank.add_argument('--license-registry', type=Path, default=None)
+    act = sub.add_parser('activation-check', help='Read-only check of a source activation package')
+    act.add_argument('--package', required=True, type=Path)
+    act.add_argument('--candidate-registry', type=Path, help='Human-edited registry to compare; never applied')
+    act.add_argument('--license-registry', type=Path, default=None)
+    act.add_argument('--instruments', type=Path, default=Path('config/tw-instruments.json'))
     schema = sub.add_parser('schema')
     schema.add_argument('--output', required=True, type=Path)
     return p
@@ -90,8 +102,11 @@ def main(argv=None):
                 raise ValueError('Import requires --evidence-bundle; no fallback to mock')
             if args.provider == 'mock' and args.evidence_bundle:
                 raise ValueError('Mock provider does not accept real evidence bundles')
+            if args.provider == 'synthetic-event' and not args.evidence_bundle:
+                raise ValueError('The synthetic event provider requires the --evidence-bundle written by event-rank')
             request = Request.model_validate(read_json(args.request))
-            result = prepare(request, args.output, read_json(args.evidence_bundle) if args.evidence_bundle else None)
+            result = prepare(request, args.output, read_json(args.evidence_bundle) if args.evidence_bundle else None,
+                             synthetic_source=args.provider == 'synthetic-event')
         elif args.command == 'analyze':
             directory, data, prepared = load_prepared(args.run)
             exchange(data, directory)
@@ -157,6 +172,35 @@ def main(argv=None):
             write_json(args.output, template)
             result = {'status': 'success', 'request_path': str(args.output),
                       'research_as_of': template.research_as_of.isoformat()}
+        elif args.command == 'event-rank':
+            dossier = EventDossier.model_validate(read_json(args.dossier))
+            # A real dossier is always checked against the versioned registry; a mock one never needs it.
+            registry = load_registry(args.license_registry) if dossier.dossier_kind == 'real' else None
+            data, report = rank_dossier(dossier, load_universe(args.universe), registry)
+            directory = args.output / report['dossier_sha256'][:16]
+            directory.mkdir(parents=True, exist_ok=True)
+            write_json(directory / 'event-ranking.json', report)
+            result = {'status': report['status'], 'dossier_kind': report['dossier_kind'],
+                      'data_label': report['data_label'], 'ranking_path': str(directory / 'event-ranking.json'),
+                      'event_verification': report['event']['verification']['level'],
+                      'ranking': [{'rank': row['rank'], 'entity_id': row['entity_id'],
+                                   'relationship': row['relationship'], 'selected': row['selected']}
+                                  for row in report['ranking']],
+                      'excluded': [{'entity_id': row['entity_id'], 'reason': row['reason']}
+                                   for row in report['excluded_candidates']],
+                      'research_as_of': report['request']['research_as_of'],
+                      'blockers': report['blockers'], 'warnings': report['warnings']}
+            for name in ('event-bundle.json', 'request.json'):
+                (directory / name).unlink(missing_ok=True)
+            if data is not None:
+                write_json(directory / 'event-bundle.json', data)
+                write_json(directory / 'request.json', data.request)
+                result.update(bundle_path=str(directory / 'event-bundle.json'),
+                              request_path=str(directory / 'request.json'),
+                              next_provider='import' if data.dataset_kind == 'real' else 'synthetic-event')
+        elif args.command == 'activation-check':
+            result = activation_check(args.package, load_registry(args.license_registry),
+                                      read_json(args.instruments), args.candidate_registry)
         elif args.command == 'probe':
             result = probes(args.output, args.user_agent, args.retries)
         else:

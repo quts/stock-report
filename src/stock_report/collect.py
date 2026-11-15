@@ -296,7 +296,8 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
     entity = None
     if request.mode != 'stock':
         blockers.append({'code': 'event_mode_real_collection_not_implemented',
-                         'detail': '真實事件探索與候選排序尚未實作，不以單一公司採集冒充事件研究'})
+                         'detail': '採集流程只支援個股；事件研究須以人工查證的事件卷宗經 event-rank 產生證據包，'
+                                   '不以單一公司採集冒充事件研究'})
     if not collections:
         blockers.append({'code': 'no_collection_supplied', 'detail': '沒有任何採集結果，不能產生真實證據包'})
     for collection in collections:

@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "config_version": "0.1.0",
+  "notes": "Bounded Phase 0 universe for event candidate ranking. Only these entities can be ranked; any other candidate in a dossier is reported as outside_supported_universe and is never ranked. Membership means the project has an explicit identity configuration for the instrument. It is not a claim that the entity is related to any event, and it does not open any source permission.",
+  "entities": [
+    {
+      "entity_id": "NVDA",
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "share_class": "common",
+      "identity_basis": "config/sec-entities.json (ticker to CIK map, operator-maintained)"
+    },
+    {
+      "entity_id": "AMD",
+      "exchange": "NASDAQ",
+      "currency": "USD",
+      "share_class": "common",
+      "identity_basis": "config/sec-entities.json (ticker to CIK map, operator-maintained)"
+    },
+    {
+      "entity_id": "2330.TW",
+      "exchange": "TWSE",
+      "currency": "TWD",
+      "share_class": "common",
+      "identity_basis": "config/tw-instruments.json (assistant-poc-declaration; not a human attestation)"
+    },
+    {
+      "entity_id": "6488.TWO",
+      "exchange": "TPEx",
+      "currency": "TWD",
+      "share_class": "common",
+      "identity_basis": "config/tw-instruments.json (assistant-poc-declaration; not a human attestation)"
+    }
+  ]
+}

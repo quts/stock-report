@@ -40,11 +40,19 @@ def coverage(data):
     return result
 
 
-def prepare(request, root, source=None):
+def prepare(request, root, source=None, synthetic_source=False):
+    if synthetic_source and source is None:
+        raise ValueError('A synthetic event run requires the bundle written by event-rank')
     data = ResearchInput.model_validate(source) if source is not None else fixture(request)
     if data.request != request:
         raise ValueError('Imported request does not match the validated request')
-    if source is not None and data.dataset_kind != 'real':
+    if synthetic_source:
+        # The explicit synthetic path accepts authored records only, and stays labelled as a demo.
+        if (data.dataset_kind != 'mock' or request.mode != 'event'
+                or any(e.source_type != 'synthetic' for e in data.evidence)):
+            raise ValueError('The synthetic event provider only accepts a mock event bundle of synthetic evidence; '
+                             'real evidence must use --provider import')
+    elif source is not None and data.dataset_kind != 'real':
         raise ValueError('Import is reserved for explicitly reviewed real evidence bundles')
     # Personal use is not a permission: local persistence still needs confirmed internal-use terms.
     if any(not e.internal_use_allowed for e in data.evidence):
@@ -54,7 +62,8 @@ def prepare(request, root, source=None):
     # Recompute imported quantities; never trust provider-supplied calculations.
     data.metrics = calculate(data.evidence, request.research_as_of)
     # Pin the executing code versions, but never relabel a real import as synthetic data.
-    dataset = data.versions.get('dataset', 'real-import-1') if data.dataset_kind == 'real' else VERSIONS['dataset']
+    dataset = (data.versions.get('dataset', 'real-import-1') if data.dataset_kind == 'real'
+               else data.versions.get('dataset', VERSIONS['dataset']) if synthetic_source else VERSIONS['dataset'])
     data.versions = {**VERSIONS, 'dataset': dataset}
     run_id = uuid.uuid4().hex
     directory = Path(root).resolve() / run_id
