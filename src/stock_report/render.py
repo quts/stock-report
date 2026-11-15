@@ -120,7 +120,7 @@ def render(data, decision, mapping, path, company_research=None, investment=None
         env.filters['num'] = lambda v, d=2: '—' if v is None else f'{v:,.{d}f}'
         env.filters['status'] = lambda s: STATUS_LABELS.get(s, s)
         context.update(inv=investment, charts=charts_for(investment), currency=currency, method_labels=METHOD_LABELS,
-                       basis_labels={'historical_fact': '歷史事實', 'management_guidance': '公司指引',
+                       basis_labels={'historical_fact': '歷史事實', 'management_guidance': '公司指引', 'guidance_informed_model': '衍生假設',
                                      'consensus': '市場共識', 'model_assumption': '模型假設'},
                        thesis=(investment.get('thesis') or [None])[0],
                        driver_labels={'inventory_days': '存貨天數', 'receivable_days': '應收天數', 'payable_days': '應付天數',

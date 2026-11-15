@@ -185,16 +185,24 @@ DELL_HORIZON = 'NTM 2026-08-01~2027-07-31'
 
 
 def driver(value, basis='model_assumption', ids=()):
-    return Assumption(name='test driver', value=value, unit='%', basis=basis, evidence_ids=list(ids), rationale='test')
+    return Assumption(name='test driver', value=value, unit='%', basis=basis, evidence_ids=list(ids), rationale='test',
+                      source_period='historical fixture', forecast_period=DELL_HORIZON,
+                      accounting_basis='reported', derivation='Independent scenario assumption for test')
 
 
 def scenario(name, growth, multiple, margin=7.5, basis='model_assumption', ids=(), mbasis='model_assumption',
              margin_basis='historical_fact', method='pe', period=DELL_HORIZON, extra=None):
     drivers = {'revenue_growth': driver(growth, basis, ids), 'operating_margin': driver(margin, margin_basis)}
     drivers.update(extra or {})
+    for d in drivers.values():
+        d.forecast_period = period
     return ScenarioProposal(entity_id='DELL', name=name, target_period=period, drivers=drivers,
                             financial_outcome='test', valuation_metric='eps', multiple_method=method,
-                            multiple=multiple, multiple_basis=mbasis, invalidation_conditions=['test condition'])
+                            multiple=multiple, multiple_basis=mbasis, invalidation_conditions=['test condition'],
+                            operating_invalidations=[{'driver': k, 'operator': 'gt' if name == 'bear' else 'lt',
+                                                       'threshold': v + (5 if name == 'bear' else -5),
+                                                       'period': period, 'rationale': 'Operating outcome contradicts scenario'}
+                                                      for k, v in [('revenue_growth', growth), ('operating_margin', margin)]])
 
 
 def default_scenarios():

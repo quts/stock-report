@@ -478,13 +478,25 @@ class Assumption(Model):
     name: str = Field(min_length=1, max_length=80)
     value: float
     unit: str = Field(min_length=1, max_length=40)
-    basis: Literal['historical_fact', 'management_guidance', 'consensus', 'model_assumption']
-    evidence_ids: list[str] = Field(default_factory=list, max_length=8)
+    basis: Literal['historical_fact', 'management_guidance', 'guidance_informed_model', 'consensus', 'model_assumption']
+    evidence_ids: list[str] = Field(default_factory=list, max_length=64)
     rationale: str = Field(min_length=1, max_length=300)
+    source_period: str | None = None
+    forecast_period: str | None = None
+    accounting_basis: str | None = None
+    derivation: str | None = None
 
 
 ForecastDriver = Literal['revenue_growth', 'operating_margin', 'non_operating_ratio', 'tax_rate', 'share_change',
-                         'da_intensity', 'capex_intensity', 'working_capital_intensity']
+                         'da_intensity', 'capex_intensity', 'working_capital_intensity', 'ocf_residual_intensity']
+
+
+class OperatingInvalidation(Model):
+    driver: ForecastDriver
+    operator: Literal['lt', 'gt']
+    threshold: float
+    period: str
+    rationale: str = Field(min_length=1, max_length=300)
 
 
 class ScenarioProposal(Model):
@@ -506,6 +518,8 @@ class ScenarioProposal(Model):
     multiple_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
     catalysts: list[str] = Field(default_factory=list, max_length=5)
     invalidation_conditions: list[str] = Field(min_length=1, max_length=5)
+    operating_invalidations: list[OperatingInvalidation] = Field(default_factory=list, max_length=8)
+    leading_indicators: list[str] = Field(default_factory=list, max_length=5)
 
 
 class InvestmentThesis(Model):

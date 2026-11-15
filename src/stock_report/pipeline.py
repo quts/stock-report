@@ -155,6 +155,8 @@ def finalize(directory, proposal_path, mapping_path):
             'report_grade': investment['gates']['grade'] if investment['gates'] else None,
             'quality_gates': investment['gates']['checks'] if investment['gates'] else [],
             'market_data': investment['market_data'], 'forecast_calibration': investment['forecast'].get('calibration'),
+            'ocf_reconciliation': investment['forecast'].get('reconciliation'),
+            'forecast_backtest': investment['forecast'].get('backtest'),
             'forecast_notes': investment['forecast']['notes'], 'scenario_problems': investment['scenarios']['problems'],
             'sector_drivers_unavailable': investment['sector_drivers']['unavailable']}))
     # File output is transactional: the personal PDF is written only after all checks pass.

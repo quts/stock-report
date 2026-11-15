@@ -34,6 +34,7 @@ sup { font-size:6.8pt; color:#12657a; } .tag { font-size:7.6pt; padding:0 1mm; b
 {% if thesis %}{% for p in thesis.opposing %}<p>{{ p.text }} <sup>{{ p.evidence_ids|cite }}</sup></p>{% endfor %}{% endif %}
 {% for f in inv.analysis.flags %}<p>{{ f }}</p>{% endfor %}
 <h3>證據品質與缺漏</h3>
+<p class="small">財務預測尚未通過可靠度驗證：歷史現金流仍有未解釋殘差，FCF 回測樣本不足；情境數值僅為營運與估值敏感度，已記錄的假設不等於已證實合理。</p>
 <p>{% set gaps = inv.completeness.fields|selectattr('status', 'ne', 'available')|list %}{% if gaps %}缺漏 {{ gaps|length }} 項：{% for g in gaps %}{{ g.label }}（{{ g.status|status }}）{% if not loop.last %}、{% endif %}{% endfor %}。{% else %}必要資料齊全。{% endif %}</p>
 
 <div class="page"></div><p class="eyebrow">財務表現 · 最近 {{ inv.analysis.quarters|length }} 季</p>
@@ -71,10 +72,10 @@ sup { font-size:6.8pt; color:#12657a; } .tag { font-size:7.6pt; padding:0 1mm; b
 {% if inv.events.low_impact %}<p class="small">低影響事件另列附錄：{% for e in inv.events.low_impact %}{{ e.title }}{% if not loop.last %}、{% endif %}{% endfor %}。</p>{% endif %}
 {{ paragraphs(c.research.news) }}
 {% set cats = [] %}{% for s in inv.scenarios.scenarios %}{% for k in s.catalysts %}{% if k not in cats %}{% set _ = cats.append(k) %}{% endif %}{% endfor %}{% endfor %}
-{% if cats %}<h3>催化劑</h3><p>{{ cats|join('；') }}</p>{% endif %}
 
 <div class="page"></div><p class="eyebrow">估值與情境</p>
 <h1>價格反映了什麼？</h1>
+{% if cats %}<p class="small"><b>催化劑：</b>{{ cats|join('；') }}</p>{% endif %}
 <h3>估值方法（依產業與資料品質選擇）</h3>
 <table><tr><th>方法</th><th>狀態</th><th class="n">數值</th><th>公式與輸入</th><th>限制</th></tr>
 {% for r in val.results %}<tr><td>{{ r.label }}</td><td>{{ r.status|status }}</td><td class="n">{% if r.value is not none %}{{ r.value|num(1) }}{{ 'x' if r.unit == 'x' else '%' }}{% else %}—{% endif %}</td>
@@ -95,15 +96,17 @@ sup { font-size:6.8pt; color:#12657a; } .tag { font-size:7.6pt; padding:0 1mm; b
 <tr><td>倍數</td><td class="n">{% for v in val.results if v.method == 'pe_trailing' and v.value is not none %}{{ v.value|num(1) }}x{% endfor %}</td>{% for r in rows %}<td class="n">{{ r.valuation.multiple|num(1) }}x {{ r.valuation.method }} <span class="tag {{ 'model_assumption' if not r.evidence_based_multiple else '' }}">{{ {'current_trailing':'目前','historical_range':'歷史','peer_median':'同業','model_assumption':'假設'}[r.valuation.multiple_basis] }}</span></td>{% endfor %}</tr>
 <tr><td><b>{{ '假設性每股價值' if hypo else '隱含每股價值' }}</b></td><td class="n">{{ val.market.price.value|num(0) if val.market.price.status == 'available' else '無參考價' }}</td>{% for r in rows %}<td class="n"><b>{{ r.implied_price_display|num(0) if r.implied_price_display is not none else '—' }}</b></td>{% endfor %}</tr>
 <tr><td>相對參考價</td><td></td>{% for r in rows %}<td class="n">{{ r.change_vs_reference_percent|pct(0) if r.change_vs_reference_percent is not none else '—' }}</td>{% endfor %}</tr></table>
-<p class="small">標籤：歷史＝由最近四季推得；公司＝公司指引；市場＝共識；模型＝明確模型假設。OCF＝淨利＋折舊攤銷−營運資金增量。{% if inv.forecast.calibration and inv.forecast.calibration.gap_percent is not none %}模型校準：TTM 實際營業現金流與「淨利＋折舊攤銷」相差 {{ inv.forecast.calibration.gap_percent|pct }}。{% endif %}{% for n in inv.forecast.notes %}{{ n }}。{% endfor %}</p>
-{% for r in rows %}<p class="small"><b>{{ r.name|title }}：</b>{{ r.financial_outcome }}</p>{% endfor %}
+<p class="small">歷史＝歷史錨點的外推；公司＝直接同期間指引；衍生＝參考指引的模型假設；市場＝共識；模型＝未驗證假設。NTM 自最近財報期末起算。OCF＝淨利＋折舊攤銷−營運資金增量＋殘差假設。{% set rec = inv.forecast.reconciliation %}{% if rec.residual is not none %}TTM：淨利 {{ rec.net_income|money }}＋折舊攤銷 {{ rec.da|money }}−營運資金餘額變化 {{ rec.wc_proxy|money }}＋未解釋殘差 {{ rec.residual|money }}＝OCF {{ rec.actual_ocf|money }}。{% endif %}其他非現金、稅款與融資應收等未完整拆解；殘差按營收延用不代表可持續。回測可評分 FCF 樣本 {{ inv.forecast.backtest.fcf_test_count }}；{% for bt in inv.forecast.backtest.rows if bt.errors.free_cash_flow.error_percent is not none %}{{ bt.target_end }} 止四季 FCF 誤差 {{ bt.errors.free_cash_flow.error_percent|pct }}；{% endfor %}部分僅為目前版本財報的期間留出，可能含重編，非即時回測。樣本不足，算術一致不能證明 FCF 預測可靠。</p>
+{% for r in rows %}<p class="small"><b>{{ r.name|title }}：</b>{{ r.financial_outcome }}{% for k,d in r.drivers.items() if d.source == 'proposal' and d.basis == 'guidance_informed_model' %} {{ d.derivation }}（來源期間 {{ d.source_period }}；{{ d.accounting_basis }}；非全年公司指引）{% endfor %}</p>{% endfor %}
+{% if rows[0].reverse_valuation %}<p class="small"><b>反向估值：</b>以核實參考價 {{ val.market.price.value|num(0) }}、固定股數與倍數，{% for r in rows %}{% set rv = r.reverse_valuation %}{{ rv.multiple|num(0) }}x {{ rv.metric }} 需 {{ rv.required_per_share|num(2) }}（較 TTM {{ rv.required_growth_percent|pct(1) if rv.required_growth_percent is not none else '無可比成長率' }}）{% if not loop.last %}；{% endif %}{% endfor %}。這是未折現的價格／倍數損益兩平敏感度，沒有必要報酬假設；不支持合理價或目標價。</p>{% endif %}
 {% if charts.scenarios %}<div class="chart">{{ charts.scenarios|safe }}</div>{% endif %}
 {% if inv.scenarios.sensitivity %}{% set sen = inv.scenarios.sensitivity %}<h3>敏感度（Base：{{ sen.metric }} × 倍數）</h3>
 <table><tr><th>{{ sen.metric }} 變動 ＼ 倍數變動</th>{% for m in sen.multiple_factors %}<th class="n">{{ '%+d'|format(((m - 1) * 100)|round|int) }}%</th>{% endfor %}</tr>
 {% for row in sen.grid %}<tr><td>{{ '%+d'|format(((sen.metric_factors[loop.index0] - 1) * 100)|round|int) }}%</td>{% for v in row %}<td class="n">{{ v|num(0) }}</td>{% endfor %}</tr>{% endfor %}</table>{% endif %}
 <p class="small">情境不附機率；它們是條件式結果，不是預測。EPS 與倍數分別設定，不假設兩者同向變動。</p>
 <h3>論點推翻條件</h3>
-<p>{% for s in inv.scenarios.scenarios %}<b>{{ s.name|title }}：</b>{{ s.invalidation_conditions|join('；') }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+<p class="small">各情境均用同 NTM 期間實績檢驗；以下容忍帶屬模型設定，不是公司指引或統計信賴區間。</p>
+<p class="small">{% for s in inv.scenarios.scenarios %}<b>{{ s.name|title }}：</b>{{ s.invalidation_conditions|join('；') }}{% if s.leading_indicators %}。領先觀察（不直接推翻）：{{ s.leading_indicators|join('；') }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
 {% else %}<p>沒有提供情境假設，不計算隱含股價。</p>{% endif %}
 {% if inv.scenarios.problems %}<p class="small">情境檢查：{{ inv.scenarios.problems|join('；') }}</p>{% endif %}
 <h3>3-6m／6-12m 研究結論</h3>

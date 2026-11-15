@@ -8,8 +8,10 @@ Probabilities are not accepted.
 """
 from .forecast import DRIVERS, project
 from .policy import reportable
+from .fin_series import ttm, build
 
 BASIS_KINDS = {'historical_fact': ('fact', 'reported_claim'), 'management_guidance': ('management_guidance',),
+               'guidance_informed_model': ('management_guidance',),
                'consensus': ('consensus_estimate', 'analyst_estimate')}
 SENSITIVITY_METRIC = (0.9, 1.0, 1.1)
 SENSITIVITY_MULTIPLE = (0.8, 1.0, 1.2)
@@ -45,14 +47,12 @@ def reference_for(method, basis, references):
 
 
 def _basis_issues(a, index, request):
-    if a.basis == 'model_assumption':
-        return []
     cited = [index.get(i) for i in a.evidence_ids]
     if not cited:
-        return [] if a.basis == 'historical_fact' else [f'假設「{a.name}」標為 {a.basis}，但沒有引用證據']
+        return [] if a.basis in ('historical_fact', 'model_assumption') else [f'假設「{a.name}」標為 {a.basis}，但沒有引用證據']
     if any(e is None or not reportable(e, request) for e in cited):
         return [f'假設「{a.name}」引用了不可用的證據']
-    if any(e.statement_kind not in BASIS_KINDS[a.basis] for e in cited):
+    if a.basis != 'model_assumption' and any(e.statement_kind not in BASIS_KINDS[a.basis] for e in cited):
         return [f'假設「{a.name}」標為 {a.basis}，但引用的證據類別不同（指引不能當共識，反之亦然）']
     return []
 
@@ -73,15 +73,46 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
     out = []
     for s in sorted(rows, key=lambda s: ('bear', 'base', 'bull').index(s.name)):
         issues = [i for a in list(s.assumptions) + list(s.drivers.values()) for i in _basis_issues(a, index, data.request)]
+        for name, a in s.drivers.items():
+            cited = [index[i] for i in a.evidence_ids if i in index]
+            if a.forecast_period and a.forecast_period != s.target_period:
+                issues.append(f'期間錯配：{name} 預測期間與情境不同')
+            if not all((a.source_period, a.forecast_period, a.accounting_basis, a.derivation)):
+                issues.append(f'輸入追溯：{name} 缺來源期間、預測期間、口徑或推導')
+            if a.basis == 'historical_fact' and name in ('revenue_growth', 'operating_margin'):
+                expected = {'revenue_growth': {'revenue'}, 'operating_margin': {'operating_income', 'revenue', 'operating_margin'}}[name]
+                if cited and any(e.financial_metric not in expected for e in cited):
+                    issues.append(f'輸入追溯：{name} 不能以訂單、積壓或不相符指標作為已實現營收／利益率')
+            if a.basis in ('management_guidance', 'guidance_informed_model'):
+                if not all((a.source_period, a.forecast_period, a.accounting_basis, a.derivation)):
+                    issues.append(f'指引歸因：{name} 缺來源期間、預測期間、口徑或推導')
+                periods = [e.target_period for e in cited if e.target_period]
+                if a.source_period and periods and not any(p in a.source_period or a.source_period in p for p in periods):
+                    issues.append(f'期間錯配：{name} 宣告的來源期間與引用指引不同')
+                if a.basis == 'management_guidance':
+                    exact = [e for e in cited if e.target_period == s.target_period and e.financial_metric == name
+                             and e.value is not None and abs(e.value - a.value) < 1e-6]
+                    if not exact:
+                        issues.append(f'指引歸因：{name} 不是公司直接揭露的同期間同指標數字，應為 guidance_informed_model')
+                if any(e.accounting_basis in ('non_gaap', 'company_adjusted') for e in cited) and a.accounting_basis in ('reported', 'gaap', 'ifrs'):
+                    issues.append(f'口徑錯配：{name} 以調整後指引支持報表口徑')
         drivers, statements = {}, None
         if forecast_anchor is not None:
             for name in DRIVERS:
                 if name in s.drivers:
                     a = s.drivers[name]
-                    drivers[name] = {'value': a.value, 'basis': a.basis, 'evidence_ids': a.evidence_ids,
-                                     'rationale': a.rationale, 'source': 'proposal'}
+                    drivers[name] = {**a.model_dump(), 'source': 'proposal'}
                 else:
                     drivers[name] = {**forecast_anchor['drivers'][name], 'source': 'historical_anchor'}
+                drv = drivers[name]
+                drv['forecast_period'] = s.target_period
+                drv['forecast_role'] = 'direct_guidance' if drv['basis'] == 'management_guidance' else 'model_assumption'
+                drv['evidence_role'] = 'context_only' if drv['basis'] == 'model_assumption' else 'derivation_input'
+                drv['source_evidence'] = [
+                    {'id': e.evidence_id, 'url': e.source_url, 'period': e.target_period or e.period,
+                     'start': e.period_start, 'end': e.target_period_end or e.period_end,
+                     'accounting_basis': e.accounting_basis or 'unspecified', 'metric': e.financial_metric, 'value': e.value}
+                    for e in (index[i] for i in drv['evidence_ids'] if i in index)]
             statements = project(forecast_anchor['base'], drivers)
             if statements is None:
                 issues.append('缺少 TTM 營收、營業利益率或營收成長假設，無法建立財務預測')
@@ -113,6 +144,38 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
             issues.append('缺少股數或淨負債，無法換算每股價值')
         upside = None if value is None or reference_price is None else (value / reference_price - 1) * 100
         problems.extend(f'{s.name}：{i}' for i in issues)
+        invalidations = []
+        for c in s.operating_invalidations:
+            d = drivers.get(c.driver, {}).get('value')
+            min_distance = 1.0 if c.driver == 'revenue_growth' else 0.25
+            if (c.period != s.target_period or d is None or
+                    (c.operator == 'lt' and c.threshold >= d) or (c.operator == 'gt' and c.threshold <= d) or
+                    (d is not None and abs(c.threshold - d) < min_distance)):
+                issues.append(f'失效條件不矛盾：{c.driver} 門檻未推翻同期間假設')
+            invalidations.append(c.model_dump())
+        # Legacy prose is retained for compatibility but cannot pass the economic gate.
+        driver_labels = {'revenue_growth': '營收成長', 'operating_margin': '營業利益率', 'capex_intensity': '資本支出／營收',
+                         'working_capital_intensity': '營運資金／營收增量'}
+        invalidation_text = [f'{driver_labels.get(c.driver, c.driver)} {"低於" if c.operator == "lt" else "高於"} {c.threshold:.1f}%'
+                             for c in s.operating_invalidations] or s.invalidation_conditions
+        reverse = None
+        if reference_price is not None and s.multiple_method in ('pe', 'p_fcf'):
+            metric0 = None
+            if forecast_anchor:
+                if s.multiple_method == 'pe':
+                    eps0 = ttm(build(data, entity.entity_id), 'diluted_eps')
+                    metric0 = eps0['value'] if eps0 else None
+                else:
+                    ocf0 = forecast_anchor['base']['ocf_ttm']
+                    capex0 = ttm(build(data, entity.entity_id), 'capital_expenditure')
+                    shares0 = valuation['market'].get('shares') or forecast_anchor['base']['shares']
+                    same_window = ocf0 and capex0 and (ocf0['start'], ocf0['end'], ocf0['currency']) == (capex0['start'], capex0['end'], capex0['currency'])
+                    metric0 = (ocf0['value'] - capex0['value']) / shares0['value'] if same_window and shares0 and shares0['value'] > 0 else None
+            required = reference_price / s.multiple
+            reverse = {'metric': metric_name, 'multiple': s.multiple, 'required_per_share': required,
+                       'ttm_per_share': metric0, 'required_growth_percent': (required / metric0 - 1) * 100 if metric0 and metric0 > 0 else None,
+                       'interpretation': '固定股數、倍數之價格／倍數損益兩平敏感度；無風險折現或必要報酬，不證明倍數合理或構成目標價。'}
+        problems.extend(f'{s.name}：{i}' for i in issues if f'{s.name}：{i}' not in problems)
         out.append({'name': s.name, 'target_period': s.target_period, 'financial_outcome': s.financial_outcome,
                     'assumptions': [a.model_dump() for a in s.assumptions], 'drivers': drivers, 'statements': statements,
                     'valuation': {'metric': metric_name, 'metric_value': metric_value, 'method': s.multiple_method,
@@ -124,8 +187,10 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                     'implied_price_display': None if value is None else (round(value, 0) if evidence_based else round_sig(value)),
                     'reference_price': reference_price,
                     'change_vs_reference_percent': None if upside is None else round(upside, 2),
-                    'catalysts': s.catalysts, 'invalidation_conditions': s.invalidation_conditions,
-                    'model_assumption_count': sum(d['basis'] == 'model_assumption' for d in drivers.values())
+                    'catalysts': s.catalysts, 'invalidation_conditions': invalidation_text,
+                    'operating_invalidations': invalidations, 'leading_indicators': s.leading_indicators,
+                    'reverse_valuation': reverse,
+                    'model_assumption_count': sum(d['basis'] in ('model_assumption', 'guidance_informed_model') for d in drivers.values())
                     + sum(a.basis == 'model_assumption' for a in s.assumptions), 'issues': issues})
     prices = {r['name']: r['implied_price'] for r in out if r['implied_price'] is not None}
     if len(prices) == 3 and not prices['bear'] <= prices['base'] <= prices['bull']:

@@ -45,6 +45,40 @@ def numbers_in(text):
     return out
 
 
+def economic_checks(data, engine):
+    scen, forecast = engine['scenarios'], engine.get('forecast')
+    rows, out = scen['scenarios'], []
+    provenance = [p for p in scen['problems'] if any(w in p for w in ('指引歸因', '期間錯配', '口徑錯配', '輸入追溯'))]
+    out.append(check('forecast_input_provenance', not provenance, 'critical',
+                     '未把衍生 NTM 假設冒充公司指引' if not provenance else '；'.join(provenance[:4])))
+    weak = []
+    for r in rows:
+        rules = r.get('operating_invalidations', [])
+        if not rules or not {'revenue_growth', 'operating_margin'} <= {c['driver'] for c in rules}:
+            weak.append(f'{r["name"]} 缺同期間營收成長及營業利益率失效門檻')
+        weak += [p for p in r['issues'] if '失效條件不矛盾' in p]
+    out.append(check('scenario_invalidation_logic', not weak, 'critical', '；'.join(weak) or '失效門檻直接推翻同期間營運假設；領先指標另列'))
+    recon = (forecast or {}).get('reconciliation', {})
+    residual = recon.get('residual_percent_ocf')
+    out.append(state('ocf_reconciliation', 'WARNING' if residual is not None else 'FAIL',
+                     f'未解釋殘差占實際 OCF {residual:+.1f}%；餘額變化非現金流明細，FCF 預測受限' if residual is not None else
+                     '無法建立同期間現金流勾稽；不可宣稱 FCF 預測可靠'))
+    bt = (forecast or {}).get('backtest', {})
+    out.append(state('forecast_backtest', 'WARNING',
+                     f'可評分 FCF 樣本 {bt.get("fcf_test_count", 0)}；歷史留出樣本有限，算術一致不代表預測可靠'))
+    # Ordered scenario labels must also agree with operating economics, not just selected multiples.
+    mapped = {r['name']: r for r in rows}
+    contradictions = []
+    if set(mapped) == {'bear', 'base', 'bull'}:
+        for key in ('revenue_growth', 'operating_margin'):
+            vals = [mapped[n]['drivers'].get(key, {}).get('value') for n in ('bear', 'base', 'bull')]
+            if all(v is not None for v in vals) and vals != sorted(vals):
+                contradictions.append(f'{key} 與 bear/base/bull 營運排序矛盾')
+    out.append(check('operating_conclusion_consistency', not contradictions, 'critical',
+                     '；'.join(contradictions) or '營運假設與情境順序一致；未以倍數遮掩營運反轉'))
+    return out
+
+
 def supported(value, candidates):
     for c in candidates:
         if c == 0:
@@ -211,6 +245,8 @@ def run(data, proposal, engine, entity, decision=None):
     results.append(check('section_contradictions', not contradictions, 'critical',
                          '各章節結論一致' if not contradictions else '；'.join(contradictions[:3])))
     results += model_checks(data, engine)
+    if engine['scenarios']['scenarios']:
+        results += economic_checks(data, engine)
     critical = [r for r in results if r['status'] == 'FAIL']
     return {'grade': 'limited' if critical else 'complete', 'checks': results,
             'critical_failures': [r['check'] for r in critical],
@@ -263,7 +299,7 @@ def model_checks(data, engine):
         if r['name'] == 'base' and any(d[k]['basis'] == 'model_assumption' for k in KEY_DRIVERS):
             warns.append('基準情境的營收成長或利潤率是模型假設，沒有指引、共識或歷史資料直接支持')
     out.append(state('assumption_evidence_quality', 'FAIL' if fails else ('WARNING' if warns else 'PASS'),
-                     '；'.join((fails + warns)[:4]) or '關鍵假設皆有歷史、指引或共識依據，且在合理範圍內'))
+                     '；'.join((fails + warns)[:4]) or '未觸發來源或歷史區間異常；這不證明預測假設在經濟上合理'))
     # 2. Internal consistency: the statements reconcile and the implied value follows from them.
     broken = []
     for r in rows:
@@ -271,7 +307,7 @@ def model_checks(data, engine):
         if s is None:
             broken.append(f'{r["name"]}：無法建立財務預測')
             continue
-        ident = [('稅後淨利', s['net_income'], None if d['tax_rate']['value'] is None else s['pretax_income'] * (1 - d['tax_rate']['value'] / 100)),
+        ident = [('稅後淨利', s['net_income'], None if d['tax_rate']['value'] is None or s['pretax_income'] is None else s['pretax_income'] * (1 - d['tax_rate']['value'] / 100)),
                  ('EPS × 股數', None if s['eps'] is None else s['eps'] * s['diluted_shares'], s['net_income']),
                  ('FCF', s['free_cash_flow'], None if s['operating_cash_flow'] is None or s['capital_expenditure'] is None
                   else s['operating_cash_flow'] - s['capital_expenditure'])]

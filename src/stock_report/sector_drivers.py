@@ -29,6 +29,8 @@ def working_capital_days(series):
     if rev is None or inv is None:
         return []
     end = inv['end']
+    if end != rev['end']:
+        return []
     ar = _balance(series, ('accounts_receivable_net', 'accounts_receivable'), end)
     ap = _balance(series, ('accounts_payable',), end)
     out = []
@@ -42,7 +44,8 @@ def working_capital_days(series):
                         'formula': 'balance / TTM flow * 365（期末餘額對 TTM，非平均餘額）'})
     if None not in (dio, dso, dpo):
         out.append({'name': 'cash_conversion_cycle', 'value': dio + dso - dpo, 'unit': 'days', 'window': f'@{end}',
-                    'evidence_ids': [], 'formula': 'inventory days + receivable days − payable days'})
+                    'evidence_ids': inv['evidence_ids'] + ar['evidence_ids'] + ap['evidence_ids'],
+                    'formula': '期末餘額近似：inventory days + receivable days − payable days；非平均餘額'})
     return out
 
 
@@ -64,13 +67,13 @@ def inventory_demand(series, analysis):
     ratio = backlog['value'] / inv['value'] if inv['value'] else None
     if not prior:
         return {'name': 'inventory_demand_assessment', 'status': 'partially_supported',
-                'text': text + f'；期末積壓約為存貨的 {ratio:.1f} 倍，但缺少一年前的積壓可比，只能說明存貨有訂單覆蓋，無法確認覆蓋率是否改善。',
+                'text': text + f'；期末積壓／存貨金額約 {ratio:.1f} 倍；售價與成本口徑不同，且未核對可取消性、交付與收款，不能視為存貨覆蓋率或已實現收入。',
                 'evidence_ids': backlog['evidence_ids'] + inv['evidence_ids']}
     backlog_growth = (backlog['value'] / prior[-1]['value'] - 1) * 100
     supported = backlog_growth >= growth['value']
     return {'name': 'inventory_demand_assessment', 'status': 'demand_backed' if supported else 'weakening_signal',
-            'text': text + f'；積壓年增 {backlog_growth:+.1f}%，' + ('高於存貨增幅，存貨增加有訂單支撐。' if supported
-                                                                 else '低於存貨增幅，需留意需求轉弱或交付延遲。'),
+            'text': text + f'；積壓年增 {backlog_growth:+.1f}%，' + ('高於存貨增幅，僅為需求領先訊號。' if supported
+                                                                 else '低於存貨增幅，需留意交付與取消。') + '訂單、期末積壓、認列營收與收款是不同指標；不可直接等同。',
             'evidence_ids': backlog['evidence_ids'] + prior[-1]['evidence_ids'] + inv['evidence_ids']}
 
 
