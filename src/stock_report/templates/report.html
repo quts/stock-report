@@ -31,7 +31,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 {% for e in c.events[:3] %}<p>{{ e.claim }} <small>[{{ e.evidence_id }}]</small></p>{% else %}<p>沒有可呈現的已核實事件；不可推論沒有風險。</p>{% endfor %}
 <h2>歷史基本面 · 不代表最新季度或目前估值</h2>
 <table><tr><th>指標</th><th>數值 / 期別</th><th>證據</th></tr>
-{% for m in c.metrics %}<tr><td>{{ metric_labels[m.name] }}</td><td>{{ '%.2f'|format(m.value) }} {{ m.currency or '' }} {{ {'percent':'%', 'multiple':'倍', 'million':'百萬', 'thousand':'千'}.get(m.unit, m.unit) }} / {{ m.period }}</td><td><small>{{ m.evidence_ids|join(', ') }}</small></td></tr>{% endfor %}
+{% for m in c.metrics %}<tr><td>{{ metric_labels[m.name] }}</td><td>{% if m.unit in ('USD', 'TWD') %}{% if m.value|abs >= 100000000 %}{{ '%.2f'|format(m.value / 100000000) }} 億{% else %}{{ '%.2f'|format(m.value) }} {% endif %}{{ m.currency or m.unit }}{% else %}{{ '%.2f'|format(m.value) }} {{ m.currency or '' }} {{ {'percent':'%', 'multiple':'倍', 'million':'百萬', 'thousand':'千'}.get(m.unit, m.unit) }}{% endif %} / {{ m.period }}</td><td><small>{{ m.evidence_ids|join(', ') }}</small></td></tr>{% endfor %}
 </table>
 <p class="note">不可驗證或不適用的指標已省略；公式、原始單位與缺項原因保留於本機 JSON。</p>
 <h2>市場反應與資料限制</h2>
@@ -48,7 +48,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 <h2>主要來源與使用範圍</h2>
 {% for e in display_sources[:2] %}<p class="sources">{{ e.publisher }} · <a href="{{ e.source_url }}">原始來源</a> · [{{ e.evidence_id }}]<br>{{ e.attribution }}</p>{% endfor %}
 {% if sources|selectattr('publication_basis', 'equalto', 'observed_availability')|list %}<p class="note">部分來源未宣告公開時間，僅以擷取當下的可得性上界表示，只適用於最新時點研究，不得視為歷史時點證據。</p>{% endif %}
-<p class="note">完整來源、證據與逐機構明細保留於本機 evidence.json / research.json；PDF 與本機稽核檔皆僅供個人使用，不對外提供。</p>
+<p class="note">完整來源、證據與評等明細見本機 JSON；報告與稽核資料僅供本人使用，不得散布。</p>
 <div class="page"></div>
 <p class="private-label">僅供個人使用・不得散布 · Personal use only / Not for distribution</p>
 <h2>{{ '個股' if data.request.mode == 'stock' else '公司' }}獨立展望 · 3–6 / 6–12 個月</h2>
