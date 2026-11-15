@@ -112,7 +112,7 @@ def test_cli_contract_and_observable_errors(tmp_path,capsys):
 def test_layout_overflow_is_failure(tmp_path,request_model,monkeypatch):
     import weasyprint
     class Overflow:
-        pages=[1,2,3]
+        pages=[1,2,3,4,5]
     monkeypatch.setattr(weasyprint.HTML,'render',lambda *a,**k:Overflow())
     result=prepare(request_model,tmp_path);run=Path(result['research_input_path']).parent
     _,data,_=load_prepared(run)

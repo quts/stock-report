@@ -8,7 +8,7 @@
 
 本機投資研究工具的 **Phase 0 可執行 POC**。依 [產品規格](docs/product-spec-v0.2.md) 與 [驗證計畫](docs/phase-0-feasibility-plan.md) 建立，尚未宣告正式 MVP 或 Phase 0 GO。
 
-已實作 Schema 驗證、Prepare → 提案交換 → Finalize、SQLite 證據庫、Python 確定性計算、機構評等統計、逐公司／逐期限 Policy Gate、兩頁繁體中文 PDF、稽核 JSON／Manifest 與隔離 Replay。合成資料明確標示 `DEMO / SYNTHETIC DATA`，真實資料失敗不會自動退回 Mock。
+已實作 Schema 驗證、Prepare → 提案交換 → Finalize、SQLite 證據庫、Python 確定性計算、機構評等統計、逐公司／逐期限 Policy Gate、1–4 頁繁體中文 PDF（個股四頁研究格式；`max_pdf_pages=2` 保留兩頁版型）、稽核 JSON／Manifest 與隔離 Replay。合成資料明確標示 `DEMO / SYNTHETIC DATA`，真實資料失敗不會自動退回 Mock。
 
 **所有輸出僅供使用者本人使用，不分享、不散布**（2026-11-15 範圍變更）。PDF 每頁標示「僅供個人使用・不得散布 / Personal use only / Not for distribution」；沒有任何分享功能。
 
@@ -121,3 +121,7 @@ STOCK_REPORT_SEC_CONTACT='Your Name you@example.com' \
 操作細節、已實作範圍與限制見 [實作說明](docs/phase-0/implementation.md)、[來源可行性](docs/phase-0/provider-feasibility.md) 及 [Phase 0 Review](docs/phase-0/phase-0-review.md)。
 
 NVDA 個股修正已加入受查核 SEC 8-K 文件採集與重大事件優先呈現；它是有界、由審閱者整理的真實來源流程，不是自動全網事件搜尋。未完成事件查核或仍有重大線索時，不得宣稱研究完成。操作與驗收見 [修正紀錄](docs/phase-0/nvda-event-report-correction.md)。
+
+### 個股研究 V2（2026-11-15）
+
+真實個股研究必須納入截止時點前最新一期財報（SEC submissions 發現 → 最新申報的財務事實），並附上下一次財報預期的搜尋紀錄（`bundle --earnings-preview`）。主流媒體經查核後可作為 secondary 來源，收錄時與官方事實分開標示。公司指引、具名分析師／共識預測、情境假設三者分開呈現。四頁報告由提案的 `company_research` 段落組成，正文使用 `[n]` 註腳。操作與 Schema 見 [個股研究 V2](docs/phase-0/stock-research-v2.md)。

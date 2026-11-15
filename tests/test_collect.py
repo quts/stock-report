@@ -144,7 +144,8 @@ def test_endpoint_change_does_not_inherit_reviewed_dataset_permissions(attested,
 def test_licensed_single_quote_produces_an_insufficient_report(attested, tmp_path):
     """Core-record count is the directional Gate threshold, not a condition for any report."""
     collection = twse_collection(attested)
-    request = tsmc_request()
+    # Legacy two-page profile: the four-page profile additionally requires the latest filing.
+    request = tsmc_request().model_copy(update={'max_pdf_pages': 2})
     data, report = build_bundle(request, [collection], registry=attested)
     assert data is not None and report['status'] == 'ready'
     assert report['core_source_records'] == 1

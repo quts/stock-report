@@ -241,14 +241,16 @@ def test_packaged_scope_yields_only_an_insufficient_2330_report_without_raw_or_h
                          cache_dir=tmp_path / 'cache')
     assert all('response_sha256' not in row for row in collection.transport)
     assert not (tmp_path / 'cache').exists()
-    data, report = build_bundle(tsmc_request(), [collection], registry=registry)
+    # Legacy two-page profile: the four-page profile additionally requires the latest filing.
+    request = tsmc_request().model_copy(update={'max_pdf_pages': 2})
+    data, report = build_bundle(request, [collection], registry=registry)
     assert report['status'] == 'ready' and report['core_source_records'] == 1
     assert report['coverage_warnings'][0]['code'] == 'core_evidence_below_direction_threshold'
     assert sorted(e.kind for e in data.evidence) == ['identity', 'price']
     assert all(e.source_hash is None and e.internal_use_allowed and not e.shareable_in_pdf for e in data.evidence)
     item = next(i for i in read_json(PACKAGE)['items'] if i['source_id'] == TWSE)
     assert {e.attribution for e in data.evidence} == {item['proposed_attribution']}
-    prepared = prepare(tsmc_request(), tmp_path, data.model_dump(mode='json'))
+    prepared = prepare(request, tmp_path, data.model_dump(mode='json'))
     run_dir = Path(prepared['research_input_path']).parent
     _, stored, _ = load_prepared(run_dir)
     # Even a directional proposal is downgraded: one licensed close cannot carry a direction.

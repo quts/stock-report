@@ -72,6 +72,8 @@ def parser():
     bun.add_argument('--output', required=True, type=Path)
     bun.add_argument('--license-registry', type=Path, default=None)
     bun.add_argument('--allow-fixture-capture', action='store_true', help='Offline tests only')
+    bun.add_argument('--earnings-preview', type=Path, default=None,
+                     help='EarningsPreviewReview JSON recording the next-earnings search; cited IDs must be in the bundle')
     tpl = sub.add_parser('request-template', help='Write a request whose cutoff follows the collection time')
     tpl.add_argument('--mode', choices=['stock'], default='stock')
     tpl.add_argument('--ticker', required=True)
@@ -168,7 +170,8 @@ def main(argv=None):
             request = Request.model_validate(read_json(args.request))
             collections = [load_collection(path) for path in args.collection]
             data, report = build_bundle(request, collections, registry=load_registry(args.license_registry),
-                                        allow_fixture_capture=args.allow_fixture_capture)
+                                        allow_fixture_capture=args.allow_fixture_capture,
+                                        earnings_preview=read_json(args.earnings_preview) if args.earnings_preview else None)
             args.output.parent.mkdir(parents=True, exist_ok=True)
             report_path = args.output.with_name(args.output.stem + '-report.json')
             write_json(report_path, report)

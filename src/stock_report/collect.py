@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Literal
 import uuid
 from pydantic import AwareDatetime, Field
-from .models import Entity, Evidence, Model, Request, ResearchInput, SourceClass, FilingDiscovery, LatestFinancialReview
+from .models import (Entity, Evidence, Model, Request, ResearchInput, SourceClass, FilingDiscovery,
+                     LatestFinancialReview, EarningsPreviewReview, financial_review_state)
 from .mock import VERSIONS
 from .providers import HTTPClient
 from .quant import calculate
@@ -317,7 +318,7 @@ def exclusion_reason(evidence, request):
     return None
 
 
-def build_bundle(request, collections, *, registry, allow_fixture_capture=False):
+def build_bundle(request, collections, *, registry, allow_fixture_capture=False, earnings_preview=None):
     """Return (research_input_or_None, report). Blockers are reported, never worked around."""
     cutoff = request.research_as_of
     blockers, exclusions, notes, evidence, summary = [], [], [], [], []
@@ -431,18 +432,25 @@ def build_bundle(request, collections, *, registry, allow_fixture_capture=False)
         raise ValueError('The supplied research cutoff must never be modified')
     if blockers:
         return None, report
-    data = ResearchInput(dataset_kind=dataset_kind, request=request, entities=[entity], evidence=evidence,
-                         metrics=calculate(evidence, cutoff), relationships=[], event_evidence_ids=[],
-                         versions={**VERSIONS, 'dataset': 'real-collected-1' if dataset_kind == 'real'
-                                   else 'fixture-capture-1'})
+    latest_financials = None
     discoveries = [c.filing_discovery for c in collections if c.filing_discovery is not None]
     if discoveries:
         if len(discoveries) != 1:
             raise ValueError('Use one official latest-filing discovery per stock run')
         discovery = discoveries[0]
-        data.latest_financials = LatestFinancialReview(discovery=discovery,
+        latest_financials = LatestFinancialReview(discovery=discovery,
             evidence_ids=[e.evidence_id for e in evidence if e.kind == 'financial'
                           and e.source_url == discovery.document_url])
+    # Every review object is validated together with the evidence it cites, never attached afterwards.
+    data = ResearchInput(dataset_kind=dataset_kind, request=request, entities=[entity], evidence=evidence,
+                         metrics=calculate(evidence, cutoff), relationships=[], event_evidence_ids=[],
+                         latest_financials=latest_financials,
+                         earnings_preview=(EarningsPreviewReview.model_validate(earnings_preview)
+                                           if earnings_preview is not None else None),
+                         versions={**VERSIONS, 'dataset': 'real-collected-1' if dataset_kind == 'real'
+                                   else 'fixture-capture-1'})
+    report['latest_financial_report_status'] = financial_review_state(data) or ['covered']
+    report['earnings_preview_status'] = data.earnings_preview.status if data.earnings_preview else 'not_run'
     report['metrics'] = [{'name': m.name, 'value': m.value, 'missing_reason': m.missing_reason} for m in data.metrics]
     return data, report
 

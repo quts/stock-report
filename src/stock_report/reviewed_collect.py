@@ -67,7 +67,9 @@ def parse_submissions(payload, row, as_of, observed):
             candidates.append((pub, recent['reportDate'][i], form, accession, document))
     if not candidates:
         raise ValueError('No eligible financial filing in the available SEC index; historical coverage not assumed')
-    pub, period, form, accession, document = max(candidates)
+    # The latest reporting period wins; an amendment filed later for an older period never displaces
+    # a newer original 10-Q/10-K, and for the same period the original is preferred over its amendment.
+    pub, period, form, accession, document = max(candidates, key=lambda c: (c[1], not c[2].endswith('/A'), c[0]))
     return FilingDiscovery(entity_id=row['ticker'], cik=row['cik'], as_of=as_of, discovered_at=observed,
         form=form, accession=accession, period_end=period, published_at=pub,
         document_url=f'https://www.sec.gov/Archives/edgar/data/{int(row["cik"])}/{accession.replace("-", "")}/{document}',
@@ -78,6 +80,9 @@ def collect_reviewed(source_id, ticker, *, registry, plan, client, now=None):
     from .collect import Collection
     profile, (row, entity) = REVIEWED_PROFILES[source_id], issuer(ticker)
     snapshot = registry.snapshot(source_id)
+    # Unconfirmed publishers stay closed: nothing is fetched until a sufficient review opened them.
+    if not snapshot['source_reviewed'] or not snapshot['internal_use_allowed']:
+        raise ValueError(f'{source_id}: source review or internal-use permission is not confirmed; collection stays closed')
     if not registry.get(source_id).covers_endpoint(profile['endpoint']):
         raise ValueError('Publisher endpoint is outside registered scope')
     if snapshot['source_class'] != profile['source_class']:
@@ -166,5 +171,5 @@ def collect_reviewed(source_id, ticker, *, registry, plan, client, now=None):
         requested_ticker=ticker, collected_at=now or datetime.now(timezone.utc), entity=entity,
         observations=observations, license=snapshot, transport=transport, filing_discovery=discovery,
         sec_contact_configured=source_id == 'sec-submissions-history',
-        retention='research_input_allowed' if snapshot['internal_use_allowed'] else 'feasibility_only',
+        retention='research_input_allowed',
         notes=notes + ['No raw responses, article bodies or response hashes are retained.'])

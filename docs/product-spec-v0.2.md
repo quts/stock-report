@@ -5,6 +5,8 @@
 > 本版目的：凍結已確認的產品決策；將尚無法驗證的資料能力與授權問題移交 Phase 0，不將假設冒充已實現能力。  
 > **2026-11-15 範圍變更（使用者明示，取代原「偶爾分享 PDF」設計）**：所有輸出**僅供使用者本人使用，永不對外分享或散布**；保留易讀的 PDF 報告。原分享版 PDF 與再散布授權要求不再是報告條件，本文件已就地改寫；來源、身份、時點查核與內部使用授權控管全數保留。
 
+> **2026-11-15 個股研究 V2（使用者明示，取代本文件中「1–2 頁」與兩頁版型的規定）**：PDF 改為 1–4 頁（`max_pdf_pages` 1–4，預設 4；設 2 仍使用舊的兩頁版型）。真實個股研究必須納入截止時點前最新一期財報，否則不能算完成，四頁報告也不發布。主流媒體經查核後可作為 secondary 來源。報告採四頁易讀格式：公司概況、最新財務、消息與下次財報預期、3-6m／6-12m 分析，最後附單一資料限制與來源附錄。操作契約見 [個股研究 V2](./phase-0/stock-research-v2.md)。
+
 ## 1. 產品目標與範圍
 
 Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 以繁體中文自然語言提出股票或事件研究需求，系統從合法可用的免費資料蒐集證據，由 Python 進行確定性計算、Codex/LLM 產生結構化研究提案，經 Policy Gate 審查後生成 **1–2 頁 A4 繁體中文 PDF** 與可稽核 JSON。
@@ -49,7 +51,7 @@ Stock Report 是本機 Mac 上的 AI 投資研究工具。使用者透過 Codex 
 
 ### 2.2 標準化輸入
 
-使用 Pydantic Schema 表達 `mode`、`ticker/exchange` 或 `event_query`、`research_as_of`、`lookback_days`、`horizons`、`max_companies=5`、`language=zh-TW`、`max_pdf_pages=2`、`sharing_profile`（相容用欄位，只接受 `private`；要求任何分享設定的 Request 會被拒絕，不會默默降級）。有效輸入僅能藉受控參數傳給 CLI，不得由 LLM 任意組 shell 字串。
+使用 Pydantic Schema 表達 `mode`、`ticker/exchange` 或 `event_query`、`research_as_of`、`lookback_days`、`horizons`、`max_companies=5`、`language=zh-TW`、`max_pdf_pages`（1–4，預設 4；V2 變更）、`sharing_profile`（相容用欄位，只接受 `private`；要求任何分享設定的 Request 會被拒絕，不會默默降級）。有效輸入僅能藉受控參數傳給 CLI，不得由 LLM 任意組 shell 字串。
 
 `research_as_of` 必須記錄時區；區分事件時間、資料發布時間、資料擷取時間與交易市場時間。研究截止日後才公開的資料不得用於該歷史時點研究。
 
@@ -162,7 +164,7 @@ Gate 狀態：`APPROVED`、`APPROVED_WITH_WARNINGS`、`REVISE`、`REJECTED`。�
 
 ## 6. PDF / 報告契約
 
-共用字型、引用、風險、品質元件，但分股票與事件版型；A4、繁體中文、最多兩頁，易讀優先，不得用極小字級塞內容。每頁標示「僅供個人使用・不得散布 / Personal use only / Not for distribution」；合成資料另保留 DEMO / SYNTHETIC DATA 標記。
+共用字型、引用、風險、品質元件，但分股票與事件版型；A4、繁體中文、最多四頁（V2；四頁個股版型見 [個股研究 V2](./phase-0/stock-research-v2.md)，`max_pdf_pages=2` 保留以下兩頁版型），易讀優先，不得用極小字級塞內容。每頁標示「僅供個人使用・不得散布 / Personal use only / Not for distribution」；合成資料另保留 DEMO / SYNTHETIC DATA 標記。
 
 **股票研究**
 - 第 1 頁：標的識別、資料截至時間、基本面與估值關鍵數字、重大事件、市場反應、風險。

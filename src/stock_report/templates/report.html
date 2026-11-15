@@ -28,7 +28,7 @@ small { font-size: 9pt; } .badge { color: #145a70; font-weight: bold; } .event-c
 <p class="note">資料日期 {{ c.latest_quote.source_period_raw or c.latest_quote.event_time.date() }} · [{{ c.latest_quote.evidence_id }}]</p>{% else %}<p class="note">最近收盤價無已核實且可內部使用的資料。</p>{% endif %}
 <h2>先看重大事件與下一查核點</h2>
 {% if completion_blockers %}<p class="warning">近期事件查核尚未完整；以下僅列已核實內容，不能推論沒有其他重大事件。</p>{% endif %}
-{% for e in c.events[:3] %}<p>{{ e.claim }} <small>[{{ e.evidence_id }}]</small></p>{% else %}<p>沒有可呈現的已核實事件；不可推論沒有風險。</p>{% endfor %}
+{% for e in c.display_events %}<p>{{ e.claim }} <small>[{{ e.evidence_id }}]</small></p>{% else %}<p>沒有可呈現的已核實事件；不可推論沒有風險。</p>{% endfor %}
 <h2>歷史基本面 · 不代表最新季度或目前估值</h2>
 <table><tr><th>指標</th><th>數值 / 期別</th><th>證據</th></tr>
 {% for m in c.metrics %}<tr><td>{{ metric_labels[m.name] }}</td><td>{% if m.unit in ('USD', 'TWD') %}{% if m.value|abs >= 100000000 %}{{ '%.2f'|format(m.value / 100000000) }} 億{% else %}{{ '%.2f'|format(m.value) }} {% endif %}{{ m.currency or m.unit }}{% else %}{{ '%.2f'|format(m.value) }} {{ m.currency or '' }} {{ {'percent':'%', 'multiple':'倍', 'million':'百萬', 'thousand':'千'}.get(m.unit, m.unit) }}{% endif %} / {{ m.period }}</td><td><small>{{ m.evidence_ids|join(', ') }}</small></td></tr>{% endfor %}

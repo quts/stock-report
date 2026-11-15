@@ -9,7 +9,7 @@ from stock_report.quant import calculate, consensus
 @pytest.mark.parametrize('change', [
     {'research_as_of': '2026-11-14T17:00:00'}, {'max_companies': 6},
     {'horizons': ['3-6m', '3-6m']}, {'event_query': 'bad combination'},
-    {'language': 'en'}, {'max_pdf_pages': 3}, {'unexpected': True}])
+    {'language': 'en'}, {'max_pdf_pages': 5}, {'max_pdf_pages': 0}, {'unexpected': True}])
 def test_invalid_requests(request_model, change):
     payload = request_model.model_dump(mode='json')
     payload.update(change)

@@ -47,6 +47,9 @@ def projection(data, decision, mapping, company_research=None):
             'relationship_evidence_ids': relation.evidence_ids if valid_relation else []})
         company = companies[-1]
         company['research'] = narrative.get(entity.entity_id)
+        # Every reviewed material event is shown; minor events only fill the remaining slots.
+        major = [e for e in company['events'] if e.evidence_id in major_ids]
+        company['display_events'] = major + [e for e in company['events'] if e.evidence_id not in major_ids][:max(0, 3 - len(major))]
         rows = [r for r in statements if r['entity_id'] == entity.entity_id and 'current_value' in r]
         core = ('revenue', 'gross_profit', 'operating_income', 'net_income', 'diluted_eps',
                 'operating_cash_flow', 'free_cash_flow', 'adjusted_free_cash_flow')
