@@ -152,3 +152,18 @@ def test_tracking_conditions_do_not_double_punctuate(data, proposal, mapping):
         p.invalidation_conditions = ['條件一。', '條件二。']
     view = projection(data, evaluate(data, proposal), mapping, [company_research(data)])
     assert all(c in ('條件一', '條件二') for o in view['companies'][0]['reader_outlooks'] for c in o['conditions'])
+
+
+def test_timeline_skips_events_already_cited_in_news_but_keeps_uncited_ones(data, proposal, mapping):
+    from stock_report.models import ReviewedEvent
+    base = next(e for e in data.evidence if e.kind == 'event')
+    extra = [base.model_copy(update={'evidence_id': f'test-ev-{i}', 'event_time': base.event_time.replace(day=i + 1)})
+             for i in range(3)]
+    data.evidence += extra
+    data.event_review.events = [ReviewedEvent(event_id=f'test-ev-{i}', title=f'Test {i}', category='financing',
+        materiality='major', status='occurred', event_time=e.event_time, verification='official',
+        evidence_ids=[e.evidence_id]) for i, e in enumerate(extra)]
+    research = company_research(data)
+    research.news = [CitedParagraph(text='已分析的事件', evidence_ids=['test-ev-0'])]
+    view = projection(data, evaluate(data, proposal), mapping, [research])
+    assert [e.evidence_id for e in view['companies'][0]['timeline']] == ['test-ev-2', 'test-ev-1']

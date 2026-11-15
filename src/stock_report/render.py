@@ -62,8 +62,12 @@ def projection(data, decision, mapping, company_research=None):
         company['guidance'] = [e for e in company_evidence if e.statement_kind in (
             'management_guidance', 'analyst_estimate', 'consensus_estimate')]
         reviewed_ids = {eid for event in (data.event_review.events if data.event_review else []) for eid in event.evidence_ids}
-        company['timeline'] = [e for e in company['events'] if e.evidence_id in reviewed_ids
-                               and e.statement_kind == 'fact']
+        # Reviewed events the cited news analysis already covers are not repeated; any reviewed event
+        # the analysis left out is still listed, newest first, so no material event disappears.
+        cited_news = {eid for p in (company['research'].news if company['research'] else []) for eid in p.evidence_ids}
+        company['timeline'] = sorted([e for e in company['events'] if e.evidence_id in reviewed_ids
+                                      and e.statement_kind == 'fact' and e.evidence_id not in cited_news],
+                                     key=lambda e: (e.event_time, e.evidence_id), reverse=True)
         company['reader_outlooks'] = [{'horizon': p.horizon, 'outlook': p.outlook,
             'text': p.interpretation.split('｜分析說明：')[-1] if '｜分析說明：' in p.interpretation
                     else p.interpretation, 'evidence_ids': p.supporting_evidence_ids + p.counter_evidence_ids,
