@@ -74,7 +74,7 @@ def value(data, series, entity, analysis, references=None):
         market['enterprise_value'] = market['market_cap'] + market['net_debt']
         market['net_debt_ids'] = debt[2] + cash['evidence_ids']
     price_ok = price['status'] == 'available'
-    no_price = '缺少可用的最新收盤價' if price['status'] == 'not_found' else price['note']
+    no_price = {'stale': '收盤價過期', 'conflicting': '來源收盤價互相衝突'}.get(price['status'], '缺少可合法取得的最新收盤價')
     eps_metric = next((m for m in analysis['metrics'] if m['name'] == 'eps_ttm' and m['status'] == 'available'), None)
     eps = None if eps_metric is None else {'value': eps_metric['value'], 'evidence_ids': eps_metric['evidence_ids'],
                                            'window': eps_metric['window'], 'formula': eps_metric['formula']}

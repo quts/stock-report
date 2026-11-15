@@ -264,6 +264,8 @@ def test_hypothetical_values_lose_false_precision():
     assert base['implied_price_display'] != base['implied_price']
     assert len(str(int(base['implied_price_display'])).rstrip('0')) <= 2
     assert gate(result, 'scenario_uncertainty_disclosure')['status'] == 'PASS'
+    grid = result['scenarios']['sensitivity']['grid']
+    assert all(len(str(int(v)).rstrip('0')) <= 2 for row in grid for v in row)
 
 
 def test_gates_report_four_states():

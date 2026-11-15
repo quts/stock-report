@@ -14,7 +14,7 @@ from .policy import reportable
 from .research_contract import accounting_bucket
 
 FLOW_METRICS = ('revenue', 'gross_profit', 'operating_income', 'net_income', 'operating_cash_flow',
-                'capital_expenditure', 'depreciation_amortization', 'income_before_tax', 'income_tax')
+                'capital_expenditure', 'depreciation_amortization', 'income_before_tax', 'income_tax', 'interest_expense')
 INSTANT_METRICS = ('cash_equivalents', 'accounts_receivable_net', 'accounts_receivable', 'inventory',
                    'accounts_payable', 'short_term_debt', 'long_term_debt', 'bonds_payable', 'total_debt',
                    'total_equity', 'total_assets', 'total_liabilities', 'shares_outstanding',

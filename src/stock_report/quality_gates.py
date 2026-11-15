@@ -86,6 +86,18 @@ def engine_values(engine):
         vals += [x for x in (s['implied_price'], s['change_vs_reference_percent'], s['reference_price'],
                              s['valuation']['metric_value'], s['valuation']['multiple']) if x is not None]
         vals += [a['value'] for a in s['assumptions']]
+        vals += [v for v in (s.get('statements') or {}).values() if isinstance(v, (int, float))]
+        vals += [d['value'] for d in (s.get('drivers') or {}).values() if isinstance(d.get('value'), (int, float))]
+        if s.get('implied_price_display') is not None:
+            vals.append(s['implied_price_display'])
+    for d in (engine.get('forecast') or {}).get('drivers', {}).values():
+        if isinstance(d.get('value'), (int, float)):
+            vals.append(d['value'])
+    for d in (engine.get('sector_drivers') or {}).get('drivers', []):
+        if isinstance(d.get('value'), (int, float)):
+            vals.append(d['value'])
+    for ref in ((engine['valuation'].get('references') or {}).get('historical_pe') or {}, *((engine['valuation'].get('references') or {}).get('peers') or {}).values()):
+        vals += [v for v in (ref.get('stats') or {}).values() if isinstance(v, (int, float))]
     for row in engine['analysis']['quarters']:
         vals += [v for k, v in row.items() if isinstance(v, (int, float))]
     market = engine['valuation']['market']
@@ -114,7 +126,8 @@ def run(data, proposal, engine, entity, decision=None):
     results = []
     price = engine['valuation']['market']['price']
     if price['status'] != 'available':
-        results.append(state('price_recency', 'FAIL', price.get('note')))
+        short = {'stale': '收盤價過期', 'conflicting': '來源收盤價互相衝突'}.get(price['status'], '沒有可合法取得的收盤價')
+        results.append(state('price_recency', 'FAIL', f'{short}（各來源狀態與補救方式見 qa.json）'))
     else:
         results.append(state('price_recency', 'PASS' if price.get('calendar_verified') else 'WARNING', price.get('note')))
     units = {}
@@ -303,6 +316,9 @@ def model_checks(data, engine):
     # 5. Uncertainty disclosure: hypothetical values must lose false precision and carry the label.
     precise = [r['name'] for r in rows if not r['evidence_based_multiple'] and r['implied_price'] is not None
                and r['implied_price_display'] == round(r['implied_price'], 4) and abs(r['implied_price']) >= 100]
+    sens = scen.get('sensitivity')
+    if sens and scen['valuation_basis'] != 'evidence_based' and sens.get('precision') != 'two_significant_digits':
+        precise.append('sensitivity')
     history = next((m for m in engine['analysis']['metrics'] if m['name'] == 'history_quarters'), {'value': 0})
     needs = scen['valuation_basis'] != 'evidence_based' or (history['value'] or 0) < 8 or \
         any(r['model_assumption_count'] for r in rows)

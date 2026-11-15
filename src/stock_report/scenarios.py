@@ -131,14 +131,16 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
     if len(prices) == 3 and not prices['bear'] <= prices['base'] <= prices['bull']:
         problems.append('情境隱含價值順序不合理：應為 bear ≤ base ≤ bull')
     base = next((r for r in out if r['name'] == 'base'), None)
+    basis = 'evidence_based' if out and all(r['evidence_based_multiple'] for r in out) else 'hypothetical_sensitivity'
     sensitivity = None
     if base and base['implied_price'] is not None:
         v = base['valuation']
+        shown = (lambda x: round(x, 2)) if basis == 'evidence_based' else round_sig
         sensitivity = {'metric': v['metric'], 'method': v['method'], 'reference_price': reference_price,
                        'metric_factors': list(SENSITIVITY_METRIC), 'multiple_factors': list(SENSITIVITY_MULTIPLE),
-                       'grid': [[round(implied_price(v['method'], v['metric_value'] * f, v['multiple'] * m,
-                                                     valuation['market']) or 0, 2)
+                       'precision': 'exact' if basis == 'evidence_based' else 'two_significant_digits',
+                       'grid': [[shown(implied_price(v['method'], v['metric_value'] * f, v['multiple'] * m,
+                                                     valuation['market']) or 0)
                                  for m in SENSITIVITY_MULTIPLE] for f in SENSITIVITY_METRIC]}
-    basis = 'evidence_based' if out and all(r['evidence_based_multiple'] for r in out) else 'hypothetical_sensitivity'
     return {'status': 'invalid' if problems else 'available', 'scenarios': out, 'problems': problems,
             'sensitivity': sensitivity, 'probabilities': 'not_assigned', 'valuation_basis': basis}
