@@ -96,7 +96,7 @@ def projection(data, decision, mapping, company_research=None):
             'statement_labels': STATEMENT_LABELS}
 
 
-def render(data, decision, mapping, path, company_research=None, investment=None, layout='standard'):
+def render(data, decision, mapping, path, company_research=None, investment=None):
     from weasyprint import HTML
     def deny_resources(url, *args, **kwargs):
         raise ValueError('External and local URL resource fetching is disabled')
@@ -158,14 +158,8 @@ def render(data, decision, mapping, path, company_research=None, investment=None
         context['limitations'].append('研究品質檢查未全數通過：' + '、'.join(
             c.get('label', c['check']) for c in investment['gates']['checks'] if c['status'] == 'FAIL') + '。')
     html = env.get_template(template).render(**context)
-    if layout == 'mobile':
-        from .mobile_layout import reflow
-        html = reflow(html)
-    elif layout != 'standard':
-        raise ValueError('Unknown report layout')
     document = HTML(string=html, url_fetcher=deny_resources).render()
-    page_budget = 64 if layout == 'mobile' else data.request.max_pdf_pages
-    if not 1 <= len(document.pages) <= page_budget:
+    if not 1 <= len(document.pages) <= data.request.max_pdf_pages:
         raise ValueError(f'PDF layout exceeds page budget: {len(document.pages)} pages; no report published')
     document.write_pdf(path)
     return len(document.pages)
