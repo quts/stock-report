@@ -10,7 +10,7 @@ from . import (candidates, charts, completeness, expectations, fcf_history, fin_
 from .backtesting import MIN_SAMPLES
 from .research_contract import canonical_period, fiscal_year_end_month
 
-VERSION = '6'
+VERSION = '8'
 INVESTOR_LABELS = {'bear': 'Bear', 'base': '參考路徑', 'bull': 'Bull'}
 
 
@@ -56,7 +56,9 @@ def run(data, proposal=None, decision=None):
     values = valuation.value(data, series, entity, analysis, refs)
     anchor = forecast.anchors(series, analysis)
     anchor['calibration'] = forecast.calibration(anchor)
-    anchor['backtest'] = forecast.backtest(data, entity.entity_id)
+    # One filing dataset (catalog-verified vintages) feeds both retrospectives with the same cutoff rule.
+    retro = retrospective.evaluate(data, entity.entity_id)
+    anchor['backtest'] = forecast.backtest(data, entity.entity_id, retro['filing_dataset'])
     expect = expectations.compare(data, series, entity.entity_id)
     complete = completeness.assess(data, series, analysis, values, expect, entity.entity_id)
     scen = scenarios.evaluate(data, proposal, values, entity, anchor, refs)
@@ -68,7 +70,6 @@ def run(data, proposal=None, decision=None):
     fx = next((r['guidance_fx_rate_used'] for r in scen['scenarios'] if r.get('guidance_fx_rate_used')), None)
     fx_ids = next((r['guidance_fx_evidence_ids'] for r in scen['scenarios'] if r.get('guidance_fx_rate_used')), [])
     anchor['candidates'] = candidates.build(anchor, guidance, fx)
-    retro = retrospective.evaluate(data, entity.entity_id)
     candidates.select(anchor['candidates'], retro, MIN_SAMPLES)
     _label_scenarios(scen, anchor['candidates'])
     _, profile = fin_analysis.sector_profile(entity.entity_id)
@@ -76,7 +77,8 @@ def run(data, proposal=None, decision=None):
               'fiscal_year_end_month': fy_end, 'series': series, 'analysis': analysis, 'valuation': values,
               'forecast': anchor, 'sector_drivers': sector_drivers.compute(series, analysis, profile),
               'market_data': {'status': price_series['status'], 'history_points': len(price_series['points']),
-                              'diagnostics': price_series['diagnostics']},
+                              'diagnostics': price_series['diagnostics'],
+                              'dependencies': market_data.dependencies(data, entity, price_series, refs)},
               'expectations': expect, 'completeness': complete, 'scenarios': scen, 'events': materiality.rank(data)}
     engine['retrospective'] = retro
     engine['stability'] = stability.assess(data, entity.entity_id, guidance, fx, fx_ids)
@@ -89,6 +91,7 @@ def run(data, proposal=None, decision=None):
     engine['historical_fcf'] = {'history': history, 'sensitivity': fcf_history.sensitivity(
         history, paths, price.get('value') if price.get('status') == 'available' else None, shares)}
     engine['cashflow_mapping'] = fcf_history.mapping_coverage(data, series, entity.entity_id, anchor['reconciliation'])
+    engine['cashflow_drivers'] = fcf_history.forward_driver_assessment(series)
     engine['sensitivity_ranking'] = usefulness.sensitivities(engine)
     engine['reverse_valuation'] = usefulness.reverse_valuation(engine)
     engine['sector_context'] = usefulness.sector_context(engine)
@@ -133,7 +136,11 @@ def forecast_qa(engine):
                                      'claims': retro['claims']},
             'point_in_time_rows': retro['point_in_time']['rows'], 'revised_data_rows': retro['revised_data']['rows'],
             'filing_dataset': retro['filing_dataset'], 'stability': engine['stability'],
+            'full_forecast_backtest': {k: v for k, v in f['backtest'].items() if k not in ('rows', 'revised_diagnostic')},
+            'full_forecast_backtest_rows': [{k: v for k, v in r.items() if k != 'training_evidence_ids'} for r in f['backtest']['rows']],
             'historical_fcf': engine['historical_fcf'], 'cashflow_mapping': engine['cashflow_mapping'],
+            'cashflow_drivers': engine.get('cashflow_drivers'),
+            'market_data_dependencies': engine['market_data'].get('dependencies'),
             'sensitivity_ranking': engine['sensitivity_ranking'], 'reverse_valuation': engine['reverse_valuation'],
             'sector_context': engine['sector_context'],
             'gate_ids': [{'check': c['check'], 'label': c.get('label'), 'status': c['status'], 'detail': c['detail']}

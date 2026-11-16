@@ -40,7 +40,9 @@ def prices(data, entity):
     config = read_json('config/market-data-providers.json')['exchanges'].get(entity.exchange, {})
     priority = config.get('latest_close', [])
     quotes = [e for e in data.evidence if e.entity_id == entity.entity_id and e.kind == 'price'
-              and e.metric_key == 'close' and reportable(e, data.request)]
+              and e.metric_key == 'close' and reportable(e, data.request)
+              and (e.publication_basis != 'observed_availability' or
+                   e.availability_observed_at is not None and e.availability_observed_at <= data.request.research_as_of)]
     bad = [e.evidence_id for e in quotes if not e.value or e.value <= 0 or e.currency != entity.currency]
     quotes = [e for e in quotes if e.evidence_id not in bad]
     by_day = defaultdict(list)
@@ -63,6 +65,9 @@ def prices(data, entity):
             if split_day > day:
                 factor *= ratio
         points.append({'date': day, 'close': chosen.value, 'adjusted_close': chosen.value / factor,
+                       'available_at': max(chosen.published_at, chosen.event_time,
+                                           chosen.availability_observed_at if chosen.publication_basis == 'observed_availability'
+                                           else chosen.published_at),
                        'provider': chosen.license_source_id, 'evidence_id': chosen.evidence_id})
     registry = _registry()
     providers = [{'provider': p, 'status': provider_status(p, registry),
@@ -89,6 +94,81 @@ def prices(data, entity):
         note = f'收盤價過期：{note}，超過 {MAX_PRICE_LAG_TRADING_DAYS} 個交易日'
     return {'status': status, 'points': points, 'latest': last, 'trading_days_lag': lag, 'calendar_verified': verified,
             'diagnostics': diagnostics, 'note': note, 'history_points': len(points)}
+
+
+def _provider_state(provider, registry, records, need_history):
+    """Distinguish blocked, latest-only, not supplied, failed and available providers."""
+    from .sources import PROFILES
+    status = provider_status(provider, registry)
+    if provider == 'operator-import':
+        return ('available' if records else 'not_supplied_requires_user_rights_attestation')
+    if status == 'open':
+        if need_history and (PROFILES.get(provider) or {}).get('coverage_mode') == 'latest_only':
+            return 'latest_only_no_history'
+        return 'available' if records else 'open_but_no_record_for_this_cutoff'
+    if status.startswith('closed:'):
+        return 'blocked_source_review_insufficient'
+    return status
+
+
+def dependencies(data, entity, series, refs):
+    """What each valuation reference needs, and exactly why it is or is not available.
+
+    A generic source-unavailable gap cannot establish a failed retrieval without attempt
+    details; blocked or unreviewed sources never imply the data does not exist."""
+    from .multiples import MIN_HISTORY_POINTS, MIN_PEERS
+    config = read_json('config/market-data-providers.json')
+    exchange = config['exchanges'].get(entity.exchange, {})
+    registry = _registry()
+    gaps = {g.field: g for g in data.data_gaps}
+    counts = defaultdict(int)
+    for e in data.evidence:
+        if e.entity_id == entity.entity_id and e.kind == 'price' and reportable(e, data.request):
+            counts[e.license_source_id] += 1
+
+    def item(name, field, providers, need_history, have, required_for, need):
+        states = [{'provider': p, 'state': _provider_state(p, registry, counts.get(p, 0), need_history),
+                   'records': counts.get(p, 0)} for p in providers]
+        gap = gaps.get(field)
+        if have:
+            status = 'available'
+        elif any(s['state'] == 'available' for s in states):
+            status = 'insufficient_observations'
+        elif gap is not None and gap.status == 'source_unavailable' and any(
+                s['state'] == 'open_but_no_record_for_this_cutoff' for s in states):
+            status = 'source_unavailable_attempt_details_required'
+        elif states and all(s['state'] in ('blocked_source_review_insufficient', 'latest_only_no_history',
+                                           'not_supplied_requires_user_rights_attestation', 'not_registered')
+                            for s in states):
+            status = 'blocked_or_not_supplied'
+        else:
+            status = 'missing'
+        return {'input': name, 'status': status, 'required_for': required_for, 'requirement': need,
+                'providers': states, 'recorded_gap': None if gap is None else gap.model_dump(mode='json')}
+
+    hist = refs.get('historical_pe') or {}
+    peers = refs.get('peers') or {}
+    forward = any(e.entity_id == entity.entity_id and e.statement_kind == 'consensus_estimate'
+                  and e.financial_metric in ('eps', 'diluted_eps') and reportable(e, data.request) for e in data.evidence)
+    out = [item('latest_close', 'price_latest', exchange.get('latest_close', []), False,
+                series['status'] == 'available', ['pe_trailing', 'ev_ebitda', 'p_fcf', 'fcf_yield', 'p_b', 'reverse_valuation'],
+                f'one close within {MAX_PRICE_LAG_TRADING_DAYS} trading days of the cutoff'),
+           item('quarter_end_close_history', 'price_history', exchange.get('history', []), True,
+                hist.get('status') == 'sufficient', ['historical_range'],
+                f'>= {MIN_HISTORY_POINTS} quarter-end closes paired with point-in-time TTM EPS'),
+           {'input': 'peer_multiples', 'status': 'available' if any(v['status'] == 'sufficient' for v in peers.values()) else
+            ('insufficient_observations' if peers else 'missing'), 'required_for': ['peer_relative'],
+            'requirement': f'>= {MIN_PEERS} identity-reviewed peers with a licensed multiple on the same basis and date',
+            'providers': [{'provider': 'operator-import', 'state': 'available' if peers else 'not_supplied_requires_user_rights_attestation',
+                           'records': sum(len(v['peers']) for v in peers.values())}],
+            'recorded_gap': gaps['peers'].model_dump(mode='json') if 'peers' in gaps else None},
+           {'input': 'consensus_eps', 'status': 'available' if forward else 'missing', 'required_for': ['pe_forward'],
+            'requirement': 'named, terms-reviewed consensus source; company guidance is never a substitute',
+            'providers': [], 'recorded_gap': gaps['consensus'].model_dump(mode='json') if 'consensus' in gaps else None}]
+    return {'inputs': out, 'historical_pe_exclusions': hist.get('exclusions', {}),
+            'rejected_providers': config.get('rejected', []),
+            'policy': 'No provider is enabled without a complete five-aspect source review and activation-check; operator '
+                      'imports need the user\'s own rights attestation. Historical or peer multiples are never estimated.'}
 
 
 def close_on_or_before(series, day, max_gap_days=7):

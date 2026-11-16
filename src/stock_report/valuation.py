@@ -164,15 +164,17 @@ def value(data, series, entity, analysis, references=None):
                                                    f'目前 {current["value"]:.1f} 倍']+['以季末收盤價對當時 TTM EPS'] if n]))
             else:
                 results.append(result(method, 'source_unavailable' if price['history_points'] < 2 else 'not_found', as_of=as_of,
-                                      limitations=[f'歷史收盤價只有 {price["history_points"]} 筆；沒有已查核的歷史股價序列，'
-                                                   '無法建立歷史本益比區間（可用 import-market-data 匯入有權使用的歷史收盤價）']))
+                                      limitations=[f'收盤價紀錄 {price["history_points"]} 筆；' + (ref.get('note') or
+                                                   '缺少可用歷史估值配對；需核對歷史股價、當時已公布 EPS 及股數口徑。')]))
         elif method == 'peer_relative':
             ref = references['peers'].get('pe_trailing')
-            if ref and ref['status'] == 'sufficient':
+            if ref and ref.get('stats'):
                 st = ref['stats']
                 results.append(result(method, 'available', st['median'], 'x', as_of=as_of,
                                       inputs=[inp('peer_pe_median', st['median'], 'x', ref['evidence_ids'], '、'.join(ref['peers']))],
-                                      formula=f'同業本益比中位數（{st["count"]} 家，{st["min"]:.1f}–{st["max"]:.1f}）'))
+                                      formula=f'同業本益比中位數（{st["count"]} 家，{st["min"]:.1f}–{st["max"]:.1f}）',
+                                      limitations=[] if ref['status'] == 'sufficient' else
+                                      ['只有描述性比較；身份、盈餘口徑、估值日期及業務可比性尚未完整核實，不支持合理價倍數。']))
             else:
                 results.append(result(method, 'not_found', as_of=as_of, limitations=[
                     '同業估值資料不足（少於 3 家）；不以未查核網站的倍數比較' if ref else

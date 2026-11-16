@@ -5,6 +5,7 @@
   "exchanges": {
     "TWSE": {
       "latest_close": [
+        "twse-opendata-bwibbu-d-csv",
         "twse-openapi-stock-day-all",
         "operator-import"
       ],

@@ -85,6 +85,8 @@ def reverse_valuation(engine):
                      'required_operating_margin_at_reference_revenue': margin,
                      'paths_meeting_requirement': sorted(n for n, v in paths.items() if v >= revenue)})
     return {'status': 'computed', 'price': price['value'], 'price_evidence_ids': price.get('evidence_ids', []),
+            'price_date': price.get('trade_date'), 'earnings_period': engine['forecast']['horizon'],
+            'valuation_date_basis': 'spot_price_divided_by_F4Q_earnings_sensitivity_not_as_of_NTM_or_discounted_target',
             'reference_structure': {k: st[k] for k in ('margin', 'nonop', 'tax', 'shares')}, 'rows': rows,
             'note': '以核實參考價、固定股數與參考利潤結構反推；未折現、無必要報酬假設，不支持合理價或目標價。'}
 

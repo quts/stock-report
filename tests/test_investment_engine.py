@@ -181,7 +181,7 @@ def test_financial_sector_uses_book_value_methods(tmp_path, monkeypatch):
 
 # --- scenarios, labelling and narrative checks ---------------------------------------------------
 
-DELL_HORIZON = 'NTM 2026-08-01~2027-07-30'
+DELL_HORIZON = 'F4Q 2026-08-01~2027-07-30'
 
 
 def driver(value, basis='model_assumption', ids=()):

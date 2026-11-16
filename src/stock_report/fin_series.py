@@ -111,7 +111,8 @@ def build(data, entity_id):
         inst = [p for p in points if p['basis'] == 'instant']
         if inst:
             instants[name] = sorted(inst, key=lambda p: p['end'])
-    return {'quarters': quarters, 'instants': instants, 'cumulative': cumulative, 'conflicts': conflicts}
+    return {'quarters': quarters, 'instants': instants, 'cumulative': cumulative, 'conflicts': conflicts,
+            'entity_id': entity_id, 'research_as_of': data.request.research_as_of}
 
 
 def _point_from(longer, prior):

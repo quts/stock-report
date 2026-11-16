@@ -26,13 +26,16 @@ def with_imports(data, *files):
 
 
 def quarter_end_prices(pe=12.0):
-    """Close at each DELL quarter end implying a constant trailing P/E (test-only)."""
+    """Close at each DELL quarter end using only previously published EPS (test-only)."""
     data = dell()
     eps = {e.period_end: e.value for e in data.evidence if e.financial_metric == 'diluted_eps'}
     ends = [end for _, end in DELL_QUARTERS]
     rows = []
     for i in range(3, len(ends)):
-        ttm = sum(eps[e] for e in ends[i - 3:i + 1])
+        visible = [e for e in data.evidence if e.financial_metric == 'diluted_eps' and e.published_at.date() < ends[i]]
+        if len(visible) < 4:
+            continue
+        ttm = sum(e.value for e in sorted(visible, key=lambda e: e.period_end)[-4:])
         rows.append({'date': ends[i].isoformat(), 'close': round(pe * ttm, 2), 'currency': 'USD', 'adjustment': 'unadjusted'})
     return rows
 
@@ -168,7 +171,18 @@ def test_multiple_outside_the_historical_range_fails():
     assert gate(result, 'valuation_reference_quality')['status'] == 'FAIL'
 
 
-def test_peer_multiples_need_three_peers():
+def test_future_split_does_not_invalidate_pre_split_price_eps_observations():
+    rows = quarter_end_prices() + [{'date': '2026-11-13', 'close': 150, 'currency': 'USD', 'adjustment': 'unadjusted'}]
+    data = with_imports(dell(price=None), import_file('prices', rows),
+                        import_file('splits', [{'date': '2026-11-10', 'ratio': 2}]))
+    result = engine.run(data)
+    ref = result['valuation']['references']['historical_pe']
+    assert ref['points']
+    assert all(p['date'] < '2026-11-10' for p in ref['points'])
+    assert result['market_data']['history_points'] >= 8
+
+
+def test_peer_labels_alone_do_not_establish_comparability():
     two = [{'peer': p, 'metric': 'pe_trailing', 'value': v, 'as_of': '2026-11-13'} for p, v in (('HPE', 11), ('SMCI', 14))]
     data = with_imports(dell(), import_file('peers', two))
     assert engine.run(data)['valuation']['references']['peers']['pe_trailing']['status'] == 'limited'
@@ -177,6 +191,8 @@ def test_peer_multiples_need_three_peers():
     result = engine.run(data)
     peer = next(r for r in result['valuation']['results'] if r['method'] == 'peer_relative')
     assert peer['status'] == 'available' and peer['value'] == 11
+    assert result['valuation']['references']['peers']['pe_trailing']['status'] == 'limited'
+    assert peer['limitations']
 
 
 def test_imported_consensus_is_never_compared_across_gaap_and_non_gaap():

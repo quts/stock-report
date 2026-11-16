@@ -131,8 +131,9 @@ def forecast_reliability_checks(engine):
             violations.append('修訂歷史資料混入時點回測')
     out.append(check('point_in_time_backtest_integrity', bt.get('method') == 'strict_point_in_time' and not violations,
                      'critical', '；'.join(violations) or '僅使用截止前已公布資料；修訂資料測試獨立且不計入樣本'))
-    counts = {m: bt.get('metrics', {}).get(m, {}).get('sample_size', 0) for m in METRICS}
-    enough = all(n >= MIN_SAMPLES and bt['metrics'][m]['coverage'] >= 0.8 for m,n in counts.items())
+    verified_metrics = bt.get('verified_metrics', {})
+    counts = {m: verified_metrics.get(m, {}).get('sample_size', 0) for m in METRICS}
+    enough = all(n >= MIN_SAMPLES and verified_metrics[m]['coverage'] >= 0.8 for m,n in counts.items())
     out.append(check('forecast_sample_sufficiency', enough, 'critical',
                      f'PIT 樣本（營收／營益／EPS／OCF／FCF）：{"／".join(str(n) for n in counts.values())}；'
                      f'門檻各 {MIN_SAMPLES}、覆蓋80% 僅為最低條件，不代表統計驗證'))

@@ -28,7 +28,7 @@ Base 必須 forecast_method=quarterly：使用同季去年季節性、近期趨�
 計算情境、證據支持的單季輸入與統計驗證分開；未驗證的前瞻財務輸出用兩位有效數字，保留原始精度於本機稽核。歷史／同業倍數不能把假設財務變成已驗證目標價。
 OCF 需現金流量表非現金調整與有符號營運資金現金變動完整勾稽；餘額變化不是現金流，working_capital_intensity 僅診斷，禁止外推 ocf_residual_intensity。資料不全則 OCF／FCF 留白，不自行補值。
 每個 driver 須有 source_period、forecast_period、accounting_basis、derivation；逐季推估的衍生數字不可標為直接 management_guidance。operating_invalidations 須以同 NTM 期間營收成長、營業利益率的反向門檻檢驗，leading_indicators 另列。
-backtest.metrics 只含嚴格時點樣本；revised_diagnostic 是修訂歷史資料測試，不得混入時點樣本。樣本、覆蓋或現金流勾稽不足時一律維持 hypothetical_sensitivity，不得稱為驗證預測。
+backtest.metrics 是依保留時點鐘篩選的評估；verified_metrics 才另核對申報目錄及各指標必要輸入。日期上界不是精確首次公開時刻；申報紀錄數不等於可評估樣本數。revised_diagnostic 是修訂歷史資料測試，不得混入時點樣本。樣本、覆蓋或現金流勾稽不足時一律維持 hypothetical_sensitivity，不得稱為驗證預測。
 沒填的 driver 會採用 forecast.drivers 的歷史錨點；歷史成長屬極端（status=extreme）時，必須以指引、共識或明確的 model_assumption 取代，不能直接外推。
 每個 driver 標明 basis（historical_fact 須落在歷史區間內；management_guidance／consensus 須引用對應證據，指引不得標為 consensus）。
 倍數：只有在 valuation.references 的歷史區間或同業資料為 sufficient 且倍數落在區間內時，才能標 historical_range／peer_median；否則標 model_assumption，結果是假設性敏感度，不得稱為目標價或合理價。EPS 與倍數不必同向。不得給機率，不得捏造共識。

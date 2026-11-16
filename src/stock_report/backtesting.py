@@ -1,11 +1,41 @@
-"""Rolling-origin, fixed 45-day reporting lag. No fallback from PIT into revised data."""
+"""Rolling-origin full-forecast backtest. No fallback from PIT into revised data.
+
+The origin cutoff rule is shared with the candidate retrospective (`origin_release`): the
+earliest preserved version of the origin quarter, used only when it precedes the end of the
+first target quarter. Every evaluated row carries the exact vintage of its origin version; the
+catalog-verified subset is scored separately. Each metric is also compared, on the very same
+rows and actuals, with simple same-metric baselines computed from the same point-in-time data.
+"""
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from statistics import mean
 from . import fin_series, fin_analysis, forecast
 from .policy import reportable
+from .error_metrics import summarize
 
 METRICS = ('revenue', 'operating_income', 'eps', 'operating_cash_flow', 'free_cash_flow')
 MIN_SAMPLES = 8  # A minimum disclosure floor, never a statistical validation criterion.
+# Same-metric naive baselines, computed only from data visible at the cutoff:
+#   ttm_carry_forward:  NTM = trailing four quarters at the origin (the seasonal-naive sum)
+#   latest_quarter_x4:  NTM = 4 x the origin quarter (the latest-level rule)
+BASELINE_RULES = ('ttm_carry_forward', 'latest_quarter_x4')
+
+
+def origin_release(data, entity_id, origin):
+    """Earliest preserved clock of the origin quarter's revenue, shared by both retrospectives."""
+    rows = [e for e in data.evidence if e.entity_id == entity_id and e.kind == 'financial'
+            and e.financial_metric == 'revenue' and e.statement_kind == 'fact' and e.value is not None
+            and e.period_end == origin and reportable(e, data.request)
+            and (e.publication_basis != 'observed_availability' or e.availability_observed_at is not None)]
+    if not rows:
+        return {'clock': None, 'evidence_id': None}
+    def available(e):
+        clocks = [e.published_at, e.event_time]
+        if e.publication_basis == 'observed_availability':
+            clocks.append(e.availability_observed_at)
+        return max(clocks)
+    first = min(rows, key=lambda e: (available(e), e.evidence_id))
+    return {'clock': available(first), 'evidence_id': first.evidence_id}
 
 
 def snapshot(data, origin, cutoff, revised=False):
@@ -42,18 +72,79 @@ def snapshot(data, origin, cutoff, revised=False):
                                    'evidence': [e.model_copy(update={'research_as_of': cutoff}) for e in selected]})
 
 
+def _metric_stats(valid):
+    relative = [v['error_percent'] for v in valid if v['error_percent'] is not None]
+    return {**summarize(valid),
+            'mape_percent': mean(abs(v) for v in relative) if relative else None,
+            'bias_percent': mean(relative) if relative else None,
+            'percentage_sample_size': len(relative)}
+
+
+def verified_metric_rows(rows):
+    """Mask unverified metrics without shrinking the original coverage denominator."""
+    result = []
+    for row in rows:
+        errors = {m: (v if row['origin_availability_verified'] and row['metric_input_verification'][m]['verified'] else
+                          {**v, 'predicted': None, 'error_percent': None, 'unavailable_reason': 'unverified_contributing_input'})
+                      for m, v in row['errors'].items()}
+        result.append({**row, 'errors': errors})
+    return result
+
+
 def scores(rows):
     out = {}
     for name in METRICS:
         valid = [r['errors'][name] for r in rows if r['errors'][name]['predicted'] is not None and r['errors'][name]['actual'] is not None]
-        relative = [v['error_percent'] for v in valid if v['error_percent'] is not None]
         out[name] = {'sample_size': len(valid), 'eligible_origins': len(rows),
-                     'coverage': len(valid) / len(rows) if rows else 0,
-                     'mae': mean(abs(v['predicted'] - v['actual']) for v in valid) if valid else None,
-                     'bias': mean(v['predicted'] - v['actual'] for v in valid) if valid else None,
-                     'mape_percent': mean(abs(v) for v in relative) if relative else None,
-                     'bias_percent': mean(relative) if relative else None,
-                     'percentage_sample_size': len(relative)}
+                     'coverage': len(valid) / len(rows) if rows else 0, **_metric_stats(valid)}
+    return out
+
+
+def baseline_comparison(rows):
+    """Forecast versus each same-metric baseline on identical rows and actuals (matched pairs)."""
+    out = {}
+    for name in METRICS:
+        out[name] = {}
+        for rule in BASELINE_RULES:
+            pairs = []
+            for r in rows:
+                f, b = r['errors'][name], (r.get('baselines') or {}).get(rule, {}).get(name)
+                if f['predicted'] is None or f['actual'] is None or not b or b['predicted'] is None:
+                    continue
+                pairs.append((f, {**b, 'actual': f['actual'],
+                                  'error_percent': (b['predicted'] - f['actual']) / abs(f['actual']) * 100 if f['actual'] else None}))
+            available = sum(1 for r in rows if ((r.get('baselines') or {}).get(rule, {}).get(name) or {}).get('predicted') is not None)
+            fs, bs = _metric_stats([p[0] for p in pairs]), _metric_stats([p[1] for p in pairs])
+            diffs = [abs(b['error_percent']) - abs(f['error_percent']) for f, b in pairs
+                     if f['error_percent'] is not None and b['error_percent'] is not None]
+            out[name][rule] = {'matched_samples': len(pairs), 'baseline_available_rows': available,
+                               'forecast': fs, 'baseline': bs,
+                               'mae_skill': 1 - fs['mae'] / bs['mae'] if bs['mae'] else None,
+                               'wape_improvement_pp': bs['wape_percent'] - fs['wape_percent'] if bs['wape_percent'] is not None else None,
+                               'mape_improvement_pp': (bs['mape_percent'] - fs['mape_percent'])
+                               if fs['mape_percent'] is not None and bs['mape_percent'] is not None else None,
+                               'forecast_lower_error': sum(d > 0 for d in diffs),
+                               'baseline_lower_error': sum(d < 0 for d in diffs)}
+    return out
+
+
+def _baselines(series, origin):
+    """NTM baselines per metric from the point-in-time series only; none when the origin is not visible."""
+    out = {rule: {} for rule in BASELINE_RULES}
+    for metric in METRICS:
+        source = 'diluted_eps' if metric == 'eps' else metric
+        if metric == 'free_cash_flow':
+            ocf, capex = fin_series.ttm(series, 'operating_cash_flow'), fin_series.ttm(series, 'capital_expenditure')
+            ok = ocf and capex and ocf['end'] == capex['end'] == origin and ocf['start'] == capex['start']
+            out['ttm_carry_forward'][metric] = {'predicted': ocf['value'] - capex['value'] if ok else None}
+            q = {m: (series['quarters'].get(m) or [None])[-1] for m in ('operating_cash_flow', 'capital_expenditure')}
+            okq = all(p and p['end'] == origin for p in q.values())
+            out['latest_quarter_x4'][metric] = {'predicted': 4 * (q['operating_cash_flow']['value'] - q['capital_expenditure']['value']) if okq else None}
+            continue
+        t = fin_series.ttm(series, source)
+        out['ttm_carry_forward'][metric] = {'predicted': t['value'] if t and t['end'] == origin else None}
+        last = (series['quarters'].get(source) or [None])[-1]
+        out['latest_quarter_x4'][metric] = {'predicted': 4 * last['value'] if last and last['end'] == origin else None}
     return out
 
 
@@ -84,7 +175,10 @@ def initialization_diagnostics(data, observed, full, series, origin, anchor):
             'legacy_initialization_limitation': 'previous_policy_required_two_comparable_YoY_pairs_and_operating_margin_even_for_revenue'}
 
 
-def rolling_origin(data, entity_id, include_revised=True):
+def rolling_origin(data, entity_id, include_revised=True, dataset=None):
+    from .retrospective import filing_dataset
+    dataset = dataset or filing_dataset(data, entity_id)
+    by_id = {r['evidence_id']: r for r in dataset['rows']}
     full = fin_series.build(data, entity_id)
     revenue = full['quarters'].get('revenue', [])
     rows, revised_rows = [], []
@@ -92,10 +186,9 @@ def rolling_origin(data, entity_id, include_revised=True):
         origin = revenue[i]['end']
         scheduled = datetime.combine(origin + timedelta(days=45), datetime.min.time(), timezone.utc)
         target = revenue[i+1:i+5]
-        publications = [max(e.published_at, e.event_time) for e in data.evidence if e.entity_id == entity_id
-                        and e.financial_metric == 'revenue' and e.statement_kind == 'fact'
-                        and e.period_end == origin and reportable(e, data.request)]
-        first_publication = min(publications) if publications else None
+        rel = origin_release(data, entity_id, origin)
+        first_publication = rel['clock']
+        origin_row = by_id.get(rel['evidence_id']) or {}
         timely_origin = first_publication is not None and first_publication.date() < target[0]['end']
         cutoff = first_publication + timedelta(microseconds=1) if timely_origin else scheduled
         if cutoff >= data.request.research_as_of or not fin_series.contiguous_tail(target, 4):
@@ -132,20 +225,62 @@ def rolling_origin(data, entity_id, include_revised=True):
                                   'unavailable_reason': ('target_actual_missing' if value is None else
                                                         'calendar_mismatch' if pred and not aligned else
                                                         'forecast_input_missing_or_unreconciled' if estimate is None else None)}
+            used_ids = [e.evidence_id for e in observed.evidence if e.kind == 'financial']
+            dependencies = {'revenue': (),
+                            'operating_income': ('operating_margin',),
+                            'eps': ('operating_margin', 'non_operating_ratio', 'tax_rate', 'share_change'),
+                            'operating_cash_flow': tuple(a['drivers']), 'free_cash_flow': tuple(a['drivers'])}
+            verified_inputs = {}
+            for metric, names in dependencies.items():
+                ids = {i for name in names for i in a['drivers'].get(name, {}).get('evidence_ids', [])}
+                ids.update((a['base'].get('revenue_ttm') or {}).get('evidence_ids', []))
+                ids.update(i for q in projected for i in q.get('revenue_origin', {}).get('evidence_ids', []))
+                missing = [name for name in names if a['drivers'].get(name, {}).get('value') is None]
+                if a['base'].get('revenue_ttm') is None:
+                    missing.append('four_quarter_revenue_base')
+                verified_inputs[metric] = {'evidence_ids': sorted(ids), 'missing_features': missing,
+                                          'verified': not missing and bool(ids) and all(
+                    by_id.get(i, {}).get('availability_verified', False) for i in ids)}
             dest.append({'origin': origin, 'information_cutoff': cutoff.isoformat(), 'target_start': target[0]['start'],
                          'target_end': end, 'vintage_status': 'revised_diagnostic' if revised else 'strict_point_in_time',
                          'cutoff_basis': 'first_preserved_origin_publication' if timely_origin else 'scheduled_diagnostic_no_original_vintage',
                          'first_preserved_publication': first_publication, 'diagnostics': diagnostic,
+                         'origin_evidence_id': rel['evidence_id'], 'origin_vintage': origin_row.get('vintage'),
+                         'origin_availability_verified': bool(timely_origin and origin_row.get('availability_verified')),
+                         'metric_input_verification': verified_inputs,
+                         'input_vintage_counts': dict(Counter(by_id[i]['vintage'] for i in used_ids if i in by_id)),
                          'training_evidence_ids': [e.evidence_id for e in observed.evidence],
                          'max_input_published_at': max((e.published_at for e in observed.evidence), default=None),
-                         'max_input_event_time': max((e.event_time for e in observed.evidence), default=None), 'errors': errors})
+                         'max_input_event_time': max((e.event_time for e in observed.evidence), default=None), 'errors': errors,
+                         'baselines': _baselines(series, origin)})
     metrics = scores(rows)
-    from collections import Counter
+    verified_rows = verified_metric_rows(rows)
     root_counts = Counter(reason for row in rows for reason in row['diagnostics']['root_causes'])
+    funnel = {'catalog_status': dataset['catalog']['status'], 'catalog_entries': dataset['catalog'].get('entries', 0),
+              'financial_periods': len(revenue), 'origins_with_four_target_quarters': len(rows),
+              'timely_origins': sum(r['cutoff_basis'] == 'first_preserved_origin_publication' for r in rows),
+              'initialized_predictions': {m: sum(r['errors'][m]['predicted'] is not None for r in rows) for m in METRICS},
+              'catalog_verified_origins': sum(r['origin_availability_verified'] for r in rows),
+              'catalog_verified_original_origins': sum(r['origin_availability_verified'] and
+                                                       r['origin_vintage'] == 'verified_original' for r in rows),
+              'verified_feature_origins': {m: sum(r['origin_availability_verified'] and
+                  r['metric_input_verification'][m]['verified'] for r in rows) for m in METRICS},
+              'forecast_eligible_origins': {m: sum(r['origin_availability_verified'] and
+                  r['metric_input_verification'][m]['verified'] and r['errors'][m]['predicted'] is not None
+                  for r in rows) for m in METRICS},
+              'verified_evaluated_samples': {m: scores(verified_rows)[m]['sample_size'] for m in METRICS},
+              'note': 'Catalog entries, financial periods, initialized predictions and verified evaluated samples are different counts.'}
     return {'status': 'insufficient', 'method': 'strict_point_in_time', 'reporting_lag_days': 45,
+            'horizon_basis': 'four_fiscal_quarters_after_last_reported_period; legacy_ntm_keys_are_F4Q',
             'root_cause_counts': dict(root_counts),
-            'cutoff_policy': 'first_preserved_origin_filing_publication; scheduled45_only_for_unavailable_vintage_diagnostics',
+            'cutoff_policy': 'first_preserved_origin_filing_publication (shared origin_release rule); scheduled45_only_for_unavailable_vintage_diagnostics',
             'fcf_test_count': metrics['free_cash_flow']['sample_size'], 'rows': rows, 'metrics': metrics,
+            'verified_metrics': scores(verified_rows), 'funnel': funnel,
+            'origin_vintage_counts': dict(Counter(r['origin_vintage'] or 'absent' for r in rows)),
+            'baseline_comparison': baseline_comparison(rows),
+            'verified_baseline_comparison': baseline_comparison(verified_rows),
+            'baseline_rules': {'ttm_carry_forward': 'NTM = trailing four quarters visible at the cutoff',
+                               'latest_quarter_x4': 'NTM = 4 x origin quarter visible at the cutoff'},
             'revised_diagnostic': {'method': 'revised_historical_data_not_point_in_time',
                                    'rows': revised_rows, 'metrics': scores(revised_rows)},
             'reliability': 'not_validated', 'minimum_sample_floor': MIN_SAMPLES,

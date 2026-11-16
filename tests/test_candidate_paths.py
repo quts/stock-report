@@ -105,11 +105,19 @@ def test_without_point_in_time_evidence_base_is_only_a_reference():
     assert hierarchy_checks(r)[0]['status'] == 'FAIL'
 
 
-def pit_eval(candidate_mape, baseline_mape, samples, method='raw_rule', integrity='pass', coverage=1.0):
+def pit_eval(candidate_mape, baseline_mape, samples, method='raw_rule', integrity='pass', coverage=1.0, verified=True):
     pair = {'drift': {b: {'method': method, 'matched_ntm_samples': samples, 'ntm_coverage': coverage,
                           'candidate_ntm_mape': candidate_mape, 'baseline_ntm_mape': baseline_mape}
                       for b in candidates.BASELINES}}
-    return {'point_in_time': {'integrity': {'status': integrity}, 'pairwise_by_method': {method: pair}}}
+    return {'point_in_time': {'integrity': {'status': integrity}, 'pairwise_by_method': {method: pair},
+                              'verified_pairwise_by_method': {method: pair} if verified else {}}}
+
+
+def test_preserved_clock_samples_without_catalog_verification_never_promote():
+    a = anchor_for(dell(drop=['dell-guidance-rev']), 'DELL')
+    built = candidates.select(candidates.build(a), pit_eval(5, 10, 50, verified=False), 8)
+    assert built['selected'] is None
+    assert 'origin_vintages_not_catalog_verified' in built['candidates']['drift']['promotion_check']['failed_prerequisites']
 
 
 def test_sample_count_and_lower_mape_alone_never_promote_a_path():

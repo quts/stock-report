@@ -122,6 +122,15 @@ def parser():
     act.add_argument('--instruments', '--target-config', dest='instruments', type=Path, default=None,
                      help='Target configuration; defaults to config/tw-instruments.json for a Taiwan target '
                           'and config/sec-entities.json for a SEC target')
+    cat = sub.add_parser('filing-catalog', help='Verify cited SEC accessions against reviewed SEC indexes; metadata only')
+    cat.add_argument('--input', required=True, type=Path, help='Reviewed research_input.json whose cited accessions are verified')
+    cat.add_argument('--output', required=True, type=Path, help='New research input carrying the catalog (input is not modified)')
+    cat.add_argument('--catalog-output', required=True, type=Path, help='Normalized catalog audit file')
+    cat.add_argument('--allow-network', action='store_true', help='Required; no fixture fallback')
+    cat.add_argument('--license-registry', type=Path, default=None)
+    cat.add_argument('--sec-contact', help=f'Prefer the {SEC_CONTACT_ENV} environment variable; never logged or stored')
+    cat.add_argument('--retries', type=int, default=1)
+    cat.add_argument('--interval', type=float, default=1.0)
     schema = sub.add_parser('schema')
     sub.add_parser('doctor', help='Read-only readiness and recorded validation status; no network')
     schema.add_argument('--output', required=True, type=Path)
@@ -178,6 +187,36 @@ def main(argv=None):
                       'research_as_of': 'not applied; supply the cutoff with request-template or bundle',
                       'persistence_blockers': persistence_blockers(collection),
                       'warnings': ['採集本身不建立任何內部使用或留存權限'] + collection.notes}
+        elif args.command == 'filing-catalog':
+            from . import filing_catalog
+            from .collect import user_agent_for
+            from .providers import HTTPClient
+            if args.output.exists() or args.catalog_output.exists():
+                raise ValueError('Catalog outputs must be new immutable files')
+            if not args.allow_network:
+                raise ValueError('Filing catalog verification requires --allow-network; no fixture fallback')
+            if args.interval < 1.0:
+                raise ValueError('SEC requests stay at or below one request per second')
+            source = read_json(args.input)
+            checked = ResearchInput.model_validate(source)
+            if checked.dataset_kind != 'real' or checked.request.mode != 'stock':
+                raise ValueError('Catalog verification applies to a real stock research input')
+            client = HTTPClient(user_agent_for(filing_catalog.SUBMISSIONS, None, args.sec_contact),
+                                retries=args.retries, interval=args.interval)
+            catalog = filing_catalog.build(checked.request.ticker, source, registry=load_registry(args.license_registry),
+                                           client=client, as_of=checked.request.research_as_of)
+            from .models import FilingCatalog
+            write_json(args.catalog_output, FilingCatalog.model_validate(catalog))
+            updated = ResearchInput.model_validate(filing_catalog.attach(source, read_json(args.catalog_output)))
+            write_json(args.output, updated)
+            result = {'status': 'cataloged', 'entity_id': catalog['entity_id'], 'entries': len(catalog['entries']),
+                      'cited_accessions': catalog['cited_accessions'],
+                      'cited_accessions_cataloged': catalog['cited_accessions_cataloged'],
+                      'uncataloged': len(catalog['cited_accessions_uncataloged']),
+                      'header_lookups': {s: sum(h['status'] == s for h in catalog['header_lookups'])
+                                         for s in sorted({h['status'] for h in catalog['header_lookups']})},
+                      'catalog_path': str(args.catalog_output), 'research_input_path': str(args.output),
+                      'retention': catalog['retention']}
         elif args.command == 'bundle':
             request = Request.model_validate(read_json(args.request))
             collections = [load_collection(path) for path in args.collection]

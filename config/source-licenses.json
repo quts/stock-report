@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
-  "registry_version": "0.6.2",
-  "updated_at": "2026-11-15T08:51:32.926018+00:00",
+  "registry_version": "0.6.4",
+  "updated_at": "2026-11-16T14:07:30+00:00",
   "policy": "Lawful, free access for personal non-distributed use only. Under the user's 2026-11-15 authorization, a sufficient AI review of official source, identity, time, terms and free access may confirm a specific source. Human attestations remain separately recorded. Unknown or restricted sources stay closed. Accessibility alone is not permission; no sharing, paid API, raw response or response hash retention is enabled by AI review.",
   "sources": [
     {
@@ -749,6 +749,103 @@
         ]
       },
       "notes": "僅為來源登錄候選，未修改config。啟用前須activation-check，通過後提升registry_version並重新採集；unknown期間的舊採集不能沿用新權限。媒體摘要仍是secondary敘述，不能自動變成公司已驗證事實或市場共識。"
+    },
+    {
+      "source_id": "twse-opendata-bwibbu-d-csv",
+      "publisher": "臺灣證券交易所",
+      "source_class": "official",
+      "attribution": "金融監督管理委員會證券期貨局／臺灣證券交易所，2026，盤後資訊 > 個股日本益比、殖利率及股價淨值比（依日期查詢）（11764）；依政府資料開放授權條款第1版釋出：https://data.gov.tw/license。原機關未推薦本研究。",
+      "endpoint_scope": "https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU_d?response=open_data",
+      "terms_url": "https://data.gov.tw/license",
+      "declared_status": "confirmed",
+      "scope": {
+        "internal_use_allowed": true,
+        "pdf_share_allowed": false,
+        "store_response_hash": false,
+        "store_raw_response": false
+      },
+      "terms_evidence": [
+        {
+          "terms_url": "https://data.gov.tw/license",
+          "checked_at": "2026-11-16T14:07:00+00:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code (Opus 5.5)",
+          "excerpt": "各機關所提供之開放資料，授權使用者不限目的、時間及地域、非專屬、不可撤回、免授權金進行利用，利用之方式包括重製、散布、公開傳輸、公開播送、公開口述、公開上映、公開演出、編輯、改作",
+          "excerpt_covers": "政府資料開放授權條款第1版第二條第一款；第三條第二款要求依附件顯名，未顯名視為自始未取得授權。"
+        },
+        {
+          "terms_url": "https://www.twse.com.tw/zh/page/terms/use.html",
+          "checked_at": "2026-11-16T14:07:00+00:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code (Opus 5.5)",
+          "excerpt": "但臺灣證券交易所已授權「政府資料開放平臺」提供公眾使用之本網站資料，不在此限。",
+          "excerpt_covers": "TWSE 網站條款第八條對政府資料開放平臺授權資料的例外；同條款第六條禁止未經同意以自動程式下載其他網站資料。例外僅及於資料集登錄之資源，不及於加上 date 參數的其他查詢。"
+        },
+        {
+          "terms_url": "https://data.gov.tw/api/v2/rest/dataset/11764",
+          "checked_at": "2026-11-16T14:02:26+00:00",
+          "checked_by": "assistant",
+          "checker": "Claude Code (Opus 5.5)",
+          "excerpt": "resourceDownloadUrl: https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU_d?response=open_data",
+          "excerpt_covers": "Official government dataset binds the exact CSV resource; licence evidence is retained separately."
+        }
+      ],
+      "attested_by": null,
+      "attested_at": null,
+      "source_review": {
+        "reviewed_by": "assistant",
+        "reviewer": "Claude Code (Opus 5.5)",
+        "reviewed_at": "2026-11-16T14:07:30+00:00",
+        "authorization": "使用者於2026-11-15明示由AI查核，證據充分才啟用；最低合法免費、僅自用不散布；見AGENTS.md",
+        "reviewed_endpoint_scope": "https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU_d?response=open_data",
+        "use_basis": "personal_non_distributed",
+        "verdict": "sufficient",
+        "unresolved": [],
+        "findings": [
+          {
+            "aspect": "official_source",
+            "official_url": "https://data.gov.tw/api/v2/rest/dataset/11764",
+            "checked_at": "2026-11-16T14:02:26+00:00",
+            "excerpt": "resourceDownloadUrl: https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU_d?response=open_data",
+            "conclusion": "政府資料平臺資料集11764（識別碼A45020000D-000302，臺灣證券交易所）登錄的資源網址即本 endpoint_scope，未登錄任何請求參數；本次CSV表頭9欄與登錄欄位逐一相同。"
+          },
+          {
+            "aspect": "identity",
+            "official_url": "https://investor.tsmc.com/sites/ir/sec-filings/2025_20F%20Report.pdf",
+            "checked_at": "2026-11-15T06:33:06+00:00",
+            "excerpt": "The principal trading market for our common shares is the Taiwan Stock Exchange.",
+            "conclusion": "沿用既有 twse-openapi-stock-day-all 的身份查核（20-F Item 9 普通股代號2330）。本次CSV中2330唯一一列。僅涵蓋2330；同業代號須另行逐檔查核身份。"
+          },
+          {
+            "aspect": "publication_time",
+            "official_url": "https://data.gov.tw/api/v2/rest/dataset/11764",
+            "checked_at": "2026-11-16T14:02:26+00:00",
+            "excerpt": "updateFrequency: Frequency 1, unittime 日",
+            "conclusion": "每日更新，未宣告發布時刻。2026-11-16T14:03Z（台北22:03）CSV為20261116，同時OpenAPI JSON仍為20261113。僅能以回應完成時間作observed_availability上界，只支援晚於採集的研究截止，不回填歷史。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://data.gov.tw/license",
+            "checked_at": "2026-11-16T14:07:00+00:00",
+            "excerpt": "各機關所提供之開放資料，授權使用者不限目的、時間及地域、非專屬、不可撤回、免授權金進行利用，利用之方式包括重製、散布、公開傳輸、公開播送、公開口述、公開上映、公開演出、編輯、改作",
+            "conclusion": "資料集11764 license=1（政府資料開放授權條款第1版），notes『授權說明網址: http://data.gov.tw/license』。允許程式化重製與改作；須顯名。限本資料集登錄資源。"
+          },
+          {
+            "aspect": "terms_of_use",
+            "official_url": "https://www.twse.com.tw/zh/page/terms/use.html",
+            "checked_at": "2026-11-16T14:07:00+00:00",
+            "excerpt": "但臺灣證券交易所已授權「政府資料開放平臺」提供公眾使用之本網站資料，不在此限。",
+            "conclusion": "TWSE自身條款對政府資料平臺授權資料設例外，解除第六條自動下載限制對本登錄資源的適用；加日期參數的歷史查詢不是登錄資源，仍受禁止。"
+          },
+          {
+            "aspect": "free_access",
+            "official_url": "https://data.gov.tw/api/v2/rest/dataset/11764",
+            "checked_at": "2026-11-16T14:02:26+00:00",
+            "excerpt": "cost: free",
+            "conclusion": "官方計費欄位為免費；本次直接取得，無API Key、登入或付費。"
+          }
+        ]
+      }
     }
   ]
 }

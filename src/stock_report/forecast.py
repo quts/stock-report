@@ -6,7 +6,7 @@ net income + D&A + other noncash adjustments + signed working-capital cash movem
 Every driver carries its origin. Drivers the proposal leaves out fall back to the deterministic
 historical anchor; anchors that cannot be measured are reported, never invented.
 """
-from datetime import timedelta
+from datetime import date, timedelta
 from statistics import median
 from .fin_series import ttm, year_ago
 
@@ -107,14 +107,26 @@ def anchors(series, analysis):
     if rev:
         windows = quarter_windows(series)
         start, end = (windows[0]['start'], windows[-1]['end']) if windows else (rev['end'] + timedelta(days=1), rev['end'] + timedelta(days=365))
-        horizon = {'start': start.isoformat(), 'end': end.isoformat(), 'label': f'NTM {start.isoformat()}~{end.isoformat()}'}
+        as_of = series.get('research_as_of')
+        day = as_of.date() if as_of else None
+        unreported = [{'start': w['start'].isoformat(), 'end': w['end'].isoformat()}
+                      for w in windows if day and w['end'] < day]
+        horizon = {'start': start.isoformat(), 'end': end.isoformat(),
+                   'label': f'F4Q {start.isoformat()}~{end.isoformat()}',
+                   'basis': 'four_fiscal_quarters_after_last_reported_period',
+                   'as_of_ntm_start': day.isoformat() if day else None,
+                   'as_of_ntm_end': (day.replace(year=day.year + 1, day=28) if day and day.month == 2 and day.day == 29
+                                     else day.replace(year=day.year + 1)).isoformat() if day else None,
+                   'completed_unreported_quarters': unreported,
+                   'as_of_ntm_computed': False,
+                   'note': 'F4Q 為最後已報期後四個財季，並非研究截止日起十二個月；已結束未報季度仍為估計，不按日比例換算 NTM。'}
     return {'drivers': out, 'ranges': ranges, 'base': base, 'notes': notes, 'horizon': horizon,
             'reconciliation': reconciliation, 'balance_sheet_proxy': proxy, 'series': series,
             'reliability': 'hypothetical_sensitivity'}
 
 
 def quarter_windows(series):
-    """Calendar quarters or an explicitly assumed 52-week fiscal calendar, never a 365-day stub."""
+    """Calendar quarters, DELL's public 52/53-week rule, or an explicit 52-week assumption."""
     from .fin_series import contiguous_tail
     past = contiguous_tail(series['quarters'].get('revenue', []), 4)
     if not past:
@@ -128,6 +140,21 @@ def quarter_windows(series):
         except ValueError:
             return d.replace(year=d.year + 1, day=28)
     first = past[-1]['end'] + timedelta(days=1)
+    if weekly and series.get('entity_id') == 'DELL':
+        # The public fiscal rule predates every initialized DELL evaluation origin.
+        # https://www.sec.gov/Archives/edgar/data/1574135/000104746918002061/a2234898zs-1.htm
+        # No future observations or realized target dates are used to construct windows.
+        def year_end(year):
+            anchor = date(year, 1, 31)
+            return anchor + timedelta(days=(4 - anchor.weekday() + 3) % 7 - 3)
+        boundaries = []
+        for year in range(first.year - 1, first.year + 3):
+            previous, end = year_end(year - 1), year_end(year)
+            boundaries.extend([previous + timedelta(weeks=13 * q) for q in (1, 2, 3)] + [end])
+        ends = sorted(d for d in boundaries if d >= first)[:4]
+        starts = [first] + [d + timedelta(days=1) for d in ends[:-1]]
+        return [{'start': s, 'end': e, 'prior': p, 'calendar_basis': 'issuer_52_53_week_friday_nearest_january_31'}
+                for s, e, p in zip(starts, ends, past)]
     return [{'start': first + timedelta(days=91*i) if weekly else next_year(p['start']),
              'end': first + timedelta(days=91*(i+1)-1) if weekly else next_year(p['end']), 'prior': p,
              'calendar_basis': '52_week_model_assumption' if weekly else 'calendar_year'} for i,p in enumerate(past)]
@@ -333,9 +360,9 @@ def balance_proxy(series, analysis=None):
             'limitation': '僅淨利、折舊攤銷及應收／存貨／應付餘額變化；其他非現金、遞延稅、融資應收等缺逐項證據，殘差未解釋。延用殘差比率是模型假設。'}
 
 
-def backtest(data, entity_id):
+def backtest(data, entity_id, dataset=None):
     from .backtesting import rolling_origin
-    return rolling_origin(data, entity_id)
+    return rolling_origin(data, entity_id, dataset=dataset)
 
 
 def calibration(anchor):

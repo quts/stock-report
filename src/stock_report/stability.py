@@ -71,6 +71,30 @@ def _guidance_for(data, entity_id, fx_rate, fx_ids):
     return guidance, fx
 
 
+def summarize(tests):
+    """Quantified, same-period sensitivity per rule; no rule is chosen from these numbers."""
+    windows = {}
+    for key, v in (tests.get('training_windows') or {}).get('variants', {}).items():
+        name = key.split('@')[0]
+        if v.get('growth_change_pp') is not None:
+            windows.setdefault(name, []).append((abs(v['growth_change_pp']), key, v['growth_change_pp']))
+    window_rows = {n: {'variants': len(r), 'max_abs_growth_change_pp': max(r)[0], 'max_variant': max(r)[1],
+                       'signed_changes_pp': {k: c for _, k, c in sorted(r, key=lambda x: x[1])},
+                       'material': max(r)[0] >= MATERIAL_GROWTH_PP} for n, r in windows.items()}
+    exceptional = tests.get('normalize_exceptional_quarter') or {}
+    ex_rows = {n: {'growth_change_pp': r.get('growth_change_pp'), 'eps_change_percent': r.get('eps_change_percent'),
+                   'material': r.get('material')}
+               for n, r in (exceptional.get('candidates') or {}).items()}
+    return {'training_window_sensitivity': window_rows,
+            'exceptional_quarter': {'normalized_quarter': (exceptional.get('normalized_quarter') or {}).get('end'),
+                                    'sequential_growth_percent': (exceptional.get('normalized_quarter') or {}).get('sequential_growth_percent'),
+                                    'replacement_growth_percent': (exceptional.get('normalized_quarter') or {}).get('replacement_growth_percent'),
+                                    'by_candidate': ex_rows,
+                                    'material_candidates': sorted(n for n, r in ex_rows.items() if r['material'])},
+            'out_of_sample_window_errors': 'see retrospective.point_in_time.window_sensitivity (identical keys, descriptive only)',
+            'selection': 'none: the most optimistic, pessimistic or smoothest variant is never selected'}
+
+
 def assess(data, entity_id, guidance=(), fx_rate=None, fx_evidence_ids=()):
     anchor = _anchor(data, entity_id)
     baseline = _paths(anchor, guidance, fx_rate)
@@ -165,6 +189,7 @@ def assess(data, entity_id, guidance=(), fx_rate=None, fx_evidence_ids=()):
     material = sorted(k for k, t in tests.items() if t.get('material_candidates') or
                       any(v.get('material') for v in t.get('variants', {}).values()))
     return {'status': 'computed', 'baseline': baseline, 'tests': tests, 'material_tests': material,
+            'summary': summarize(tests),
             'thresholds': {'eps_percent': MATERIAL_EPS_PERCENT, 'growth_pp': MATERIAL_GROWTH_PP,
                            'purpose': 'review flags only; never a cap, decay or target'},
             'limitation': '穩定性檢查只顯示規則對單一輸入的敏感度，不是信賴區間或預測能力證明。'}

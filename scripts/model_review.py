@@ -20,13 +20,17 @@ from stock_report import engine
 from stock_report.forecast_attribution import change_report
 from stock_report.models import Proposal, Request, ResearchInput
 from stock_report.pipeline import prepare, finalize
-from stock_report.storage import read_json, write_json
+from stock_report.storage import digest, read_json, write_json
 from pypdf import PdfReader
 
-SOURCES = [Path('reports/tsmc-2330-20261115/forecast-normalized-20261116/runs/abf01038ff114ab0bef3a985d4a5d302'),
-           Path('reports/dell-v2-20261115/forecast-normalized-20261116/runs/a4f21b15dda6452e8f77c2058163a859')]
-OUTPUT = 'candidate-paths-reviewed-20261116'
+# Latest final runs (candidate paths over reviewed full inputs). Their reviewed inputs plus a
+# reviewed SEC filing catalog (metadata only) are regenerated into fresh runs; baselines are never
+# overwritten. Private local paths: reports/ is ignored by Git.
+SOURCES = [Path('reports/tsmc-2330-20261115/candidate-paths-reviewed-20261116/runs/8a8f4ff79dbd48029c032c94b21dc68b'),
+           Path('reports/dell-v2-20261115/candidate-paths-reviewed-20261116/runs/7ea2d8d717e94cf1babcd64d4e33fbca')]
+OUTPUT = 'pit-catalog-reviewed-20261116'
 MAX_PAGES = 7  # The prior final reports were 7 pages; no expansion is accepted.
+VALUATION_AUDIT = Path('reports/valuation-source-review-20261116/audit.json')
 CONTRACT = ('research_input.json', 'context.json', 'proposal.schema.json', 'analysis-instructions.txt')
 # Scenario revenue rules: the reference keeps the prior level policy; Bear and Bull take the
 # lowest and the highest-momentum baseline-family rules, not a tuned growth number.
@@ -69,13 +73,26 @@ def do_prepare(reviewed_inputs=None):
         checked = ResearchInput.model_validate(selected)
         if checked.request != Request.model_validate(original['request']) or checked.dataset_kind != 'real':
             raise SystemExit('Reviewed input must preserve the baseline request, cutoff and real-data classification')
+        # Evidence must be the baseline's own reviewed evidence: only metadata (the filing catalog)
+        # may be added, so no stale predecessor input or new values slip in silently.
+        same_evidence = digest(original['evidence']) == digest(selected['evidence'])
+        selected_by_id = {e['evidence_id']: e for e in selected['evidence']}
+        if any(selected_by_id.get(e['evidence_id']) != e for e in original['evidence']):
+            raise SystemExit('Reviewed input must preserve every baseline evidence record unchanged')
         root = source.parent.parent.parent / OUTPUT
         result = prepare(checked.request, root / 'runs', selected)
         run = Path(result['research_input_path']).parent
         write_json(run / 'contract-review.json', contract_hashes(run))
+        catalog = checked.filing_catalog
         write_json(run / 'data-review.json', {
             'baseline': str(source), 'reviewed_input': str(reviewed_inputs[i]) if reviewed_inputs else None,
             'baseline_evidence_count': len(original['evidence']), 'reviewed_evidence_count': len(checked.evidence),
+            'evidence_identical_to_baseline': same_evidence,
+            'filing_catalog': None if catalog is None else {
+                'entries': len(catalog.entries), 'cited_accessions': catalog.cited_accessions,
+                'cited_accessions_cataloged': catalog.cited_accessions_cataloged,
+                'uncataloged': catalog.cited_accessions_uncataloged, 'retrieved_at': catalog.retrieved_at.isoformat(),
+                'sources': catalog.sources, 'retention': catalog.retention},
             'request_unchanged': True, 'permissions_changed': False,
             'input_sha256': hashlib.sha256((run / 'research_input.json').read_bytes()).hexdigest()})
         pending[str(source)] = str(run)
@@ -256,6 +273,29 @@ def do_finalize(qa):
         assert manifest['distribution'] == 'personal_use_only' and 'forecast_qa.json' in manifest['hashes']
         assert manifest['pdf_pages'] <= MAX_PAGES, f'{run}: {manifest["pdf_pages"]} pages exceeds the prior {MAX_PAGES}-page report'
         write_json(run / 'version_attribution.json', engine.jsonable(attribution(source, run)))
+        bt = inv['forecast']['backtest']
+        pit = inv['retrospective']['point_in_time']
+        previous = read_json(source / 'investment.json')
+        summary = {'run': str(run), 'cutoff': read_json(run / 'research_input.json')['request']['research_as_of'],
+                   'previous_run': str(source), 'previous_metrics': previous['forecast']['backtest']['metrics'],
+                   'previous_sample_classification': 'preserved-clock evaluation without accession catalog verification',
+                   'cashflow_reconciliation': {k: inv['forecast']['reconciliation'].get(k) for k in
+                                              ('status', 'actual_ocf', 'residual', 'residual_percent_ocf', 'missing_components')},
+                   'previous_ocf_residual': previous['forecast']['reconciliation'].get('residual'),
+                   'full_forecast_funnel': bt['funnel'], 'verified_metrics': bt['verified_metrics'],
+                   'matched_baselines': bt['verified_baseline_comparison'],
+                   'candidate_funnel': pit['funnel'],
+                   'candidate_scores': {m: {n: v['ntm'] for n, v in s['per_candidate'].items()}
+                                        for m, s in pit['verified_scores_by_method'].items()},
+                   'cashflow_drivers': {k: inv['cashflow_drivers'][k] for k in
+                                       ('independent_windows', 'reconciled_windows', 'drivers', 'blockers', 'forecast_ocf_fcf_enabled')},
+                   'market_data_dependencies': inv['market_data']['dependencies'],
+                   'limitations': ['Overlapping NTM windows are not independent samples.',
+                                   'Catalog acceptance is not an exact first-public-availability timestamp.',
+                                   'Target actuals use the latest reviewed version; training uses historical vintages.']}
+        write_json(run / 'validation_summary.json', summary)
+        print(json.dumps({'validation': {'funnel': bt['funnel'], 'metrics': bt['verified_metrics'],
+                                         'candidate_funnel': pit['funnel']}}, default=str))
         if qa:
             subprocess.run([sys.executable, 'scripts/qa_pdf.py', '--report', str(run / 'report.pdf'),
                             '--output', str(run / 'visual-qa')], check=True)
