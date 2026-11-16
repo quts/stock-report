@@ -40,7 +40,9 @@ def prices(data, entity):
     config = read_json('config/market-data-providers.json')['exchanges'].get(entity.exchange, {})
     priority = config.get('latest_close', [])
     quotes = [e for e in data.evidence if e.entity_id == entity.entity_id and e.kind == 'price'
-              and e.metric_key == 'close' and reportable(e, data.request)]
+              and e.metric_key == 'close' and reportable(e, data.request)
+              and (e.publication_basis != 'observed_availability' or
+                   e.availability_observed_at is not None and e.availability_observed_at <= data.request.research_as_of)]
     bad = [e.evidence_id for e in quotes if not e.value or e.value <= 0 or e.currency != entity.currency]
     quotes = [e for e in quotes if e.evidence_id not in bad]
     by_day = defaultdict(list)
@@ -63,6 +65,9 @@ def prices(data, entity):
             if split_day > day:
                 factor *= ratio
         points.append({'date': day, 'close': chosen.value, 'adjusted_close': chosen.value / factor,
+                       'available_at': max(chosen.published_at, chosen.event_time,
+                                           chosen.availability_observed_at if chosen.publication_basis == 'observed_availability'
+                                           else chosen.published_at),
                        'provider': chosen.license_source_id, 'evidence_id': chosen.evidence_id})
     registry = _registry()
     providers = [{'provider': p, 'status': provider_status(p, registry),

@@ -10,7 +10,7 @@ from . import (candidates, charts, completeness, expectations, fcf_history, fin_
 from .backtesting import MIN_SAMPLES
 from .research_contract import canonical_period, fiscal_year_end_month
 
-VERSION = '7'
+VERSION = '8'
 INVESTOR_LABELS = {'bear': 'Bear', 'base': '參考路徑', 'bull': 'Bull'}
 
 

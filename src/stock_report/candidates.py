@@ -195,6 +195,7 @@ def build(anchor, guidance=(), fx_rate=None):
         spread = {'low': low['name'], 'high': high['name'], 'low_revenue': low['ntm_revenue'], 'high_revenue': high['ntm_revenue'],
                   'range_percent_of_ttm': (high['ntm_revenue'] - low['ntm_revenue']) / ttm['value'] * 100 if ttm else None}
     return {'candidates': out, 'spread': spread, 'seasonality': seasonality(points),
+            'horizon_basis': 'four_fiscal_quarters_after_last_reported_period; legacy_ntm_keys_are_F4Q',
             'horizon': anchor.get('horizon'), 'selected': None,
             'selection_status': 'no_candidate_selected_insufficient_point_in_time_evidence',
             'hierarchy_levels': list(HIERARCHY),
@@ -232,6 +233,9 @@ def promotion_check(row, pit, min_samples):
             failed.append(f'coverage_below_floor_vs_{base}')
         if c['candidate_ntm_mape'] is None or c['baseline_ntm_mape'] is None or c['candidate_ntm_mape'] >= c['baseline_ntm_mape']:
             failed.append(f'not_lower_error_than_{base}_on_identical_origins')
+        matched = c.get('ntm', {})
+        if matched.get('mae_skill') is not None and matched['mae_skill'] <= 0:
+            failed.append(f'not_lower_mae_than_{base}_on_identical_origins')
     return {'eligible': not failed, 'failed_prerequisites': failed, 'evaluated_method_required': method,
             'scope': HIERARCHY_SCOPE}
 

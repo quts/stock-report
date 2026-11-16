@@ -32,6 +32,7 @@ from . import fin_series, filing_catalog
 from .backtesting import origin_release, snapshot
 from .candidates import BASELINES, CANDIDATES, DEFAULT_WINDOWS, min_history, overlay_guidance, path
 from .policy import reportable
+from .error_metrics import summarize
 
 # Statutory filing windows (10-Q 40-45 days, 10-K 60-90 days; Taiwan Securities and Exchange Act
 # Article 36: quarterly 45 days, annual three months). Used only to label an inference: a later
@@ -168,6 +169,8 @@ def filing_dataset(data, entity_id):
             'source_publication_timestamp_missing': sum(not r['source_publication_timestamp_known'] for r in rows),
             'verified_original_count': sum(r['original_verified'] for r in rows),
             'verified_availability_count': sum(r['availability_verified'] for r in rows),
+            'verified_original_filings': len({r['accession'] for r in rows if r['original_verified'] and r['accession']}),
+            'date_verified_filings': len({r['accession'] for r in rows if r['availability_verified'] and r['accession']}),
             'catalog': catalog_info,
             'classification_rule': {
                 'verified_original': 'catalog: first non-amended periodic filing whose report period equals the fact period',
@@ -228,7 +231,7 @@ def _errors(values, targets, by_id=None):
                           'error_percent': (value - actual['value']) / abs(actual['value']) * 100 if actual['value'] else None,
                           'actual_evidence_ids': sorted(actual['evidence_ids']),
                           'actual_vintages': _vintages(actual['evidence_ids'], by_id)}
-    if len(targets) == HORIZON and all(targets) and all(v is not None for v in values):
+    if len(values) == HORIZON and len(targets) == HORIZON and all(targets) and all(v is not None for v in values):
         total = sum(t['value'] for t in targets)
         ids = sorted({i for t in targets for i in t['evidence_ids']})
         errors['ntm'] = {'predicted': sum(values), 'actual': total,
@@ -253,7 +256,7 @@ def _pad(targets):
 
 def _stats(errs):
     pct = [e['error_percent'] for e in errs if e['error_percent'] is not None]
-    return {'mae': mean(abs(e['predicted'] - e['actual']) for e in errs) if errs else None,
+    return {**summarize(errs),
             'mape_percent': mean(abs(v) for v in pct) if pct else None,
             'bias_percent': mean(pct) if pct else None,
             'median_ape_percent': median(abs(v) for v in pct) if pct else None}
@@ -265,11 +268,15 @@ def matched_pairs(a, b, keys):
         return {'samples': 0, 'candidate': _stats([]), 'baseline': _stats([]), 'mape_improvement_pp': None,
                 'mae_improvement': None, 'candidate_lower_error': 0, 'baseline_lower_error': 0, 'ties': 0}
     ca, ba = _stats([a[k] for k in keys]), _stats([b[k] for k in keys])
-    diffs = [abs(b[k]['error_percent']) - abs(a[k]['error_percent']) for k in keys]
+    diffs = [abs(b[k]['predicted'] - b[k]['actual']) - abs(a[k]['predicted'] - a[k]['actual']) for k in keys]
+    pct_diffs = [abs(b[k]['error_percent']) - abs(a[k]['error_percent']) for k in keys
+                if a[k]['error_percent'] is not None and b[k]['error_percent'] is not None]
     return {'samples': len(keys), 'candidate': ca, 'baseline': ba,
-            'mape_improvement_pp': ba['mape_percent'] - ca['mape_percent'],
+            'mape_improvement_pp': ba['mape_percent'] - ca['mape_percent'] if ca['mape_percent'] is not None else None,
             'mae_improvement': ba['mae'] - ca['mae'],
-            'median_pair_improvement_pp': median(diffs),
+            'mae_skill': 1 - ca['mae'] / ba['mae'] if ba['mae'] else None,
+            'wape_improvement_pp': ba['wape_percent'] - ca['wape_percent'] if ca['wape_percent'] is not None else None,
+            'median_pair_improvement_pp': median(pct_diffs) if pct_diffs else None,
             'candidate_lower_error': sum(d > 0 for d in diffs), 'baseline_lower_error': sum(d < 0 for d in diffs),
             'ties': sum(d == 0 for d in diffs)}
 
@@ -284,7 +291,7 @@ def _keyed(rows, method, verified_only=False):
                     (result.get('methods') or {}).get(method) or {}).get('guidance_inputs_verified', False):
                 continue
             for h, err in ((((result.get('methods') or {}).get(method) or {}).get('errors')) or {}).items():
-                if err['error_percent'] is not None:
+                if err['predicted'] is not None and err['actual'] is not None:
                     keyed[name][(str(row['origin']), str(h))] = err
     return keyed
 
@@ -515,6 +522,7 @@ def point_in_time(data, entity_id, dataset=None):
               'preserved_clock_evaluated_ntm_samples': {n: scores['raw_rule']['per_candidate'][n]['ntm']['samples'] for n in CANDIDATES},
               'note': 'Each stage is counted separately; a catalog entry, a financial period or an initialized prediction is not an evaluated sample.'}
     return {'method': 'strict_point_in_time_earliest_preserved_version', 'rows': rows, 'scores': scores['raw_rule'],
+            'horizon_basis': 'four_fiscal_quarters_after_last_reported_period; legacy_ntm_keys_are_F4Q',
             'scores_by_method': scores, 'pairwise_by_method': {m: s['pairwise'] for m, s in scores.items()},
             'verified_scores_by_method': verified_scores,
             'verified_pairwise_by_method': {m: s['pairwise'] for m, s in verified_scores.items()},

@@ -171,17 +171,15 @@ def test_multiple_outside_the_historical_range_fails():
     assert gate(result, 'valuation_reference_quality')['status'] == 'FAIL'
 
 
-def test_unpublished_eps_and_unknown_split_basis_are_distinct_from_missing_prices():
+def test_future_split_does_not_invalidate_pre_split_price_eps_observations():
     rows = quarter_end_prices() + [{'date': '2026-11-13', 'close': 150, 'currency': 'USD', 'adjustment': 'unadjusted'}]
     data = with_imports(dell(price=None), import_file('prices', rows),
                         import_file('splits', [{'date': '2026-11-10', 'ratio': 2}]))
     result = engine.run(data)
     ref = result['valuation']['references']['historical_pe']
-    assert ref['status'] == 'insufficient'
-    assert ref['exclusions']['split_eps_share_basis_unverified'] > 0
+    assert ref['points']
+    assert all(p['date'] < '2026-11-10' for p in ref['points'])
     assert result['market_data']['history_points'] >= 8
-    assert any('股數' in n for r in result['valuation']['results'] if r['method'] == 'historical_range'
-               for n in r['limitations'])
 
 
 def test_peer_labels_alone_do_not_establish_comparability():
