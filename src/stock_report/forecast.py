@@ -85,9 +85,13 @@ def anchors(series, analysis):
     base['cashflow_reconciled'] = bool(rev and reconciliation['status'] == 'reconciled' and
                                       (reconciliation['start'], reconciliation['end'], reconciliation['currency']) ==
                                       (rev['start'], rev['end'], rev['currency']))
-    base['cashflow_ratios'] = ({'other_noncash': reconciliation['noncash_adjustments'] / rev['value'],
+    base['historical_cashflow_ratios'] = ({'other_noncash': reconciliation['noncash_adjustments'] / rev['value'],
                                'working_capital_cash_movement': reconciliation['working_capital_cash_movement'] / rev['value']}
                               if base['cashflow_reconciled'] and rev else None)
+    # A historical statement bridge does not justify revenue-proportional cash collection,
+    # financing receivables, deferred revenue or recurring investment gains in future quarters.
+    base['cashflow_ratios'] = None
+    base['cashflow_forecast_limitation'] = '歷史勾稽不等於未來現金轉換假設；未建立可核實的營運資金、非現金調整及實付稅額路徑，OCF／FCF 預測維持封鎖。'
     put('ocf_residual_intensity', None,
         '未解釋殘差禁止外推；現金流量表無法完整勾稽時不產生 OCF／FCF 預測',
         reconciliation.get('evidence_ids', []))
@@ -130,23 +134,28 @@ def quarter_windows(series):
 
 
 def trend_drivers(anchor):
-    """Shared live/backtest Base policy. Two comparable quarters are required, never invented."""
+    """A level reference, not a claim that exceptional YoY growth will repeat."""
     series = anchor['series']
     drivers = {k: dict(v) for k,v in anchor['drivers'].items()}
     revs = series['quarters'].get('revenue', [])
     recent = revs[-2:]
     prior = [year_ago(revs, p) for p in recent]
-    growth = median((r['value'] / p['value'] - 1) * 100 for r,p in zip(recent, prior)) if len(recent) == 2 and all(p and p['value'] for p in prior) else None
+    growth = 0.0 if recent else None
     ops = [next((p for p in series['quarters'].get('operating_income', [])
                  if (p['start'], p['end']) == (r['start'], r['end'])), None) for r in recent]
-    margin = sum(p['value'] for p in ops) / sum(r['value'] for r in recent) * 100 if len(recent) == 2 and all(ops) else None
+    margin = anchor['drivers']['operating_margin']['value']
     for key,value in (('revenue_growth', growth), ('operating_margin', margin)):
         drivers[key].update(value=value, basis='model_assumption',
-                            derivation='最近兩季可比成長中位數／營業利益率加權平均；同一政策用於即時模型與歷史回測')
+                            derivation='營收以最新已報季度水準作無新增成長的參考路徑；年增率隨比較基期自然變化，不預設衰減係數。利潤率延用 TTM。此為機械情境，非已驗證預測。')
+    drivers['revenue_growth']['policy'] = 'level_carry_forward'
+    drivers['revenue_growth']['seasonality_status'] = 'not_separable_from_trend_in_short_history'
+    drivers['revenue_growth']['latest_two_yoy_diagnostic'] = (
+        median((r['value'] / p['value'] - 1) * 100 for r,p in zip(recent, prior))
+        if len(recent) == 2 and all(p and p['value'] for p in prior) else None)
     return drivers
 
 
-def quarterly_project(anchor, drivers, guidance=(), fx_rate=None):
+def quarterly_project(anchor, drivers, guidance=(), fx_rate=None, growth_policy=None):
     """Same-quarter prior-year seasonality, explicit YoY trend and period-specific guidance."""
     series, base = anchor['series'], anchor['base']
     windows = quarter_windows(series)
@@ -154,19 +163,42 @@ def quarterly_project(anchor, drivers, guidance=(), fx_rate=None):
         return None, []
     rows, used, rejected = [], [], []
     prior_rev = base['revenue_ttm']
-    if not prior_rev or drivers['operating_margin']['value'] is None or drivers['revenue_growth']['value'] is None:
+    policy = growth_policy or drivers['revenue_growth'].get('policy', 'explicit_yoy')
+    if not prior_rev or (policy == 'explicit_yoy' and drivers['revenue_growth']['value'] is None):
         return None, []
     historical_margin = (base['operating_income_ttm']['value'] / prior_rev['value'] * 100
                          if base['operating_income_ttm'] else None)
-    for w in windows:
+    from . import candidates
+    candidate_path = None
+    if policy in candidates.CANDIDATES and policy != 'level_carry_forward':
+        candidate_path = candidates.path(policy, series['quarters'].get('revenue', []))
+        if candidate_path['status'] != 'applicable':
+            return None, []
+    for i, w in enumerate(windows):
         prior = w['prior']
         d = {k: dict(v) for k,v in drivers.items()}
         origin = {'method': 'same_quarter_yoy_trend', 'evidence_ids': prior['evidence_ids'],
                   'growth_assumption': d['revenue_growth']['value']}
+        if candidate_path is not None:
+            value = candidate_path['values'][i]
+            d['revenue_growth']['value'] = (value / prior['value'] - 1) * 100
+            spec = candidates.SPECS[policy]
+            origin = {'method': f'candidate:{policy}', 'candidate': policy, 'evidence_ids': candidate_path['evidence_ids'],
+                      'formula': spec['formula'], 'rule_revenue': value, 'comparison_period_end': prior['end'].isoformat(),
+                      'growth_assumption': d['revenue_growth']['value'],
+                      'limitation': f'機械候選路徑：{spec["assumes"]}。年增率由去年同季比較基期換算，不是需求證據。'}
+        elif policy == 'level_carry_forward':
+            latest = series['quarters']['revenue'][-1]
+            d['revenue_growth']['value'] = (latest['value'] / prior['value'] - 1) * 100
+            origin = {'method': 'latest_reported_level_reference', 'evidence_ids': latest['evidence_ids'],
+                      'anchor_period_end': latest['end'].isoformat(), 'anchor_revenue': latest['value'],
+                      'comparison_period_end': prior['end'].isoformat(), 'comparison_revenue': prior['value'],
+                      'growth_assumption': d['revenue_growth']['value'],
+                      'limitation': '不外推例外季度的年增率；最新季水準本身也可能異常，延續該水準尚未被證實，須配合替代水準敏感度。比較基期追上造成的年增下降是算術效果，非需求衰退證據。短歷史未能分離季節性與趨勢。'}
         # Keep historical seasonal margins while shifting the annual margin by the scenario delta.
         op = next((p for p in series['quarters'].get('operating_income', [])
                    if (p['start'], p['end']) == (prior['start'], prior['end'])), None)
-        if op and historical_margin is not None and prior['value']:
+        if policy == 'explicit_yoy' and op and historical_margin is not None and prior['value'] and d['operating_margin']['value'] is not None:
             d['operating_margin']['value'] += op['value'] / prior['value'] * 100 - historical_margin
         applicable = []
         for g in guidance:
@@ -200,7 +232,12 @@ def quarterly_project(anchor, drivers, guidance=(), fx_rate=None):
         if s is None:
             return None, rows
         rows.append({'start': w['start'], 'end': w['end'], 'calendar_basis': w['calendar_basis'],
-                     'revenue_origin': origin, 'statements': s})
+                     'revenue_origin': origin, 'statements': s, 'growth_policy': policy,
+                     'revenue_confidence': 'evidence_supported_forecast' if origin['method'] == 'management_guidance_midpoint' else 'mechanical_scenario',
+                     'hierarchy': 'evidence_supported_forecast' if origin['method'] == 'management_guidance_midpoint' else 'mechanical_sensitivity',
+                     'confidence_scope': 'revenue_input_only_not_whole_statement_or_statistical_validation',
+                     'operating_margin_origin': {'method': 'explicit_yoy_seasonal_shift' if policy == 'explicit_yoy' else 'ttm_margin_reference',
+                                                 'evidence_ids': drivers['operating_margin']['evidence_ids']}})
     annual = {key: sum(r['statements'][key] for r in rows) if all(r['statements'][key] is not None for r in rows) else None
               for key in ADDITIVE_METRICS}
     shares = [r['statements']['diluted_shares'] for r in rows]
@@ -209,7 +246,7 @@ def quarterly_project(anchor, drivers, guidance=(), fx_rate=None):
     annual['eps'] = annual['net_income'] / annual['diluted_shares'] if annual['net_income'] is not None and annual['diluted_shares'] else None
     annual['fcf_per_share'] = annual['free_cash_flow'] / annual['diluted_shares'] if annual['free_cash_flow'] is not None and annual['diluted_shares'] else None
     annual['revenue_growth'] = (annual['revenue'] / prior_rev['value'] - 1) * 100
-    annual['operating_margin'] = annual['operating_income'] / annual['revenue'] * 100 if annual['revenue'] else None
+    annual['operating_margin'] = annual['operating_income'] / annual['revenue'] * 100 if annual['revenue'] and annual['operating_income'] is not None else None
     annual['ocf_residual'] = None
     annual['guidance_used'], annual['guidance_rejected'] = used, rejected
     return annual, rows
@@ -239,11 +276,11 @@ def project(base, drivers):
     """Deterministic statements for one scenario; returns None for fields whose inputs are missing."""
     rev0, shares = base['revenue_ttm'], base['shares']
     d = {k: (v['value'] if v and v.get('value') is not None else None) for k, v in drivers.items()}
-    if rev0 is None or d.get('revenue_growth') is None or d.get('operating_margin') is None:
+    if rev0 is None or d.get('revenue_growth') is None:
         return None
     revenue = rev0['value'] * (1 + d['revenue_growth'] / 100)
-    op = revenue * d['operating_margin'] / 100
-    pretax = op + revenue * d['non_operating_ratio'] / 100 if d.get('non_operating_ratio') is not None else None
+    op = revenue * d['operating_margin'] / 100 if d.get('operating_margin') is not None else None
+    pretax = op + revenue * d['non_operating_ratio'] / 100 if op is not None and d.get('non_operating_ratio') is not None else None
     tax = d.get('tax_rate')
     ni = pretax * (1 - tax / 100) if tax is not None and pretax is not None else None
     share_count = shares['value'] * (1 + d['share_change'] / 100) if shares and d.get('share_change') is not None else None
@@ -261,7 +298,7 @@ def project(base, drivers):
             'eps': eps, 'depreciation_amortization': da, 'working_capital_investment': wc, 'operating_cash_flow': ocf,
             'capital_expenditure': capex, 'free_cash_flow': fcf, 'ocf_residual': residual, 'other_noncash_adjustments': noncash,
             'fcf_per_share': fcf / share_count if fcf is not None and share_count else None,
-            'ebitda': op + da if da is not None else None}
+            'ebitda': op + da if da is not None and op is not None else None}
 
 
 def reconcile(series, analysis=None):

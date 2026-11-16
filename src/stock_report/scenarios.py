@@ -96,7 +96,7 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                         issues.append(f'指引歸因：{name} 不是公司直接揭露的同期間同指標數字，應為 guidance_informed_model')
                 if any(e.accounting_basis in ('non_gaap', 'company_adjusted') for e in cited) and a.accounting_basis in ('reported', 'gaap', 'ifrs'):
                     issues.append(f'口徑錯配：{name} 以調整後指引支持報表口徑')
-        drivers, statements, quarter_rows = {}, None, []
+        drivers, statements, quarter_rows, fx_used = {}, None, [], None
         if forecast_anchor is not None:
             for name in DRIVERS:
                 if name in s.drivers:
@@ -116,14 +116,19 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                      'accounting_basis': e.accounting_basis or 'unspecified', 'metric': e.financial_metric, 'value': e.value}
                     for e in (index[i] for i in drv['evidence_ids'] if i in index)]
             if s.forecast_method == 'quarterly':
-                guidance = guidance_records(data, entity.entity_id) if s.name == 'base' else []
+                # Candidate paths carry verified guidance in its own quarter; legacy policies keep it on Base only.
+                guidance = guidance_records(data, entity.entity_id) if s.name == 'base' or s.revenue_candidate else []
                 fx_ids = [index[i] for i in s.guidance_fx_evidence_ids if i in index and reportable(index[i], data.request)]
                 fx_valid = s.guidance_fx_rate is not None and any(
                     e.value == s.guidance_fx_rate or str(s.guidance_fx_rate) in e.claim for e in fx_ids)
                 if s.guidance_fx_rate and not fx_valid:
                     issues.append('指引歸因：換算匯率缺少核實來源，不使用跨幣別指引')
+                fx_used = s.guidance_fx_rate if fx_valid else None
                 statements, quarter_rows = quarterly_project(forecast_anchor, drivers, guidance,
-                                                             s.guidance_fx_rate if fx_valid else None)
+                                                             s.guidance_fx_rate if fx_valid else None,
+                                                             s.revenue_candidate or s.growth_policy)
+                if s.revenue_candidate and statements is None:
+                    issues.append(f'候選路徑：{s.revenue_candidate} 歷史季度不足，無法建立')
                 if statements:
                     for key in ('revenue_growth', 'operating_margin'):
                         drivers[key]['input_value'] = drivers[key]['value']
@@ -135,6 +140,11 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                     issues.append('季度預測：Base 不得以單季年化敏感度代替四季預測')
             if statements is None:
                 issues.append('缺少 TTM 營收、營業利益率或營收成長假設，無法建立財務預測')
+        for side in ('supporting', 'contradicting'):
+            for p in getattr(s, side):
+                if any(i not in index or not reportable(index[i], data.request) or index[i].entity_id != entity.entity_id
+                       for i in p.evidence_ids):
+                    issues.append(f'情境證據：{side} 引用了不可用的證據')
         metric_name = METRIC_FOR[s.multiple_method]
         metric_value = statements.get(metric_name) if statements else None
         if metric_value is None and s.valuation_metric_value is not None:
@@ -198,6 +208,13 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
         out.append({'name': s.name, 'target_period': s.target_period, 'financial_outcome': s.financial_outcome,
                     'forecast_method': s.forecast_method, 'quarterly_forecast': quarter_rows,
                     'forecast_reliability': 'hypothetical_sensitivity',
+                    'confidence_class': 'mechanical_scenario', 'validation_status': 'not_validated',
+                    'hierarchy': 'mechanical_sensitivity', 'guidance_fx_rate_used': fx_used,
+                    'guidance_fx_evidence_ids': list(s.guidance_fx_evidence_ids) if fx_used else [],
+                    'revenue_candidate': s.revenue_candidate or (s.growth_policy if s.growth_policy == 'level_carry_forward' else None),
+                    'supporting': [p.model_dump() for p in s.supporting],
+                    'contradicting': [p.model_dump() for p in s.contradicting],
+                    'valuation_is_price_target': False, 'display_significant_digits': 2,
                     'assumptions': [a.model_dump() for a in s.assumptions], 'drivers': drivers, 'statements': statements,
                     'valuation': {'metric': metric_name, 'metric_value': metric_value, 'method': s.multiple_method,
                                   'multiple': s.multiple, 'multiple_basis': s.multiple_basis,
@@ -205,7 +222,7 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                                   'reference': None if ref is None else {k: ref.get(k) for k in ('status', 'stats')}},
                     'evidence_based_multiple': evidence_based,
                     'implied_price': None if value is None else round(value, 4),
-                    'implied_price_display': None if value is None else (round(value, 0) if evidence_based else round_sig(value)),
+                    'implied_price_display': None if value is None else round_sig(value),
                     'reference_price': reference_price,
                     'change_vs_reference_percent': None if upside is None else round(upside, 2),
                     'catalysts': s.catalysts, 'invalidation_conditions': invalidation_text,
@@ -221,12 +238,17 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
     sensitivity = None
     if base and base['implied_price'] is not None:
         v = base['valuation']
-        shown = (lambda x: round(x, 2)) if basis == 'evidence_based' else round_sig
+        shown = round_sig
         sensitivity = {'metric': v['metric'], 'method': v['method'], 'reference_price': reference_price,
                        'metric_factors': list(SENSITIVITY_METRIC), 'multiple_factors': list(SENSITIVITY_MULTIPLE),
-                       'precision': 'exact' if basis == 'evidence_based' else 'two_significant_digits',
+                       'precision': 'two_significant_digits',
                        'grid': [[shown(implied_price(v['method'], v['metric_value'] * f, v['multiple'] * m,
                                                      valuation['market']) or 0)
                                  for m in SENSITIVITY_MULTIPLE] for f in SENSITIVITY_METRIC]}
     return {'status': 'invalid' if problems else 'available', 'scenarios': out, 'problems': problems,
-            'sensitivity': sensitivity, 'probabilities': 'not_assigned', 'valuation_basis': basis}
+            'sensitivity': sensitivity, 'probabilities': 'not_assigned', 'valuation_basis': basis,
+            'forecast_confidence': 'mechanical_scenario', 'hierarchy': 'mechanical_sensitivity',
+            'hierarchy_levels': ['mechanical_sensitivity', 'evidence_supported_forecast', 'backtested_forecast'],
+            'base_role': 'reference_not_most_likely',
+            'confidence_classes': ['mechanical_scenario', 'evidence_supported_forecast', 'validated_forecast'],
+            'confidence_note': 'Multiple references and arithmetic do not validate financial forecasts. Sample insufficiency lowers confidence, never removes computable earnings sensitivity. No validated forecast is asserted.'}

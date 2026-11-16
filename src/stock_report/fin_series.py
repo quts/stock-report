@@ -15,6 +15,8 @@ from .research_contract import accounting_bucket
 
 # Signed cash-flow movements are separate metrics from period-end balance-sheet balances.
 CF_FLOW_METRICS = ('cf_other_noncash_adjustments', 'cf_working_capital_cash_movement',
+                  'cf_statement_starting_profit', 'cf_income_taxes_paid',
+                  'cf_deferred_revenue',
                   'cf_share_based_compensation', 'cf_deferred_tax', 'cf_other_noncash',
                   'cf_receivables', 'cf_inventory', 'cf_payables', 'cf_financing_receivables',
                   'cf_other_operating_assets_liabilities')
@@ -52,6 +54,13 @@ def build(data, entity_id):
                 e.period_basis)].append(e)
     windows = {}
     for key, rows in groups.items():
+        # Preserve all vintages in evidence. Build a series from the latest available version
+        # per source at its evaluation clock, rather than treating amendments as source conflicts.
+        latest = {}
+        for r in rows:
+            source = r.license_source_id or r.source_url
+            latest[source] = max(latest.get(source, r.published_at), r.published_at)
+        rows = [r for r in rows if r.published_at == latest[r.license_source_id or r.source_url]]
         values = [r.value for r in rows]
         low, high = min(values), max(values)
         if high - low > CONFLICT_TOLERANCE * max(abs(high), abs(low), 1e-12):
@@ -80,7 +89,7 @@ def build(data, entity_id):
         name = metric
         singles = {(p['start'], p['end']): p for p in points if p['basis'] == 'single_quarter'}
         cums = [p for p in points if p['basis'] in ('cumulative_ytd', 'fiscal_year') and p['start']]
-        if metric in FLOW_METRICS and unit in ('USD', 'TWD'):
+        if (metric in FLOW_METRICS or metric.startswith('cf_detail_')) and unit in ('USD', 'TWD'):
             for longer in cums:
                 shorter = [p for p in cums + list(singles.values())
                            if p['start'] == longer['start'] and 80 <= (longer['end'] - p['end']).days <= 100]
@@ -126,7 +135,7 @@ def ttm(series, metric):
     tail = contiguous_tail(series['quarters'].get(metric, []), 4)
     if tail is None:
         # Per-share figures and share counts are never derived by subtracting cumulative windows.
-        return ttm_from_cumulative(series, metric) if metric in FLOW_METRICS else None
+        return ttm_from_cumulative(series, metric) if metric in FLOW_METRICS or metric.startswith('cf_detail_') else None
     return {'metric': metric, 'value': sum(p['value'] for p in tail), 'start': tail[0]['start'], 'end': tail[-1]['end'],
             'basis': 'trailing_twelve_months', 'unit': tail[0]['unit'], 'currency': tail[0]['currency'],
             'evidence_ids': sorted({i for p in tail for i in p['evidence_ids']}),

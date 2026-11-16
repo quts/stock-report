@@ -281,6 +281,14 @@ PROFILES = {
             'operating_cash_flow': {'concepts': ['NetCashProvidedByUsedInOperatingActivities'], 'units': ['USD'], 'unit': 'USD'},
             'capital_expenditure': {'concepts': ['PaymentsToAcquirePropertyPlantAndEquipment'], 'units': ['USD'], 'unit': 'USD'},
             'depreciation_amortization': {'concepts': ['DepreciationDepletionAndAmortization', 'DepreciationAndAmortization'], 'units': ['USD'], 'unit': 'USD'},
+            'cf_share_based_compensation': {'concepts': ['ShareBasedCompensation'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},
+            'cf_deferred_tax': {'concepts': ['DeferredIncomeTaxesAndTaxCredits', 'DeferredIncomeTaxExpenseBenefit'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},
+            # Positive noncash income is subtracted in the operating-cash-flow bridge.
+            'cf_other_noncash': {'concepts': ['OtherNoncashIncomeExpense'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
+            'cf_receivables': {'concepts': ['IncreaseDecreaseInAccountsReceivable'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
+            'cf_inventory': {'concepts': ['IncreaseDecreaseInInventories'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
+            'cf_payables': {'concepts': ['IncreaseDecreaseInAccountsPayable'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},
+            'cf_financing_receivables': {'concepts': ['IncreaseDecreaseInFinanceReceivables'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
             'cash_equivalents': {'concepts': ['CashAndCashEquivalentsAtCarryingValue'], 'units': ['USD'], 'unit': 'USD'},
             'accounts_receivable_net': {'concepts': ['AccountsReceivableNetCurrent'], 'units': ['USD'], 'unit': 'USD'},
             'inventory': {'concepts': ['InventoryNet'], 'units': ['USD'], 'unit': 'USD'},
@@ -867,7 +875,7 @@ class SecConceptAdapter:
     QUARTER_BASES = (('single_quarter', 80, 100), ('cumulative_ytd', 170, 290), ('fiscal_year', 350, 380))
 
     def quarterly_facts(self, payload, spec):
-        """Every 10-Q/10-K window of one concept; the latest filing of a window is kept."""
+        """Retain each filing vintage. Selecting the latest here destroys PIT evidence."""
         units = payload.get('units')
         unit_key = bind_field(units, spec['units']) if isinstance(units, dict) else None
         if unit_key is None or not isinstance(units[unit_key], list):
@@ -891,8 +899,10 @@ class SecConceptAdapter:
                     continue
             row = dict(value=value, start_date=start_date, end_date=end_date, filed_date=filed_date, accn=accn,
                        form=fact.get('form'), fy=fact.get('fy'), fp=fact.get('fp'), basis=basis, unit_key=unit_key)
-            key = (start_date, end_date)
-            if key not in selected or (filed_date, accn) > (selected[key]['filed_date'], selected[key]['accn']):
+            key = (start_date, end_date, filed_date, accn)
+            if key in selected and selected[key]['value'] != value:
+                raise SourceContractError(f'{self.source_id}: conflicting facts within one filing context')
+            if key not in selected:
                 selected[key] = row
         return list(selected.values())
 
@@ -927,15 +937,19 @@ class SecConceptAdapter:
             url = self.profile['endpoint'].format(cik=config['cik'], concept=used)
             for row in sorted((r for r in rows if r['end_date'] in ends), key=lambda r: (r['end_date'], r['basis'])):
                 tag = {'single_quarter': 'q', 'cumulative_ytd': 'ytd', 'fiscal_year': 'fy', 'instant': 'i'}[row['basis']]
+                variants = [r for r in rows if (r['start_date'], r['end_date']) == (row['start_date'], row['end_date'])]
+                suffix = f'-v{row["filed_date"]:%Y%m%d}-{row["accn"].replace("-", "")[-6:]}' if len(variants) > 1 else ''
+                identifier = f'sec-{ticker}-{role}-{row["end_date"].isoformat()}-{tag}'
+                sign = spec.get('cash_sign', 1)
                 observations.append(Observation(
-                    evidence_id=f'sec-{ticker}-{role}-{row["end_date"].isoformat()}-{tag}'[:80], entity_id=ticker,
+                    evidence_id=identifier[:80-len(suffix)] + suffix, entity_id=ticker,
                     kind='financial', financial_metric=role, accounting_basis='gaap',
-                    value=row['value'], unit=spec['unit'], currency=config['currency'] if spec['unit'] != 'shares' else None,
+                    value=row['value'] * sign, unit=spec['unit'], currency=config['currency'] if spec['unit'] != 'shares' else None,
                     period=f'{row["fy"]}{row["fp"]}' if row['fy'] and row['fp'] else None,
                     period_start=row['start_date'] or row['end_date'], period_end=row['end_date'], period_basis=row['basis'],
                     claim=f'us-gaap:{used} {row["value"]} {row["unit_key"]}，期間 '
                           f'{row["start_date"] or ""}~{row["end_date"]}（{row["basis"]}），來自 {row["form"]} {row["accn"]}，'
-                          f'申報日 {row["filed_date"]}。',
+                          f'申報日 {row["filed_date"]}。' + (f' 現金流符號轉換 × {sign}（非餘額差額）。' if 'cash_sign' in spec else ''),
                     provider_record_id=f'{row["accn"]}:{used}:{row["start_date"]}:{row["end_date"]}'[:120],
                     request_key=f'{role}:{used}', source_url=url, source_published_raw=row['filed_date'].isoformat(),
                     source_period_raw=f'{row["start_date"]}..{row["end_date"]} fy={row["fy"]} fp={row["fp"]}'[:120],

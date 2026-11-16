@@ -57,14 +57,47 @@ def scores(rows):
     return out
 
 
+def initialization_diagnostics(data, observed, full, series, origin, anchor):
+    """Explain absence rather than conflating a data outage with a model initialization rule."""
+    historical = [p for p in full['quarters'].get('revenue', []) if p['end'] <= origin]
+    visible = series['quarters'].get('revenue', [])
+    reasons = []
+    if not fin_series.contiguous_tail(visible, 4):
+        if fin_series.contiguous_tail(historical, 4):
+            reasons.append('missing_historical_filing_snapshots')
+        else:
+            reasons.append('insufficient_or_noncontiguous_historical_periods')
+    if visible and visible[-1]['end'] != origin:
+        reasons.append('origin_filing_unavailable_at_cutoff')
+    if not anchor['base'].get('shares'):
+        reasons.append('missing_point_in_time_diluted_shares')
+    if anchor['drivers']['operating_margin']['value'] is None:
+        reasons.append('missing_operating_income_inputs')
+    if anchor['reconciliation']['status'] != 'reconciled':
+        reasons.append('missing_cash_flow_statement_components')
+    known = {e.evidence_id for e in observed.evidence}
+    excluded = [e for e in data.evidence if e.entity_id == data.entities[0].entity_id and e.kind == 'financial'
+                and e.period_end and e.period_end <= origin and e.evidence_id not in known]
+    return {'root_causes': sorted(set(reasons)), 'historical_revenue_periods': len(historical),
+            'visible_revenue_periods': len(visible), 'excluded_later_publications': len(excluded),
+            'initialization_policy': 'four_contiguous_quarters_for_NTM; latest_level_needs_no_two_YoY_pairs',
+            'legacy_initialization_limitation': 'previous_policy_required_two_comparable_YoY_pairs_and_operating_margin_even_for_revenue'}
+
+
 def rolling_origin(data, entity_id, include_revised=True):
     full = fin_series.build(data, entity_id)
     revenue = full['quarters'].get('revenue', [])
     rows, revised_rows = [], []
     for i in range(3, len(revenue) - 4):
         origin = revenue[i]['end']
-        cutoff = datetime.combine(origin + timedelta(days=45), datetime.min.time(), timezone.utc)
+        scheduled = datetime.combine(origin + timedelta(days=45), datetime.min.time(), timezone.utc)
         target = revenue[i+1:i+5]
+        publications = [max(e.published_at, e.event_time) for e in data.evidence if e.entity_id == entity_id
+                        and e.financial_metric == 'revenue' and e.statement_kind == 'fact'
+                        and e.period_end == origin and reportable(e, data.request)]
+        first_publication = min(publications) if publications else None
+        timely_origin = first_publication is not None and first_publication.date() < target[0]['end']
+        cutoff = first_publication + timedelta(microseconds=1) if timely_origin else scheduled
         if cutoff >= data.request.research_as_of or not fin_series.contiguous_tail(target, 4):
             continue
         end = target[-1]['end']
@@ -81,6 +114,11 @@ def rolling_origin(data, entity_id, include_revised=True):
             observed = snapshot(data, origin, cutoff, revised)
             series = fin_series.build(observed, entity_id)
             a = forecast.anchors(series, fin_analysis.analyse(observed, series, entity_id))
+            diagnostic = initialization_diagnostics(data, observed, full, series, origin, a)
+            if not timely_origin:
+                diagnostic['root_causes'].append('original_origin_filing_not_preserved; latest_repeat_is_after_first_target_quarter')
+            elif first_publication >= scheduled:
+                diagnostic['root_causes'].append('legacy_fixed_45_day_cutoff_would_exclude_origin_filing')
             pred, projected = (forecast.quarterly_project(a, forecast.trend_drivers(a), forecast.guidance_records(observed, entity_id))
                                if a['base']['revenue_ttm'] and a['base']['revenue_ttm']['end'] == origin else (None, []))
             # An unknown/changed fiscal calendar cannot be graded against another target window.
@@ -96,13 +134,19 @@ def rolling_origin(data, entity_id, include_revised=True):
                                                         'forecast_input_missing_or_unreconciled' if estimate is None else None)}
             dest.append({'origin': origin, 'information_cutoff': cutoff.isoformat(), 'target_start': target[0]['start'],
                          'target_end': end, 'vintage_status': 'revised_diagnostic' if revised else 'strict_point_in_time',
+                         'cutoff_basis': 'first_preserved_origin_publication' if timely_origin else 'scheduled_diagnostic_no_original_vintage',
+                         'first_preserved_publication': first_publication, 'diagnostics': diagnostic,
                          'training_evidence_ids': [e.evidence_id for e in observed.evidence],
                          'max_input_published_at': max((e.published_at for e in observed.evidence), default=None),
                          'max_input_event_time': max((e.event_time for e in observed.evidence), default=None), 'errors': errors})
     metrics = scores(rows)
+    from collections import Counter
+    root_counts = Counter(reason for row in rows for reason in row['diagnostics']['root_causes'])
     return {'status': 'insufficient', 'method': 'strict_point_in_time', 'reporting_lag_days': 45,
+            'root_cause_counts': dict(root_counts),
+            'cutoff_policy': 'first_preserved_origin_filing_publication; scheduled45_only_for_unavailable_vintage_diagnostics',
             'fcf_test_count': metrics['free_cash_flow']['sample_size'], 'rows': rows, 'metrics': metrics,
             'revised_diagnostic': {'method': 'revised_historical_data_not_point_in_time',
                                    'rows': revised_rows, 'metrics': scores(revised_rows)},
             'reliability': 'not_validated', 'minimum_sample_floor': MIN_SAMPLES,
-            'limitation': '固定期末後45日為預測截止，僅用此前已公布資料；修訂資料另列不混入時點樣本。四季預測可能重疊，樣本與覆蓋不足不代表統計可靠。實績為目前核實版本。'}
+            'limitation': '以保留的首次申報公布時間為截止；若只有晚於預測季的比較數，僅保留缺資料診斷。僅使用截止前資訊。修訂資料與時點樣本分開；四季窗口可能重疊，樣本足量也不是統計驗證。'}

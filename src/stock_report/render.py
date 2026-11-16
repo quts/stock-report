@@ -104,7 +104,13 @@ def render(data, decision, mapping, path, company_research=None, investment=None
                       autoescape=select_autoescape(['html']))
     env.filters['brief'] = lambda value, n=140: str(value) if len(str(value)) <= n else str(value)[:n] + '…（完整內容見本機 JSON）'
     context = projection(data, decision, mapping, company_research)
-    env.filters['cite'] = lambda ids: ''.join(f'[{n}]' for n in sorted({context['references'][eid] for eid in ids if eid in context['references']}))
+    cited_numbers = set()
+    def cite(ids):
+        numbers = {context['references'][eid] for eid in ids if eid in context['references']}
+        cited_numbers.update(numbers)
+        return ''.join(f'[{n}]' for n in sorted(numbers))
+    context['cited_numbers'] = cited_numbers
+    env.filters['cite'] = cite
     env.filters['amount'] = lambda e: format_amount(e.value, e.unit, e.currency)
     env.filters['taipei'] = lambda stamp: stamp.astimezone(timezone(timedelta(hours=8))).strftime('%Y/%m/%d %H:%M')
     template = 'research-four.html' if data.request.mode == 'stock' and data.request.max_pdf_pages >= 4 and company_research else 'report.html'
@@ -118,8 +124,25 @@ def render(data, decision, mapping, path, company_research=None, investment=None
         env.filters['money'] = lambda v, cur=currency: format_amount(v, cur, cur)
         env.filters['pct'] = lambda v, d=1: '—' if v is None else f'{v:,.{d}f}%'
         env.filters['num'] = lambda v, d=2: '—' if v is None else f'{v:,.{d}f}'
+        from .scenarios import round_sig
+        from math import floor, log10
+        def forecast_num(v):
+            if v is None:
+                return '—'
+            x = round_sig(v)
+            places = max(0, 1 - floor(log10(abs(x)))) if x else 0
+            return f'{x:,.{places}f}'
+        env.filters['forecast_num'] = forecast_num
+        env.filters['forecast_money'] = lambda v: '—' if v is None else forecast_num(v / 1e8) + (' 億元' if currency == 'TWD' else ' 億美元')
+        env.filters['forecast_e8'] = lambda v: '—' if v is None else forecast_num(v / 1e8)
+        context['unit_e8'] = '億元' if currency == 'TWD' else '億美元'
+        # Reader-facing text: provider IDs and CLI remedies are kept in qa.json.
+        import re as _re
+        env.filters['plain'] = lambda t: _re.sub(r'（?可用 (cli )?import-market-data[^）。]*）?', '（可由使用者匯入有權使用的價格資料）',
+                                                 _re.sub(r'^[a-z0-9][a-z0-9.-]+ 收盤日', '收盤日', str(t or '')))
         env.filters['status'] = lambda s: STATUS_LABELS.get(s, s)
         context.update(inv=investment, charts=charts_for(investment), currency=currency, method_labels=METHOD_LABELS,
+                       method_short={'pe': '本益比', 'p_fcf': '股價／FCF', 'ev_ebitda': 'EV/EBITDA', 'p_b': '股價淨值比'},
                        basis_labels={'historical_fact': '歷史事實', 'management_guidance': '公司指引', 'guidance_informed_model': '衍生假設',
                                      'consensus': '市場共識', 'model_assumption': '模型假設'},
                        thesis=(investment.get('thesis') or [None])[0],
@@ -132,7 +155,8 @@ def render(data, decision, mapping, path, company_research=None, investment=None
                                       'inventory_demand_assessment': '存貨與需求'})
     elif investment is not None and investment.get('gates') and investment['gates']['grade'] == 'limited' \
             and data.dataset_kind == 'real':
-        context['limitations'].append('研究品質檢查未全數通過：' + '、'.join(investment['gates']['critical_failures']) + '。')
+        context['limitations'].append('研究品質檢查未全數通過：' + '、'.join(
+            c.get('label', c['check']) for c in investment['gates']['checks'] if c['status'] == 'FAIL') + '。')
     html = env.get_template(template).render(**context)
     document = HTML(string=html, url_fetcher=deny_resources).render()
     if not 1 <= len(document.pages) <= data.request.max_pdf_pages:

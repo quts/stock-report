@@ -94,8 +94,13 @@ def assess(data, series, analysis, valuation, expectations, entity_id):
             status, note = gap.status, gap.reason
         if profile_name == 'financials' and field in ('capital_expenditure', 'free_cash_flow', 'working_capital'):
             status, note = 'not_applicable', '金融業不以此衡量'
+        # Provider status codes and CLI remedies stay in qa.json; the report gets plain language.
+        reader = note
+        if note and ('=' in note or 'cli ' in note or 'import-market-data' in note):
+            reader = ('沒有可合法取得、已查核權限的收盤價；可由使用者匯入有權使用的價格資料' if field.startswith('price')
+                      else '來源無法取得；來源狀態與補救方式見 qa.json')
         rows.append({'field': field, 'label': label, 'status': status, 'mandatory': field in mandatory, 'note': note,
-                     'sources_tried': gap.sources_tried if gap else []})
+                     'reader_note': reader, 'sources_tried': gap.sources_tried if gap else []})
     warnings = [f'{r["label"]}：{r["status"]}' + (f'（{r["note"]}）' if r['note'] else '')
                 for r in rows if r['mandatory'] and r['status'] != 'available']
     return {'profile': profile_name, 'fields': rows, 'mandatory_gaps': [r['field'] for r in rows
