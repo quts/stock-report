@@ -5,6 +5,8 @@ same window. It never fills the blocked OCF/FCF forecast fields; applying a hist
 hypothetical revenue is labelled as arithmetic on history, not a forecast. Balance-sheet changes
 are never presented as a cash-flow reconciliation.
 """
+from datetime import timedelta
+from statistics import median
 from .fin_series import contiguous_tail, ttm
 
 FLOW = ('operating_cash_flow', 'capital_expenditure', 'revenue', 'net_income')
@@ -105,6 +107,122 @@ def history(series, adjusted_ids=()):
             'adjusted_inputs_excluded': sorted(adjusted_ids),
             'basis': 'reported_statement_values_only', 'forecast_fields_populated': False,
             'limitation': '歷史同期間 OCF、資本支出與營收的實際比率；不是現金流預測，不填入情境 OCF／FCF。重疊的 TTM 窗口不是獨立樣本。公司調整後 FCF 不納入。'}
+
+
+MIN_INDEPENDENT_WINDOWS = 3       # non-overlapping reconciled annual windows: a disclosure floor only
+DRIVER_DISPERSION_PP = 5.0        # review flag: a driver/revenue ratio moving more than this across windows
+EXCEPTIONAL_COMPONENT_SHARE = 0.25  # review flag: one bridge line above this share of |OCF|
+GROWTH_REGIME_PP = 15.0           # review flag: latest TTM revenue growth differs from history by more than this
+
+
+def _truncate(series, end):
+    return {**series, **{k: {m: [p for p in pts if p['end'] <= end] for m, pts in series[k].items()}
+                         for k in ('quarters', 'instants', 'cumulative')}}
+
+
+def forward_driver_assessment(series):
+    """Can validated historical cash-flow drivers support forward modelling? Diagnostic only.
+
+    Rebuilds the signed cash-flow-statement bridge for every historical TTM/fiscal window the
+    reviewed evidence supports, measures cash conversion and working-capital/non-cash intensity on
+    reconciled windows, and lists what blocks forward use: too few independent windows, unstable
+    drivers, exceptional lines, a different growth regime or missing statement coverage. It never
+    produces OCF/FCF forecasts; the forecast restriction is preserved regardless of the outcome."""
+    from .cashflow import reconcile
+    ends = sorted({p['end'] for k in ('quarters', 'cumulative') for p in series[k].get('operating_cash_flow', [])})
+    windows, statuses = {}, {}
+    for end in ends:
+        r = reconcile(_truncate(series, end))
+        if r.get('start') is None:
+            continue
+        key = (r['start'], r['end'])
+        statuses[key] = r['status']
+        if r['status'] != 'reconciled' or key in windows:
+            continue
+        trunc = _truncate(series, end)
+        rev = _value(trunc, 'revenue', r['start'], r['end'], None)
+        capex = _value(trunc, 'capital_expenditure', r['start'], r['end'], None)
+        if rev is None or not rev['value']:
+            statuses[key] = 'reconciled_without_same_window_revenue'
+            continue
+        lines = {**r['noncash_components'], **r['wc_components']}
+        largest = max(lines.items(), key=lambda kv: abs(kv[1]), default=(None, 0))
+        windows[key] = {'start': r['start'], 'end': r['end'], 'starting_profit_basis': r['starting_profit_basis'],
+                        'operating_cash_flow': r['actual_ocf'], 'revenue': rev['value'],
+                        'cash_conversion': r['actual_ocf'] / r['starting_profit'] if r['starting_profit'] else None,
+                        'working_capital_to_revenue_percent': (r['working_capital_cash_movement'] or 0) / rev['value'] * 100,
+                        'noncash_to_revenue_percent': (r['noncash_adjustments'] or 0) / rev['value'] * 100,
+                        'taxes_paid_to_revenue_percent': (r['income_taxes_paid'] / rev['value'] * 100) if r['income_taxes_paid'] is not None else None,
+                        'capex_to_revenue_percent': capex['value'] / rev['value'] * 100 if capex else None,
+                        'largest_bridge_line': largest[0],
+                        'largest_bridge_line_share_of_ocf': abs(largest[1]) / abs(r['actual_ocf']) if r['actual_ocf'] else None,
+                        'evidence_ids': r['evidence_ids']}
+    rows = sorted(windows.values(), key=lambda w: w['end'])
+    independent, last = [], None
+    for w in reversed(rows):
+        if last is None or w['end'] <= last['start'] - timedelta(days=1):
+            independent.append(w)
+            last = w
+    def spread(key):
+        vals = [w[key] for w in rows if w[key] is not None]
+        return {'min': min(vals), 'max': max(vals), 'median': median(vals), 'range': max(vals) - min(vals),
+                'windows': len(vals)} if vals else None
+    drivers = {k: spread(k) for k in ('cash_conversion', 'working_capital_to_revenue_percent', 'noncash_to_revenue_percent',
+                                      'taxes_paid_to_revenue_percent', 'capex_to_revenue_percent')}
+    blockers = []
+    if len(independent) < MIN_INDEPENDENT_WINDOWS:
+        blockers.append({'code': 'too_few_independent_reconciled_windows', 'independent': len(independent),
+                         'reconciled': len(rows), 'required': MIN_INDEPENDENT_WINDOWS,
+                         'detail': 'Overlapping TTM windows share quarters and are not independent observations.'})
+    for key in ('working_capital_to_revenue_percent', 'noncash_to_revenue_percent'):
+        d = drivers[key]
+        if d and d['windows'] > 1 and d['range'] > DRIVER_DISPERSION_PP:
+            blockers.append({'code': f'unstable_{key}', 'range_pp': d['range']})
+    wc = [w['working_capital_to_revenue_percent'] for w in rows]
+    if wc and min(wc) < 0 < max(wc):
+        blockers.append({'code': 'working_capital_direction_changes_across_windows'})
+    exceptional = [w for w in rows if (w['largest_bridge_line_share_of_ocf'] or 0) > EXCEPTIONAL_COMPONENT_SHARE]
+    if exceptional:
+        blockers.append({'code': 'exceptional_bridge_lines', 'windows': [[w['start'], w['end'], w['largest_bridge_line']] for w in exceptional]})
+    quarters = series['quarters'].get('revenue', [])
+
+    def growth_into(start, value):
+        """Growth versus the four contiguous quarters ending the day before `start`."""
+        prior = contiguous_tail([q for q in quarters if q['end'] <= start - timedelta(days=1)], 4)
+        if not prior or prior[-1]['end'] != start - timedelta(days=1):
+            return None
+        total = sum(q['value'] for q in prior)
+        return (value / total - 1) * 100 if total else None
+
+    growth = [g for w in rows if (g := growth_into(w['start'], w['revenue'])) is not None]
+    latest_ttm = ttm(series, 'revenue')
+    latest_growth = growth_into(latest_ttm['start'], latest_ttm['value']) if latest_ttm else None
+    regime = None
+    if growth and latest_growth is not None:
+        regime = {'latest_ttm_growth_percent': latest_growth, 'reconciled_window_median_growth_percent': median(growth),
+                  'reconciled_windows_with_growth': len(growth)}
+        if abs(latest_growth - median(growth)) > GROWTH_REGIME_PP:
+            blockers.append({'code': 'revenue_growth_regime_differs_from_reconciled_history', **regime})
+    elif rows:
+        blockers.append({'code': 'growth_regime_not_measurable_for_reconciled_windows'})
+    missing = sorted({f'{k[0]}~{k[1]}:{s}' for k, s in statuses.items() if s != 'reconciled'})
+    if missing:
+        blockers.append({'code': 'statement_coverage_incomplete_in_other_windows', 'windows': missing})
+    if not rows:
+        blockers.append({'code': 'no_reconciled_window'})
+    return {'predictive': False, 'windows': rows, 'independent_windows': len(independent),
+            'reconciled_windows': len(rows), 'window_status': {f'{k[0]}~{k[1]}': s for k, s in sorted(statuses.items())},
+            'drivers': drivers, 'blockers': blockers, 'growth_regime': regime,
+            'forward_modeling_supported': False,
+            'historical_driver_screen_passed': not blockers,
+            'forward_evidence_required': 'Historical stability does not establish future working-capital or cash-conversion assumptions.',
+            'forecast_ocf_fcf_enabled': False,
+            'restriction': 'OCF/FCF forecasts stay disabled without explicit, evidenced forward assumptions for collections, '
+                           'working capital, non-cash items and taxes, even when every historical window reconciles.',
+            'thresholds': {'min_independent_windows': MIN_INDEPENDENT_WINDOWS, 'driver_dispersion_pp': DRIVER_DISPERSION_PP,
+                           'exceptional_component_share': EXCEPTIONAL_COMPONENT_SHARE, 'growth_regime_pp': GROWTH_REGIME_PP,
+                           'purpose': 'review flags only; not statistical tests'},
+            'limitation': '歷史現金流驅動因子只描述已勾稽窗口；重疊的 TTM 窗口不是獨立樣本，業務組合與成長階段改變時不能直接外推。'}
 
 
 def sensitivity(hist, revenues, price=None, shares=None):

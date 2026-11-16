@@ -211,9 +211,14 @@ def promotion_check(row, pit, min_samples):
     if (pit.get('integrity') or {}).get('status') != 'pass':
         failed.append('point_in_time_integrity_not_established')
     method = row.get('deployed_method', 'raw_rule')
-    comparisons = (pit.get('pairwise_by_method') or {}).get(method, {}).get(row['name'], {})
-    if not comparisons:
+    # Only origins whose filing identity and date are catalog-verified can promote a path; the
+    # preserved-clock subset stays a diagnostic because its vintages are inferred.
+    evaluated = (pit.get('pairwise_by_method') or {}).get(method, {}).get(row['name'], {})
+    comparisons = (pit.get('verified_pairwise_by_method') or {}).get(method, {}).get(row['name'], {})
+    if not evaluated:
         failed.append(f'deployed_method_{method}_not_evaluated_point_in_time')
+    elif not comparisons or not any(c.get('matched_ntm_samples') for c in comparisons.values()):
+        failed.append('origin_vintages_not_catalog_verified')
     for base in BASELINES:
         c = comparisons.get(base)
         if base == row['name'] or not comparisons:

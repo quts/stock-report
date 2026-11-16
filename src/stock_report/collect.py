@@ -132,7 +132,14 @@ def collect(source_id, ticker, *, registry, allow_network=False, fixture=None, c
             # Every configured alternative is fetched: only the adapter can tell whether a
             # concept actually carries usable annual facts, so no request is skipped on a guess.
             try:
-                data, meta = client.get_json(spec.url)
+                if profile.get('transport') == 'csv':
+                    import csv
+                    import io
+                    text, meta = client.get_text(spec.url)
+                    data = list(csv.DictReader(io.StringIO(text.lstrip('\ufeff'))))
+                    del text
+                else:
+                    data, meta = client.get_json(spec.url)
             except Exception as exc:
                 if spec.required:
                     raise

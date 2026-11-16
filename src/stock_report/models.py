@@ -395,6 +395,39 @@ def financial_review_state(data):
     return []
 
 
+class FilingCatalogEntry(Model):
+    """Normalized filing identity from a reviewed SEC index; never a raw body or a hash."""
+    accession: str = Field(pattern=r'^\d{10}-\d{2}-\d{6}$')
+    form: str = Field(pattern=r'^[0-9A-Z/-]{1,12}$')
+    amendment: bool
+    report_period: date | None = None
+    filing_date: date
+    # Recorded as declared by the source; never used to move a clock or cutoff earlier.
+    acceptance_declared: str | None = Field(default=None, max_length=80)
+    cik: str = Field(pattern=r'^\d{10}$')
+    conformed_name: str | None = Field(default=None, max_length=200)
+    catalog_origin: Literal['submissions_recent', 'archive_index_header']
+    source_id: Literal['sec-submissions-history', 'sec-edgar-archives-filing']
+    source_url: str = Field(pattern=r'^https://(data\.sec\.gov|www\.sec\.gov)/')
+
+
+class FilingCatalog(Model):
+    schema_version: Literal['1'] = '1'
+    entity_id: str
+    cik: str = Field(pattern=r'^\d{10}$')
+    as_of: AwareDatetime
+    retrieved_at: AwareDatetime
+    sources: list[str] = Field(min_length=1, max_length=4)
+    entries: list[FilingCatalogEntry] = Field(default_factory=list, max_length=5000)
+    cited_accessions: int = 0
+    cited_accessions_cataloged: int = 0
+    cited_accessions_uncataloged: list[str] = Field(default_factory=list, max_length=2000)
+    coverage: dict = Field(default_factory=dict)
+    header_lookups: list[dict] = Field(default_factory=list, max_length=2000)
+    retention: str
+    acceptance_note: str
+
+
 class ResearchInput(Model):
     schema_version: Literal['1'] = '1'
     dataset_kind: Literal['mock', 'real']
@@ -409,7 +442,33 @@ class ResearchInput(Model):
     latest_financials: LatestFinancialReview | None = None
     earnings_preview: EarningsPreviewReview | None = None
     data_gaps: list[DataGap] = Field(default_factory=list, max_length=60)
+    # Filing identities used only to label evidence vintages; values never come from here.
+    filing_catalog: FilingCatalog | None = None
     versions: dict[str, str]
+
+    @model_validator(mode='after')
+    def valid_catalog(self):
+        c = self.filing_catalog
+        if c is None:
+            return self
+        from .storage import read_json
+        rows = [r for r in read_json('config/sec-entities.json')['entities'] if r['ticker'] == self.request.ticker]
+        if c.entity_id != self.request.ticker or len(rows) != 1 or rows[0]['cik'] != c.cik:
+            raise ValueError('Filing catalog issuer differs from the configured research issuer')
+        if c.as_of != self.request.research_as_of or c.retrieved_at < c.as_of:
+            raise ValueError('Filing catalog must be built at the research cutoff')
+        if any(e.cik != c.cik or e.filing_date > c.as_of.astimezone(timezone(timedelta(hours=-5))).date()
+               for e in c.entries):
+            raise ValueError('Filing catalog entries must belong to the issuer and precede the cutoff')
+        from .filing_catalog import HEADER_URL, SUBMISSIONS_URL
+        if len({e.accession for e in c.entries}) != len(c.entries):
+            raise ValueError('Duplicate filing catalog accession')
+        for e in c.entries:
+            expected = (SUBMISSIONS_URL.format(cik=c.cik) if e.catalog_origin == 'submissions_recent' else
+                        HEADER_URL.format(cik_int=int(c.cik), acc_nodash=e.accession.replace('-', ''), accession=e.accession))
+            if e.source_url != expected or e.amendment != e.form.endswith('/A'):
+                raise ValueError('Catalog source identity or amendment flag does not match the filing')
+        return self
 
     @model_validator(mode='after')
     def unique_records(self):
@@ -556,7 +615,7 @@ class HorizonProposal(Model):
 class Proposal(Model):
     input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     model: str
-    prompt_version: Literal['8'] = '8'
+    prompt_version: Literal['9'] = '9'
     usage: dict[str, int] | None = None
     outlooks: list[HorizonProposal] = Field(max_length=10)
     company_research: list[CompanyResearch] = Field(default_factory=list, max_length=5)

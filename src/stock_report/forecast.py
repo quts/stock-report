@@ -333,9 +333,9 @@ def balance_proxy(series, analysis=None):
             'limitation': '僅淨利、折舊攤銷及應收／存貨／應付餘額變化；其他非現金、遞延稅、融資應收等缺逐項證據，殘差未解釋。延用殘差比率是模型假設。'}
 
 
-def backtest(data, entity_id):
+def backtest(data, entity_id, dataset=None):
     from .backtesting import rolling_origin
-    return rolling_origin(data, entity_id)
+    return rolling_origin(data, entity_id, dataset=dataset)
 
 
 def calibration(anchor):

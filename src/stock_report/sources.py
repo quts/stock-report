@@ -161,6 +161,16 @@ TW_INCOME_ROLES = {
 # Field contracts are provisional until a recorded network smoke run confirms them;
 # `--source-profile` overrides any key without a code change.
 PROFILES = {
+    'twse-opendata-bwibbu-d-csv': {
+        'adapter': 'exchange_quote', 'transport': 'csv', 'source_class': 'official',
+        'endpoint': 'https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU_d?response=open_data',
+        'exchange': 'TWSE', 'currency': 'TWD', 'ticker_suffix': '.TW',
+        'code_shape_pattern': r'[1-9]\d{3}', 'instruments_config': 'config/tw-instruments.json',
+        'supported_instrument_types': ['common_share'], 'allowed_tickers': ['2330.TW'],
+        'coverage_mode': 'latest_only',
+        'fields': {'code': ['證券代號'], 'name': ['證券名稱'], 'close': ['收盤價'], 'date': ['日期']},
+        'required_fields': ['code', 'name', 'close', 'date'], 'date_formats': ['iso'],
+    },
     'twse-openapi-stock-day-all': {
         'adapter': 'exchange_quote', 'source_class': 'official',
         'endpoint': 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL',
@@ -336,7 +346,7 @@ FILING_PROFILES = {
 # What a source *is* and what its figures have been adjusted for are claims that need evidence in
 # the code and the source notes. A per-run profile override may rebind field names; it may not
 # assert provenance.
-PROTECTED_PROFILE_KEYS = ('adapter', 'source_class', 'adjustment_basis', 'price_field')
+PROTECTED_PROFILE_KEYS = ('adapter', 'source_class', 'adjustment_basis', 'price_field', 'allowed_tickers', 'transport')
 
 
 def merge_profile(source_id, overrides=None):
@@ -431,6 +441,8 @@ class ExchangeQuoteAdapter(TaiwanInstrumentAdapter):
     """Taiwan exchange daily-close OpenAPI endpoints (latest session only)."""
 
     def requests(self, ticker):
+        if self.profile.get('allowed_tickers') and ticker not in self.profile['allowed_tickers']:
+            raise ValueError('Issuer is outside the reviewed source identity scope')
         self.instrument(ticker)
         return [RequestSpec(key='daily', url=self.profile['endpoint'])]
 
