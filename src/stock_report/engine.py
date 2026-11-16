@@ -9,7 +9,7 @@ from . import (charts, completeness, expectations, fin_analysis, fin_series, for
                quality_gates, scenarios, sector_drivers, valuation)
 from .research_contract import canonical_period, fiscal_year_end_month
 
-VERSION = '4'
+VERSION = '5'
 
 
 def jsonable(value):
@@ -40,6 +40,9 @@ def run(data, proposal=None, decision=None):
     expect = expectations.compare(data, series, entity.entity_id)
     complete = completeness.assess(data, series, analysis, values, expect, entity.entity_id)
     scen = scenarios.evaluate(data, proposal, values, entity, anchor, refs)
+    from .forecast_sanity import assess as forecast_review
+    for row in scen['scenarios']:
+        row['sanity'] = forecast_review(anchor, row)
     _, profile = fin_analysis.sector_profile(entity.entity_id)
     engine = {'version': VERSION, 'entity_id': entity.entity_id, 'currency': entity.currency,
               'fiscal_year_end_month': fy_end, 'series': series, 'analysis': analysis, 'valuation': values,

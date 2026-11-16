@@ -7,19 +7,20 @@ import sys
 from pathlib import Path
 from stock_report import engine
 from stock_report import forecast
+from stock_report.forecast_attribution import change_report, compare_backtests
 from stock_report.models import Request, ResearchInput
 from stock_report.pipeline import prepare, finalize
 from stock_report.storage import read_json, write_json
 from pypdf import PdfReader
 
-SOURCES = [Path('reports/tsmc-2330-20261115/model-corrected-20261115/runs/d841541f67fd4f0599e13a75342b0b81'),
-           Path('reports/dell-v2-20261115/model-corrected-20261115/runs/0f7947519c334c3cbab177e4155d93a2')]
+SOURCES = [Path('reports/tsmc-2330-20261115/forecast-reliability-20261116/runs/3bfd2161a3ff474a981e7ae51214cbae'),
+           Path('reports/dell-v2-20261115/forecast-reliability-20261116/runs/1f6e6d0c28b1445ab8f6bc84d50e5ca2')]
 
 
 def regenerate(source):
     original = read_json(source/'research_input.json')
     old = read_json(source/'investment.json')
-    root = source.parent.parent.parent/'forecast-reliability-20261116'
+    root = source.parent.parent.parent/'forecast-normalized-20261116'
     result = prepare(Request.model_validate(original['request']), root/'runs', original)
     run = Path(result['research_input_path']).parent
     contract = {name: (run/name).read_text() for name in
@@ -46,19 +47,20 @@ def regenerate(source):
         scenario['forecast_method'] = 'quarterly'
         scenario['leading_indicators'] = scenario['catalysts']
         if name == 'base':
+            scenario['growth_policy'] = 'level_carry_forward'
             d = scenario['drivers']['revenue_growth']
-            d.update(value=growth, basis='model_assumption', evidence_ids=a['drivers']['revenue_growth']['evidence_ids'],
-                     source_period='最近兩季營收年增率',
+            d.update(value=growth, basis='model_assumption', evidence_ids=a['series']['quarters']['revenue'][-1]['evidence_ids'],
+                     source_period=str(a['series']['quarters']['revenue'][-1]['end']),
                      forecast_period=scenario['target_period'], accounting_basis='reported',
-                     derivation=f'各季去年同期營收 × (1 + 最近兩季年增率中位數 {growth:.4f}%)；僅指引實際季度用其同口徑中值覆蓋，四季相加。')
-            d['rationale'] = '歷史同季季節性與最近兩季成長趨勢的機械延用，不是已驗證預測；不將指引外推其他季度。'
+                     derivation='各未受指引覆蓋季度保留最新已報營收水準；年增率由去年同季比較基期計算。0 表示不另加水準成長，不是各季年增0%。四季相加。')
+            d['rationale'] = '移除最近兩季例外年增率重複外推；短歷史無法分離趨勢與季節性，不虛構季節因子或衰減係數。機械參考，不是已驗證預測。'
             if is_tw:
                 scenario['guidance_fx_rate'] = 31.8
                 scenario['guidance_fx_evidence_ids'] = ['tsmc-q4-gm-guidance-low']
             scenario['drivers']['operating_margin']['value'] = margin
             scenario['drivers']['operating_margin']['basis'] = 'model_assumption'
-            scenario['drivers']['operating_margin']['derivation'] = '最近兩季營業利益率加權平均，疊加去年同季對 TTM 的季節差；非公司年度指引。'
-            scenario['financial_outcome'] = '四季逐季推估：去年同季季節性×最近兩季成長趨勢；公司指引僅覆蓋其季度。營益率採近期趨勢與歷史季節差；OCF／FCF 因缺完整現金流量表勾稽而停止預測。單季年化僅另存敏感度，不作 Base。'
+            scenario['drivers']['operating_margin']['derivation'] = '以 TTM 利潤率作機械參考，不重複疊加最近兩季利潤改善及去年季節差；非公司指引。'
+            scenario['financial_outcome'] = '最新已報營收水準作機械參考，僅指引季度覆蓋；年增隨基期變動，不設成長上限或擬合衰減。未證實季節性；利潤率用 TTM，OCF／FCF 仍封鎖。'
         else:
             # Keep the original stress cases unless they no longer bracket the new Base.
             if name == 'bull':
@@ -116,6 +118,18 @@ def regenerate(source):
                    'revenue': 53.3e9 * 31.8 * 4 if is_tw else 49e9 * 4,
                    'limitation': '固定三季持平、無季節性的純敏感度；不納入 Base 或回測。'}}
     write_json(root/'comparison.json', summary)
+    attribution = change_report(a, summary['old_base'], summary['new_base'])
+    attribution['backtest_comparison'] = compare_backtests(summary['old_backtest'], summary['backtest'])
+    attribution['source_run'], attribution['run'] = str(source), str(run)
+    write_json(run/'forecast_attribution.json', engine.jsonable(attribution))
+    import os
+    write_json(run/'cashflow_mapping_audit.json', {
+        'reconciliation': inv['forecast']['reconciliation'],
+        'acquisition_status': 'operator_contact_available_not_collected_by_this_offline_review' if os.environ.get('STOCK_REPORT_SEC_CONTACT') else 'not_attempted_missing_operator_sec_contact',
+        'taxonomy_reference': 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces',
+        'issuer_instance_reference': 'https://www.sec.gov/Archives/edgar/data/1571996/000157199626000030/dell-20260501_htm.xml' if not is_tw else None,
+        'issuer_scope_limitation': 'TSMC needs IFRS/TWD 6-K or issuer statements; the current US-GAAP/USD 10-Q/10-K concept adapter cannot replace them.' if is_tw else 'Dell custom taxonomy, other operating assets/liabilities and statement-context coverage still require filing-level review.',
+        'source_permissions_changed': False})
     print(json.dumps({'run': str(run), 'base_growth': growth, 'base_outputs': summary['new_base']['statements'],
                       'residual': summary['reconciliation']['residual'], 'backtest_metrics': summary['backtest']['metrics'],
                       'revised_metrics': summary['backtest']['revised_diagnostic']['metrics'],
@@ -124,6 +138,8 @@ def regenerate(source):
 
 
 if __name__ == '__main__':
+    import os
+    print('SEC operator contact configured:', bool(os.environ.get('STOCK_REPORT_SEC_CONTACT')))
     parser = argparse.ArgumentParser()
     parser.add_argument('--regenerate', action='store_true')
     parser.add_argument('--qa', action='store_true')

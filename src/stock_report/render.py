@@ -118,6 +118,16 @@ def render(data, decision, mapping, path, company_research=None, investment=None
         env.filters['money'] = lambda v, cur=currency: format_amount(v, cur, cur)
         env.filters['pct'] = lambda v, d=1: '—' if v is None else f'{v:,.{d}f}%'
         env.filters['num'] = lambda v, d=2: '—' if v is None else f'{v:,.{d}f}'
+        from .scenarios import round_sig
+        from math import floor, log10
+        def forecast_num(v):
+            if v is None:
+                return '—'
+            x = round_sig(v)
+            places = max(0, 1 - floor(log10(abs(x)))) if x else 0
+            return f'{x:,.{places}f}'
+        env.filters['forecast_num'] = forecast_num
+        env.filters['forecast_money'] = lambda v: '—' if v is None else forecast_num(v / 1e8) + (' 億元' if currency == 'TWD' else ' 億美元')
         env.filters['status'] = lambda s: STATUS_LABELS.get(s, s)
         context.update(inv=investment, charts=charts_for(investment), currency=currency, method_labels=METHOD_LABELS,
                        basis_labels={'historical_fact': '歷史事實', 'management_guidance': '公司指引', 'guidance_informed_model': '衍生假設',

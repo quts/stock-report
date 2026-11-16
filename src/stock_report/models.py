@@ -508,6 +508,7 @@ class ScenarioProposal(Model):
     # the deterministic historical anchor and are labelled historical_fact.
     drivers: dict[ForecastDriver, Assumption] = Field(default_factory=dict)
     forecast_method: Literal['quarterly', 'annual_sensitivity'] = 'quarterly'
+    growth_policy: Literal['explicit_yoy', 'level_carry_forward'] = 'explicit_yoy'
     guidance_fx_rate: float | None = Field(default=None, gt=0)
     guidance_fx_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
     assumptions: list[Assumption] = Field(default_factory=list, max_length=8)
@@ -549,7 +550,7 @@ class HorizonProposal(Model):
 class Proposal(Model):
     input_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     model: str
-    prompt_version: Literal['6'] = '6'
+    prompt_version: Literal['7'] = '7'
     usage: dict[str, int] | None = None
     outlooks: list[HorizonProposal] = Field(max_length=10)
     company_research: list[CompanyResearch] = Field(default_factory=list, max_length=5)

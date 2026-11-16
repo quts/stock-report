@@ -30,10 +30,15 @@ def reconcile(series):
         p = match(total)
         selected = {total: p} if p else {name: v for name in details if (v := match(name)) is not None}
         ids.extend(i for v in selected.values() for i in v['evidence_ids'])
-        return {name: v['value'] for name, v in selected.items()}, p is not None
+        return {name: v['value'] for name, v in selected.items()}, p is not None or all(name in selected for name in details)
 
     noncash, nc_total = category('cf_other_noncash_adjustments', NONCASH)
     wc, wc_total = category('cf_working_capital_cash_movement', WORKING_CAPITAL)
+    missing = ([] if da else ['depreciation_amortization'])
+    if not nc_total:
+        missing += [name for name in NONCASH if match(name) is None]
+    if not wc_total:
+        missing += [name for name in WORKING_CAPITAL if match(name) is None]
     if da:
         ids.extend(da['evidence_ids'])
     # Missing categories remain explicitly incomplete even when the numeric residual is zero.
@@ -50,4 +55,9 @@ def reconcile(series):
             'modelled_ocf': reconstructed, 'actual_ocf': ref['value'], 'residual': residual,
             'residual_percent_ocf': residual / abs(ref['value']) * 100 if ref['value'] else None,
             'complete_categories': complete, 'tolerance': tolerance, 'evidence_ids': sorted(set(ids)),
+            'missing_components': missing,
+            'mapping_limitations': ['Source contracts previously collected no cf_* roles.',
+                'Companyconcept supplies standard entity-wide tags, not issuer custom taxonomy or segment contexts.',
+                'Asset-increase tags require negative cash signs; financing receivables are cash movements, not financing-receivable balance changes.',
+                'An exact total requires the statement presentation, all other operating lines and compatible periods; no zero residual is manufactured.'],
             'limitation': '僅使用現金流量表已核實項目；未取得項目不代表零。餘額變化另列近似診斷，未解釋殘差禁止外推。'}

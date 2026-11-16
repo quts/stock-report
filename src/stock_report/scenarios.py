@@ -123,7 +123,7 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                 if s.guidance_fx_rate and not fx_valid:
                     issues.append('指引歸因：換算匯率缺少核實來源，不使用跨幣別指引')
                 statements, quarter_rows = quarterly_project(forecast_anchor, drivers, guidance,
-                                                             s.guidance_fx_rate if fx_valid else None)
+                                                             s.guidance_fx_rate if fx_valid else None, s.growth_policy)
                 if statements:
                     for key in ('revenue_growth', 'operating_margin'):
                         drivers[key]['input_value'] = drivers[key]['value']
@@ -198,6 +198,8 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
         out.append({'name': s.name, 'target_period': s.target_period, 'financial_outcome': s.financial_outcome,
                     'forecast_method': s.forecast_method, 'quarterly_forecast': quarter_rows,
                     'forecast_reliability': 'hypothetical_sensitivity',
+                    'confidence_class': 'mechanical_scenario', 'validation_status': 'not_validated',
+                    'valuation_is_price_target': False, 'display_significant_digits': 2,
                     'assumptions': [a.model_dump() for a in s.assumptions], 'drivers': drivers, 'statements': statements,
                     'valuation': {'metric': metric_name, 'metric_value': metric_value, 'method': s.multiple_method,
                                   'multiple': s.multiple, 'multiple_basis': s.multiple_basis,
@@ -205,7 +207,7 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
                                   'reference': None if ref is None else {k: ref.get(k) for k in ('status', 'stats')}},
                     'evidence_based_multiple': evidence_based,
                     'implied_price': None if value is None else round(value, 4),
-                    'implied_price_display': None if value is None else (round(value, 0) if evidence_based else round_sig(value)),
+                    'implied_price_display': None if value is None else round_sig(value),
                     'reference_price': reference_price,
                     'change_vs_reference_percent': None if upside is None else round(upside, 2),
                     'catalysts': s.catalysts, 'invalidation_conditions': invalidation_text,
@@ -221,12 +223,15 @@ def evaluate(data, proposal, valuation, entity, forecast_anchor=None, references
     sensitivity = None
     if base and base['implied_price'] is not None:
         v = base['valuation']
-        shown = (lambda x: round(x, 2)) if basis == 'evidence_based' else round_sig
+        shown = round_sig
         sensitivity = {'metric': v['metric'], 'method': v['method'], 'reference_price': reference_price,
                        'metric_factors': list(SENSITIVITY_METRIC), 'multiple_factors': list(SENSITIVITY_MULTIPLE),
-                       'precision': 'exact' if basis == 'evidence_based' else 'two_significant_digits',
+                       'precision': 'two_significant_digits',
                        'grid': [[shown(implied_price(v['method'], v['metric_value'] * f, v['multiple'] * m,
                                                      valuation['market']) or 0)
                                  for m in SENSITIVITY_MULTIPLE] for f in SENSITIVITY_METRIC]}
     return {'status': 'invalid' if problems else 'available', 'scenarios': out, 'problems': problems,
-            'sensitivity': sensitivity, 'probabilities': 'not_assigned', 'valuation_basis': basis}
+            'sensitivity': sensitivity, 'probabilities': 'not_assigned', 'valuation_basis': basis,
+            'forecast_confidence': 'mechanical_scenario',
+            'confidence_classes': ['mechanical_scenario', 'evidence_supported_forecast', 'validated_forecast'],
+            'confidence_note': 'Multiple references and arithmetic do not validate financial forecasts. Sample insufficiency lowers confidence, never removes computable earnings sensitivity. No validated forecast is asserted.'}

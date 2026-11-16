@@ -52,6 +52,13 @@ def build(data, entity_id):
                 e.period_basis)].append(e)
     windows = {}
     for key, rows in groups.items():
+        # Preserve all vintages in evidence. Build a series from the latest available version
+        # per source at its evaluation clock, rather than treating amendments as source conflicts.
+        latest = {}
+        for r in rows:
+            source = r.license_source_id or r.source_url
+            latest[source] = max(latest.get(source, r.published_at), r.published_at)
+        rows = [r for r in rows if r.published_at == latest[r.license_source_id or r.source_url]]
         values = [r.value for r in rows]
         low, high = min(values), max(values)
         if high - low > CONFLICT_TOLERANCE * max(abs(high), abs(low), 1e-12):

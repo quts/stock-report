@@ -134,6 +134,17 @@ def forecast_reliability_checks(engine):
                 alignment.append('公司指引套用至不同季度')
     out.append(check('quarterly_forecast_consistency', not broken, 'critical', '；'.join(broken) or '四季連續且年季損益與現金流合計一致；缺值不補零'))
     out.append(check('guidance_period_alignment', not alignment, 'critical', '；'.join(alignment) or '管理層指引僅適用其實際財務季度，不外推其他季度'))
+    rows = engine['scenarios']['scenarios']
+    review = [f'{r["name"]}：{s}' for r in rows for s in r.get('sanity', {}).get('signals', [])]
+    out.append(state('forecast_growth_sanity', 'WARNING' if review else 'PASS',
+                     '；'.join(review) or '已計算成長加速度、最近兩季敏感度及指引差距；不以任意成長上限截斷情境'))
+    precision = [r['name'] for r in rows if r.get('confidence_class') != 'validated_forecast' and
+                 (r.get('display_significant_digits', 99) > 2 or r.get('valuation_is_price_target'))]
+    false_validation = [r['name'] for r in rows if r.get('confidence_class') == 'validated_forecast' and
+                        (not enough or r.get('validation_status') != 'validated_by_independent_evaluation')]
+    out.append(check('forecast_confidence_precision', not precision and not false_validation, 'critical',
+                     f'信心／精度矛盾：{precision + false_validation}' if precision or false_validation else
+                     '未驗證情境以兩位有效數字顯示，計算與信心分開；歷史／同業倍數不代表預測已驗證'))
     return out
 
 
@@ -342,7 +353,11 @@ def model_checks(data, engine):
                     not rng[0] - slack <= drv['value'] <= rng[1] + slack:
                 fails.append(f'{r["name"]}：{name} {drv["value"]:.1f}% 標為歷史事實，但超出歷史區間 {rng[0]:.1f}–{rng[1]:.1f}%')
         if g['value'] is not None and gr and g['basis'] not in ('management_guidance', 'consensus') and g['value'] > gr[1] + 10:
-            fails.append(f'{r["name"]}：營收成長 {g["value"]:.1f}% 高於歷史最高 {gr[1]:.1f}% 超過 10 個百分點，且沒有指引或共識支持')
+            supported_quarter = any(q['revenue_origin']['method'] == 'management_guidance_midpoint' for q in r.get('quarterly_forecast', []))
+            if supported_quarter:
+                warns.append(f'{r["name"]}：成長高於歷史區間，但包含同季度已核實指引；保留數值、逐季查核支持範圍，不截斷成長')
+            else:
+                fails.append(f'{r["name"]}：營收成長 {g["value"]:.1f}% 高於歷史最高 {gr[1]:.1f}% 超過 10 個百分點，且沒有指引或共識支持')
         if m['value'] is not None and mr and m['basis'] not in ('management_guidance', 'consensus') and m['value'] > mr[1] + 5:
             fails.append(f'{r["name"]}：營業利益率 {m["value"]:.1f}% 高於歷史最高 {mr[1]:.1f}% 超過 5 個百分點，且沒有證據支持')
         if g['source'] == 'historical_anchor' and anchors.get('revenue_growth', {}).get('status') == 'extreme':
