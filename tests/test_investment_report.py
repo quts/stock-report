@@ -45,6 +45,19 @@ def test_missing_price_is_published_as_a_clearly_limited_report(tmp_path):
     assert '受限報告' in text and '估值不可用' in text
 
 
+def test_investment_source_index_retains_citations_and_omits_unused_technical_sources(tmp_path):
+    data = dell()
+    probe = next(e for e in data.evidence if e.financial_metric == 'revenue').model_copy(update={
+        'evidence_id': 'unused-cash-detail', 'financial_metric': 'cf_detail_diagnostic_only',
+        'source_url': 'https://example.test/unused-financial-diagnostic',
+        'publisher': 'UnusedDiagnosticPublisher', 'attribution': 'UnusedDiagnosticAttribution'})
+    data.evidence.append(probe)
+    _, text, inv = render_fixture(tmp_path, data, proposal_for(data))
+    assert 'UnusedDiagnosticPublisher' not in text and 'UnusedDiagnosticAttribution' not in text
+    assert inv['series']['quarters']['cf_detail_diagnostic_only']  # Preserved in the audit engine.
+    assert '來源索引' in text
+
+
 def test_pipeline_writes_investment_inputs_and_audit_for_investment_profile(tmp_path):
     request = Request(mode='stock', ticker='NVDA', exchange='NASDAQ', research_as_of='2026-11-14T17:00:00+08:00',
                       report_profile='investment', max_pdf_pages=8)

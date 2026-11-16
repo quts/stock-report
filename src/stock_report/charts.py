@@ -82,7 +82,7 @@ def scenario_bars(rows, reference=None, unit='', width=520, height=150):
     for i, r in enumerate(rows):
         y = top + i * (bar_h + gap)
         bw = r['implied_price'] / hi * w
-        parts.append(f'<text x="{left - 6}" y="{y + bar_h * 0.65:.1f}" font-size="9" text-anchor="end" fill="{INK}">{r["name"].title()}</text>')
+        parts.append(f'<text x="{left - 6}" y="{y + bar_h * 0.65:.1f}" font-size="9" text-anchor="end" fill="{INK}">{escape(r.get("investor_label") or r["name"].title())}</text>')
         parts.append(f'<rect x="{left}" y="{y}" width="{bw:.1f}" height="{bar_h}" fill="{colors[r["name"]]}"/>')
         parts.append(f'<text x="{left + bw + 4:.1f}" y="{y + bar_h * 0.65:.1f}" font-size="9" fill="{INK}">{r["implied_price"]:,.0f}{unit}</text>')
     if reference:

@@ -85,9 +85,13 @@ def anchors(series, analysis):
     base['cashflow_reconciled'] = bool(rev and reconciliation['status'] == 'reconciled' and
                                       (reconciliation['start'], reconciliation['end'], reconciliation['currency']) ==
                                       (rev['start'], rev['end'], rev['currency']))
-    base['cashflow_ratios'] = ({'other_noncash': reconciliation['noncash_adjustments'] / rev['value'],
+    base['historical_cashflow_ratios'] = ({'other_noncash': reconciliation['noncash_adjustments'] / rev['value'],
                                'working_capital_cash_movement': reconciliation['working_capital_cash_movement'] / rev['value']}
                               if base['cashflow_reconciled'] and rev else None)
+    # A historical statement bridge does not justify revenue-proportional cash collection,
+    # financing receivables, deferred revenue or recurring investment gains in future quarters.
+    base['cashflow_ratios'] = None
+    base['cashflow_forecast_limitation'] = '歷史勾稽不等於未來現金轉換假設；未建立可核實的營運資金、非現金調整及實付稅額路徑，OCF／FCF 預測維持封鎖。'
     put('ocf_residual_intensity', None,
         '未解釋殘差禁止外推；現金流量表無法完整勾稽時不產生 OCF／FCF 預測',
         reconciliation.get('evidence_ids', []))
@@ -164,12 +168,26 @@ def quarterly_project(anchor, drivers, guidance=(), fx_rate=None, growth_policy=
         return None, []
     historical_margin = (base['operating_income_ttm']['value'] / prior_rev['value'] * 100
                          if base['operating_income_ttm'] else None)
-    for w in windows:
+    from . import candidates
+    candidate_path = None
+    if policy in candidates.CANDIDATES and policy != 'level_carry_forward':
+        candidate_path = candidates.path(policy, series['quarters'].get('revenue', []))
+        if candidate_path['status'] != 'applicable':
+            return None, []
+    for i, w in enumerate(windows):
         prior = w['prior']
         d = {k: dict(v) for k,v in drivers.items()}
         origin = {'method': 'same_quarter_yoy_trend', 'evidence_ids': prior['evidence_ids'],
                   'growth_assumption': d['revenue_growth']['value']}
-        if policy == 'level_carry_forward':
+        if candidate_path is not None:
+            value = candidate_path['values'][i]
+            d['revenue_growth']['value'] = (value / prior['value'] - 1) * 100
+            spec = candidates.SPECS[policy]
+            origin = {'method': f'candidate:{policy}', 'candidate': policy, 'evidence_ids': candidate_path['evidence_ids'],
+                      'formula': spec['formula'], 'rule_revenue': value, 'comparison_period_end': prior['end'].isoformat(),
+                      'growth_assumption': d['revenue_growth']['value'],
+                      'limitation': f'機械候選路徑：{spec["assumes"]}。年增率由去年同季比較基期換算，不是需求證據。'}
+        elif policy == 'level_carry_forward':
             latest = series['quarters']['revenue'][-1]
             d['revenue_growth']['value'] = (latest['value'] / prior['value'] - 1) * 100
             origin = {'method': 'latest_reported_level_reference', 'evidence_ids': latest['evidence_ids'],
@@ -216,6 +234,7 @@ def quarterly_project(anchor, drivers, guidance=(), fx_rate=None, growth_policy=
         rows.append({'start': w['start'], 'end': w['end'], 'calendar_basis': w['calendar_basis'],
                      'revenue_origin': origin, 'statements': s, 'growth_policy': policy,
                      'revenue_confidence': 'evidence_supported_forecast' if origin['method'] == 'management_guidance_midpoint' else 'mechanical_scenario',
+                     'hierarchy': 'evidence_supported_forecast' if origin['method'] == 'management_guidance_midpoint' else 'mechanical_sensitivity',
                      'confidence_scope': 'revenue_input_only_not_whole_statement_or_statistical_validation',
                      'operating_margin_origin': {'method': 'explicit_yoy_seasonal_shift' if policy == 'explicit_yoy' else 'ttm_margin_reference',
                                                  'evidence_ids': drivers['operating_margin']['evidence_ids']}})

@@ -159,6 +159,8 @@ def finalize(directory, proposal_path, mapping_path):
             'forecast_backtest': investment['forecast'].get('backtest'),
             'forecast_notes': investment['forecast']['notes'], 'scenario_problems': investment['scenarios']['problems'],
             'sector_drivers_unavailable': investment['sector_drivers']['unavailable']}))
+        # Forecast-model QA: candidates, retrospectives, filing vintages, stability, nonpredictive FCF.
+        write_json(directory / 'forecast_qa.json', engine.public(engine.forecast_qa(investment)))
     # File output is transactional: the personal PDF is written only after all checks pass.
     temp_pdf = directory / '.report.pending.pdf'
     try:
@@ -189,7 +191,7 @@ def finalize(directory, proposal_path, mapping_path):
     write_json(directory / 'ai_proposal.json', proposal)
     write_json(directory / 'rating_mapping.json', mapping)
     artifacts = ['research_input.json', 'ai_proposal.json', 'rating_mapping.json', 'evidence.json', 'evidence.sqlite', 'decision.json', 'research.json', 'report.pdf']
-    for optional in ('statement_metrics.json', 'investment.json', 'investment_inputs.json', 'qa.json'):
+    for optional in ('statement_metrics.json', 'investment.json', 'investment_inputs.json', 'qa.json', 'forecast_qa.json'):
         if (directory / optional).exists():
             artifacts.append(optional)
     manifest = {'run_id': prepared['run_id'], 'created_at': datetime.now(timezone.utc).isoformat(),

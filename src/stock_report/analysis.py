@@ -24,6 +24,7 @@ scenarios：bull、base、bear 各一；target_period 必須等於 investment_in
 不要直接指定 EPS：以 drivers（revenue_growth、operating_margin、non_operating_ratio、tax_rate、share_change、da_intensity、capex_intensity，皆為百分比）描述營運假設，程式逐季推導營收、淨利、EPS 與 CapEx，四季合計 NTM。
 Base 必須 forecast_method=quarterly：使用同季去年季節性、近期趨勢及明示假設。單季指引僅適用其實際季度；跨幣別換算需 guidance_fx_rate 與已核實 guidance_fx_evidence_ids。annual_sensitivity 僅作另列敏感度，不能作為 Base。
 短歷史不能把去年成長軌跡當成可重現季節性，不能將最近兩季例外年增率反覆外推。growth_policy=level_carry_forward 是最新已報水準的機械參考，0 表示不另加水準成長而非年增0%；比較基期效果逐季揭露。explicit_yoy 保留作明示敏感度，高成長有同季度證據時不任意截斷。無充分資料不擬合衰減係數。
+營收路徑優先使用 investment_inputs.json 的 forecast.candidates（seasonal_naive、level_carry_forward、trailing_mean_level、drift、seasonal_yoy_trend），以 revenue_candidate 指定；候選是條件式機械敏感度，指引只覆蓋其實際季度。forecast.candidates.selected 為空時不得把 Base 寫成最可能情境，Base 只是參考路徑。預測層級分為機械敏感度、證據支持的預測（僅指引季度）、經時點回測的預測；修訂資料回顧不能升級任何路徑。每個情境以 supporting／contradicting 各列引用證據的正反理由；訂單、積壓等產業驅動因素只作背景，轉換時程未揭露時不換算成營收。
 計算情境、證據支持的單季輸入與統計驗證分開；未驗證的前瞻財務輸出用兩位有效數字，保留原始精度於本機稽核。歷史／同業倍數不能把假設財務變成已驗證目標價。
 OCF 需現金流量表非現金調整與有符號營運資金現金變動完整勾稽；餘額變化不是現金流，working_capital_intensity 僅診斷，禁止外推 ocf_residual_intensity。資料不全則 OCF／FCF 留白，不自行補值。
 每個 driver 須有 source_period、forecast_period、accounting_basis、derivation；逐季推估的衍生數字不可標為直接 management_guidance。operating_invalidations 須以同 NTM 期間營收成長、營業利益率的反向門檻檢驗，leading_indicators 另列。

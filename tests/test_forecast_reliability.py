@@ -4,6 +4,8 @@ import pytest
 from stock_report import engine, forecast, fin_series
 from stock_report.backtesting import snapshot, scores, METRICS
 from stock_report.cashflow import reconcile
+from stock_report.cashflow import IFRS_NONCASH, IFRS_WORKING_CAPITAL
+from stock_report.fin_analysis import analyse
 from engine_fixtures import dell, fin
 from test_investment_engine import proposal_for, default_scenarios, gate
 
@@ -31,6 +33,10 @@ def test_signed_statement_components_reconstruct_ocf_without_balance_proxies():
     assert r['modelled_ocf'] == r['actual_ocf'] == 380 and r['residual'] == 0
     series['instants']['accounts_payable'] = [{'value': 1e12}]  # Balance changes cannot alter the cash bridge.
     assert reconcile(series) == r
+    a = forecast.anchors(series, analyse(dell(), series, 'DELL'))
+    assert a['base']['cashflow_reconciled'] is True
+    assert a['base']['historical_cashflow_ratios'] is not None
+    assert a['base']['cashflow_ratios'] is None  # Reconciled history cannot authorize a forecast.
 
 
 def test_residual_is_not_an_automatic_balancing_item_or_forecast_driver():
@@ -61,6 +67,41 @@ def test_statement_totals_do_not_double_count_details_and_reject_period_or_curre
     for p in series['quarters']['cf_working_capital_cash_movement']:
         p['currency'] = 'TWD'
     assert reconcile(series)['status'] == 'partial'
+
+
+def ifrs_statement_series():
+    series = bridge_series()
+    for metric in ('cf_other_noncash_adjustments', 'cf_working_capital_cash_movement'):
+        del series['quarters'][metric]
+    template = series['quarters']['net_income']
+    for metric, value in [('cf_statement_starting_profit', 125), ('cf_income_taxes_paid', -25),
+                          *[(m, 1) for m in IFRS_NONCASH], *[(m, -2) for m in IFRS_WORKING_CAPITAL]]:
+        series['quarters'][metric] = [dict(p, metric=metric, value=value) for p in template]
+    return series
+
+
+def test_ifrs_statement_reconciles_from_pretax_profit_and_actual_cash_tax_without_enabling_forecast():
+    series = ifrs_statement_series()
+    rec = reconcile(series)
+    assert rec['status'] == 'reconciled' and rec['residual'] == 0
+    assert rec['starting_profit'] == 500 and rec['net_income'] == 400
+    assert rec['income_taxes_paid'] == -100 and rec['forecast_compatible'] is False
+    anchor = forecast.anchors(series, analyse(dell(), series, 'DELL'))
+    assert anchor['base']['cashflow_reconciled'] is True
+    assert anchor['base']['cashflow_ratios'] is None
+    del series['quarters']['cf_income_taxes_paid']
+    assert reconcile(series)['status'] == 'partial'
+    assert 'cf_income_taxes_paid' in reconcile(series)['missing_components']
+
+
+def test_missing_ifrs_line_is_not_zero_even_if_numeric_residual_happens_to_be_zero():
+    series = ifrs_statement_series()
+    for p in series['quarters']['operating_cash_flow']:
+        p['value'] -= 1
+    del series['quarters'][IFRS_NONCASH[-1]]
+    rec = reconcile(series)
+    assert rec['residual'] == 0 and rec['status'] == 'partial'
+    assert IFRS_NONCASH[-1] in rec['missing_components']
 
 
 def test_quarterly_guidance_is_applied_once_and_all_statements_aggregate():

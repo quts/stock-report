@@ -51,6 +51,18 @@ def test_live_excerpt_contract_retains_only_normalized_facts():
     assert 'never-retain' not in c.model_dump_json()
 
 
+@pytest.mark.parametrize('token,expected', [('-', 0), ('( 454 )', -454000000)])
+def test_reviewed_statement_dash_and_spaced_parentheses_have_explicit_amounts(token, expected):
+    p = plan()
+    row = 'Other noncash adjustment ' + token
+    p['facts'][0].update(excerpts=[row], kind='financial', financial_metric='cf_other_noncash',
+                         numeric_text=token, number_scale=1000000, unit='USD', currency='USD',
+                         period_start='2026-01-01', period_end='2026-09-30', period_basis='cumulative_ytd',
+                         accounting_basis='gaap')
+    c = collect(p, Client('<p>NVIDIA</p><p>' + row + '</p>'))
+    assert c.observations[0].value == expected
+
+
 @pytest.mark.parametrize('url', [URL.replace('/1045810/', '/2488/'), URL.replace('www.sec.gov', 'evil.example')])
 def test_wrong_issuer_or_host_blocked_before_network(url):
     p, client = plan(), Client()

@@ -14,6 +14,34 @@ TOLERANCE = 0.006
 
 
 STATUS = {'critical': 'FAIL', 'warning': 'WARNING'}
+# Investor-facing names; raw check IDs and technical details stay in qa.json.
+GATE_LABELS = {
+    'price_recency': '收盤價時效', 'currency_unit_consistency': '幣別與單位一致', 'conflicting_data': '來源數值衝突',
+    'fiscal_period_consistency': '會計期間連續性', 'source_traceability': '來源可回溯', 'calculation_correctness': '估值重算',
+    'gaap_non_gaap_compatibility': '報表與調整後口徑分離', 'guidance_consensus_labeling': '指引與共識分開',
+    'mandatory_fields': '必要資料', 'valuation_assumption_disclosure': '估值假設揭露', 'unsupported_numbers': '正文數字有依據',
+    'unsupported_causal_claims': '因果敘述證據', 'section_contradictions': '章節結論一致',
+    'valuation_method_suitability': '估值方法適用性', 'assumption_evidence_quality': '關鍵假設的證據',
+    'valuation_reference_quality': '倍數參照', 'scenario_internal_consistency': '情境內部一致',
+    'scenario_uncertainty_disclosure': '不確定性揭露', 'forecast_period_consistency': '預測期間一致',
+    'forecast_input_provenance': '預測輸入來源', 'scenario_invalidation_logic': '情境推翻條件',
+    'ocf_reconciliation': '營業現金流勾稽', 'forecast_backtest': '歷史回測', 'operating_conclusion_consistency': '營運假設排序',
+    'cash_flow_statement_reconciliation': '現金流量表完整度', 'point_in_time_backtest_integrity': '回測不使用未來資料',
+    'forecast_sample_sufficiency': '時點回測樣本', 'quarterly_forecast_consistency': '季度加總一致',
+    'guidance_period_alignment': '指引季度對齊', 'forecast_growth_sanity': '成長假設檢視',
+    'forecast_confidence_precision': '精度與信心一致', 'forecast_hierarchy_integrity': '預測層級標示',
+    'historical_fcf_nonpredictive': '歷史現金流不當作預測'}
+READER_DETAIL = {
+    'price_recency': None,
+    'cash_flow_statement_reconciliation': '現金流量表的非現金調整與營運資金明細不完整，因此不預測未來營業現金流與自由現金流；只列歷史實際值。',
+    'forecast_sample_sufficiency': '各指標的時點回測樣本數或覆蓋仍不足；有歷史樣本不代表整體情境已驗證，現金流另需可支持的前瞻假設。',
+    'forecast_backtest': '歷史留出樣本有限；計算一致不代表預測可靠。',
+    'ocf_reconciliation': '營業現金流與已取得的現金流量表項目之間仍有未解釋差額，不外推。',
+    'forecast_growth_sanity': '至少一個情境的營收成長高於歷史觀察區間，需有證據支持；本報告不設成長上限。',
+    'assumption_evidence_quality': '參考路徑的營收與利潤率是機械規則或模型假設，沒有指引、共識或回測直接支持。',
+    'valuation_reference_quality': '缺少足量歷史或同業倍數，情境倍數是假設；每股數值是敏感度，不是目標價。',
+    'mandatory_fields': None}
+READER_DETAIL = {k: v for k, v in READER_DETAIL.items() if v}
 
 
 def check(name, passed, severity, detail):
@@ -60,7 +88,8 @@ def economic_checks(data, engine):
     out.append(check('scenario_invalidation_logic', not weak, 'critical', '；'.join(weak) or '失效門檻直接推翻同期間營運假設；領先指標另列'))
     recon = (forecast or {}).get('reconciliation', {})
     residual = recon.get('residual_percent_ocf')
-    out.append(state('ocf_reconciliation', 'WARNING' if residual is not None else 'FAIL',
+    out.append(state('ocf_reconciliation', 'PASS' if recon.get('status') == 'reconciled' else 'WARNING' if residual is not None else 'FAIL',
+                     '同期間實際現金流量表已勾稽；歷史核對不代表未來現金流預測可靠' if recon.get('status') == 'reconciled' else
                      f'未解釋殘差占實際 OCF {residual:+.1f}%；餘額變化非現金流明細，FCF 預測受限' if residual is not None else
                      '無法建立同期間現金流勾稽；不可宣稱 FCF 預測可靠'))
     bt = (forecast or {}).get('backtest', {})
@@ -145,6 +174,46 @@ def forecast_reliability_checks(engine):
     out.append(check('forecast_confidence_precision', not precision and not false_validation, 'critical',
                      f'信心／精度矛盾：{precision + false_validation}' if precision or false_validation else
                      '未驗證情境以兩位有效數字顯示，計算與信心分開；歷史／同業倍數不代表預測已驗證'))
+    out += hierarchy_checks(engine)
+    return out
+
+
+def hierarchy_checks(engine):
+    """Mechanical, evidence-supported and backtested levels stay distinct; no implicit most-likely Base."""
+    f, scen = engine['forecast'], engine['scenarios']
+    cands = f.get('candidates') or {}
+    selected = cands.get('selected')
+    wrong = [n for n, c in cands.get('candidates', {}).items()
+             if c['hierarchy'] == 'backtested_forecast' and n != selected and
+             not cands.get('selection_status', '').startswith('multiple_candidates_backtested')]
+    wrong += [f'{n}（只有部分季度有指引）' for n, c in cands.get('candidates', {}).items()
+              if c['hierarchy'] == 'evidence_supported_forecast' and not all(q['guided'] for q in c['quarters'])]
+    for n, c in cands.get('candidates', {}).items():
+        if c['hierarchy'] == 'backtested_forecast' and not (c.get('promotion_check') or {}).get('eligible'):
+            wrong.append(f'{n} 未通過全部時點回測前提')
+    for r in scen['scenarios']:
+        # Margins, tax, shares and multiples remain reference inputs: a scenario is never upgraded as a whole.
+        if r.get('hierarchy') in ('backtested_forecast', 'evidence_supported_forecast'):
+            wrong.append(f'{r["name"]} 整體情境不能因營收路徑或單季指引升級')
+        if r.get('revenue_candidate_hierarchy') == 'backtested_forecast' and r.get('revenue_candidate') != selected:
+            wrong.append(f'{r["name"]} 營收路徑未經時點回測選出')
+        if r.get('confidence_class') == 'validated_forecast':
+            wrong.append(f'{r["name"]} 不得使用 validated_forecast 舊別名')
+    if scen['scenarios'] and not selected and scen.get('base_role') != 'reference_not_most_likely':
+        wrong.append('沒有時點證據選出路徑時，Base 只能是參考路徑')
+    revised = ((engine.get('retrospective') or {}).get('revised_data') or {})
+    if revised.get('promotes_candidates'):
+        wrong.append('修訂資料回顧不得選出候選路徑')
+    out = [check('forecast_hierarchy_integrity', not wrong, 'critical', '；'.join(wrong) or
+                 '機械敏感度、證據支持（僅指引季度）與時點回測分開標示；證據不足時不指定最可能路徑')]
+    rec = f['reconciliation']
+    hist = ((engine.get('historical_fcf') or {}).get('history') or {})
+    leaked = [r['name'] for r in scen['scenarios'] if (rec['status'] != 'reconciled' or not f['base'].get('cashflow_ratios')) and r.get('statements')
+              and (r['statements'].get('free_cash_flow') is not None or r['statements'].get('operating_cash_flow') is not None)]
+    bad = leaked or hist.get('predictive') is not False or hist.get('forecast_fields_populated')
+    out.append(check('historical_fcf_nonpredictive', not bad, 'critical',
+                     f'歷史 FCF 敏感度不可填入預測欄位：{leaked}' if bad else
+                     '歷史 FCF 敏感度只用同期間實際值，標為非預測；歷史勾稽與前瞻假設均充分前，情境 OCF／FCF 維持空白'))
     return out
 
 
@@ -196,6 +265,16 @@ def engine_values(engine):
     for d in (engine.get('forecast') or {}).get('drivers', {}).values():
         if isinstance(d.get('value'), (int, float)):
             vals.append(d['value'])
+    for c in ((engine.get('forecast') or {}).get('candidates') or {}).get('candidates', {}).values():
+        vals += [v for v in (c.get('ntm_revenue'), c.get('ntm_growth_percent'), c.get('reference_eps')) if v is not None]
+        vals += [q['value'] for q in c.get('quarters', [])]
+        vals += [x for x in c.get('latest_quarter_change_percent', []) if x is not None]
+        vals += [q['guidance_vs_rule_percent'] for q in c.get('quarters', []) if q.get('guidance_vs_rule_percent') is not None]
+    for r in (engine.get('reverse_valuation') or {}).get('rows', []):
+        vals += [r['required_eps'], r['required_ntm_revenue_at_reference_margin'], r['required_growth_vs_ttm_percent'],
+                 r['required_operating_margin_at_reference_revenue']]
+    for row in ((engine.get('historical_fcf') or {}).get('history') or {}).get('rows', []):
+        vals += [v for k, v in row.items() if isinstance(v, (int, float)) and not isinstance(v, bool)]
     for d in (engine.get('sector_drivers') or {}).get('drivers', []):
         if isinstance(d.get('value'), (int, float)):
             vals.append(d['value'])
@@ -221,6 +300,9 @@ def paragraphs(proposal, entity_id):
     for o in proposal.outlooks if proposal else []:
         if o.entity_id == entity_id:
             out.append(('outlook', o.interpretation, o.supporting_evidence_ids + o.counter_evidence_ids))
+    for s in proposal.scenarios if proposal else []:
+        if s.entity_id == entity_id:
+            out += [(f'scenario_{s.name}', p.text, p.evidence_ids) for p in [*s.supporting, *s.contradicting]]
     return out
 
 
@@ -316,6 +398,14 @@ def run(data, proposal, engine, entity, decision=None):
     results += model_checks(data, engine)
     if engine['scenarios']['scenarios']:
         results += economic_checks(data, engine)
+    labels = {f['field']: f['label'] for f in engine['completeness']['fields']}
+    for r in results:
+        r['label'] = GATE_LABELS.get(r['check'], r['check'])
+        r['reader_detail'] = READER_DETAIL.get(r['check'], r['detail'])
+        if r['check'] == 'price_recency' and r['detail']:
+            r['reader_detail'] = re.sub(r'^(收盤價過期：)?\S+ 收盤日', r'\1收盤日', r['detail'])
+        if r['check'] == 'mandatory_fields' and gaps_mandatory:
+            r['reader_detail'] = '缺少必要資料：' + '、'.join(labels.get(g, g) for g in gaps_mandatory)
     critical = [r for r in results if r['status'] == 'FAIL']
     return {'grade': 'limited' if critical else 'complete', 'checks': results,
             'critical_failures': [r['check'] for r in critical],

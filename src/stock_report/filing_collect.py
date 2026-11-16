@@ -113,8 +113,9 @@ def collect_filings(ticker, *, registry, allow_network, plan, client, now=None):
                 raise ValueError('Numeric token must be inside a reviewed live excerpt')
             token = fact.numeric_text.replace(',', '').replace('$', '').strip()
             if token.startswith('(') and token.endswith(')'):
-                token = '-' + token[1:-1]
-            value = float(token) * fact.number_scale
+                token = '-' + token[1:-1].strip()
+            # A reviewed statement dash explicitly represents a zero amount, not an invented residual.
+            value = (0.0 if token == '-' else float(token)) * fact.number_scale
         if fact.kind == 'financial' and (value is None or not fact.financial_metric
                                          or fact.period_end is None or fact.period_basis is None):
             raise ValueError('Financial observations require a numeric token, metric and reporting window')

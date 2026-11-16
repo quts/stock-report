@@ -283,7 +283,8 @@ PROFILES = {
             'depreciation_amortization': {'concepts': ['DepreciationDepletionAndAmortization', 'DepreciationAndAmortization'], 'units': ['USD'], 'unit': 'USD'},
             'cf_share_based_compensation': {'concepts': ['ShareBasedCompensation'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},
             'cf_deferred_tax': {'concepts': ['DeferredIncomeTaxesAndTaxCredits', 'DeferredIncomeTaxExpenseBenefit'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},
-            'cf_other_noncash': {'concepts': ['OtherNoncashIncomeExpense'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},
+            # Positive noncash income is subtracted in the operating-cash-flow bridge.
+            'cf_other_noncash': {'concepts': ['OtherNoncashIncomeExpense'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
             'cf_receivables': {'concepts': ['IncreaseDecreaseInAccountsReceivable'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
             'cf_inventory': {'concepts': ['IncreaseDecreaseInInventories'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': -1},
             'cf_payables': {'concepts': ['IncreaseDecreaseInAccountsPayable'], 'units': ['USD'], 'unit': 'USD', 'cash_sign': 1},

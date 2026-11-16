@@ -103,6 +103,17 @@ def test_cash_movement_mapping_preserves_finance_receivable_sign_and_does_not_us
     assert 'accounts_receivable_net' not in values
 
 
+def test_noncash_income_tag_is_reversed_to_the_statement_adjustment_sign():
+    adapter = build_adapter('sec-xbrl-companyconcept', {'series': 'quarterly'})
+    args = {'revenue:Revenues': payload(100, '2026-09-08', '0001571996-26-000046'),
+            'net_income:NetIncomeLoss': payload(10, '2026-09-08', '0001571996-26-000046'),
+            'cf_other_noncash:OtherNoncashIncomeExpense': payload(454, '2026-09-08', '0001571996-26-000046')}
+    result = adapter.parse('DELL', args, datetime(2026, 11, 15, tzinfo=timezone.utc))
+    row = next(e for e in result.observations if e.financial_metric == 'cf_other_noncash')
+    assert row.value == -454
+
+
+
 def test_series_revision_selection_is_clock_aware_instead_of_false_source_conflict():
     data = dell()
     original = next(e for e in data.evidence if e.financial_metric == 'revenue' and str(e.period_end) == '2025-08-01')
